@@ -1,0 +1,43 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nutribox-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:./dev.db
+      - JWT_SECRET=${JWT_SECRET:-super-secure-school-mealbox-jwt-secret-key-2026}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Vidyalaya NutriBox}
+      - SEED_ON_INIT=${SEED_ON_INIT:-false}
+    volumes:
+      # Mount host prisma folder so SQLite database persists across container restarts
+      - ./prisma:/app/prisma
+
+  # Optional: Automatic SSL / Reverse Proxy using Caddy
+  # To enable with your domain:
+  # 1. Put your domain in Caddyfile
+  # 2. Run: docker compose --profile https up -d
+  caddy:
+    image: caddy:2-alpine
+    container_name: nutribox-caddy
+    restart: unless-stopped
+    profiles:
+      - https
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:

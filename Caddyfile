@@ -1,0 +1,11 @@
+# ==========================================
+# Caddyfile - Automatic HTTPS Reverse Proxy
+# ==========================================
+# Replace "yourdomain.com" with your actual domain name.
+# Caddy will automatically obtain and renew free Let's Encrypt SSL certificates.
+# If you don't have a domain yet, you can use ":80" to serve over HTTP.
+
+yourdomain.com {
+    reverse_proxy web:3000
+    encode zstd gzip
+}
