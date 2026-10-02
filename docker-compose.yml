@@ -10,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET:-super-secure-school-mealbox-jwt-secret-key-2026}
       - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Vidyalaya NutriBox}
       - SEED_ON_INIT=${SEED_ON_INIT:-false}

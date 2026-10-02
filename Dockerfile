@@ -1,6 +1,6 @@
 # ==========================================
 # Vidyalaya NutriBox - Multi-stage Dockerfile
-# Optimized for Next.js 16 Standalone + Prisma SQLite
+# Optimized for Next.js 16 Standalone + Prisma PostgreSQL
 # ==========================================
 
 FROM node:20-alpine AS base
@@ -27,7 +27,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-ENV DATABASE_URL="file:./dev.db"
+ENV DATABASE_URL=""
 ENV PATH="/app/node_modules/.bin:$PATH"
 
 # Copy standalone Next.js server and static assets

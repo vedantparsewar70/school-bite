@@ -1,6 +1,6 @@
 # 🚀 Hosting Guide: Vidyalaya NutriBox (Docker & VPS)
 
-This guide walks you through deploying your **Next.js 16 + Prisma SQLite** web application to any Virtual Private Server (VPS) or cloud host using Docker.
+This guide walks you through deploying your **Next.js 16 + Prisma PostgreSQL** web application to any Virtual Private Server (VPS) or cloud host using Docker.
 
 ---
 
@@ -9,7 +9,7 @@ This guide walks you through deploying your **Next.js 16 + Prisma SQLite** web a
 1. **[`Dockerfile`](./Dockerfile)**:
    - High-performance multi-stage build using `node:20-alpine`.
    - Standalone Next.js output (small image footprint, fast boot times).
-   - Bundles Prisma engine and client with SQLite support.
+   - Bundles Prisma engine and client with PostgreSQL support.
 
 2. **[`docker-entrypoint.sh`](./docker-entrypoint.sh)**:
    - Automatically syncs the Prisma schema (`npx prisma db push`) on startup.
@@ -149,7 +149,7 @@ cp ./prisma/dev.db ./prisma/dev_backup_$(date +%Y%m%d_%H%M%S).db
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | SQLite file connection string | `file:./dev.db` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/dbname` |
 | `JWT_SECRET` | Secret key for JWT session tokens | Secure random string |
 | `NEXT_PUBLIC_APP_NAME` | Branding title shown across the UI | `Vidyalaya NutriBox` |
 | `SEED_ON_INIT` | Whether to run demo seed data on fresh launch | `false` |

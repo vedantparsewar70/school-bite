@@ -6,7 +6,7 @@ echo "🚀 Starting Vidyalaya NutriBox container..."
 # Ensure database directory exists
 mkdir -p /app/prisma
 
-# Sync database schema to SQLite database file
+# Sync database schema with Prisma database
 echo "🔄 Checking and syncing database schema with Prisma..."
 npx prisma db push --skip-generate
 

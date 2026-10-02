@@ -55,7 +55,7 @@
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Lucide React Icons, Canvas-Confetti
 - **Backend**: Next.js API Routes & Server Actions
-- **Database**: SQLite with Prisma ORM 6 (file: `prisma/dev.db`)
+- **Database**: PostgreSQL with Prisma ORM 6 (hosted on Neon, Supabase, Vercel Postgres, or local)
 - **Authentication**: JWT session tokens via `jose` with HTTP-Only secure cookies and `bcryptjs` password hashing
 - **Currency & Localization**: Indian Rupee (₹ INR), Indian FSSAI Veg/Non-Veg badges, date formatting for Indian school terms
 
