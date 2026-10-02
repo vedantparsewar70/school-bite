@@ -7,50 +7,71 @@ import { UserRole } from '@/types';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  let normalizedEmail = '';
-  try {
-    ensureDatabaseFile();
+  let step = '1_REQUEST_RECEIVED';
+  let redactedEmail = '';
 
-    const body = await req.json();
+  try {
+    console.log('[AUTH_LOGIN_TRACE] Step 1: Request reached /api/auth/login');
+
+    step = '2_PARSE_BODY';
+    const body = await req.json().catch(() => null);
     const { email, password } = body || {};
 
     if (!email || !password) {
-      console.warn('[AUTH_LOGIN] Missing email or password in login request');
+      console.warn('[AUTH_LOGIN_TRACE] Step 2 Failed: Missing email or password in request body');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
       );
     }
 
-    normalizedEmail = String(email).toLowerCase().trim();
-    console.log(`[AUTH_LOGIN] Login attempt started for: "${normalizedEmail}"`);
+    const emailStr = String(email).trim().toLowerCase();
+    const atIndex = emailStr.indexOf('@');
+    if (atIndex > 1) {
+      redactedEmail = `${emailStr[0]}***${emailStr[atIndex - 1]}${emailStr.slice(atIndex)}`;
+    } else {
+      redactedEmail = '***@' + (emailStr.split('@')[1] || 'domain');
+    }
 
+    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail})`);
+
+    step = '3_DATABASE_CHECK';
+    console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection/check started');
+    const resolvedDbTarget = ensureDatabaseFile();
+    const isFileTarget = resolvedDbTarget.startsWith('file:');
+    console.log(`[AUTH_LOGIN_TRACE] Step 3: Database ready (type: ${isFileTarget ? 'sqlite_file' : 'external'})`);
+
+    step = '4_USER_LOOKUP';
+    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);
     const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email: emailStr },
       include: { parent: true },
     });
+    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup completed. User found: ${Boolean(user)}`);
 
     if (!user) {
-      console.warn(`[AUTH_LOGIN] Authentication failed: user not found for "${normalizedEmail}"`);
+      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: user not found in database (${redactedEmail})`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    console.log(`[AUTH_LOGIN] User account resolved for "${normalizedEmail}" (role: ${user.role}). Validating credentials...`);
-
+    step = '5_PASSWORD_VERIFY';
+    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification started for ${redactedEmail}`);
     const isValid = await comparePassword(password, user.passwordHash);
+    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification completed. Match: ${isValid}`);
+
     if (!isValid) {
-      console.warn(`[AUTH_LOGIN] Authentication failed: invalid password for "${normalizedEmail}"`);
+      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: invalid password for ${redactedEmail}`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    console.log(`[AUTH_LOGIN] Password validated successfully for "${normalizedEmail}". Creating session token...`);
-
+    step = '6_JWT_GENERATION';
+    console.log(`[AUTH_LOGIN_TRACE] Step 6: JWT generation started for userId: ${user.id}, role: ${user.role}`);
     const token = await createSessionToken({
       userId: user.id,
       email: user.email,
@@ -58,7 +79,10 @@ export async function POST(req: Request) {
       role: user.role as UserRole,
       parentId: user.parent?.id,
     });
+    console.log('[AUTH_LOGIN_TRACE] Step 6: JWT generation completed');
 
+    step = '7_SESSION_COOKIE';
+    console.log('[AUTH_LOGIN_TRACE] Step 7: Setting session cookie');
     const cookieStore = await cookies();
     cookieStore.set(TOKEN_COOKIE_NAME, token, {
       httpOnly: true,
@@ -67,8 +91,9 @@ export async function POST(req: Request) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
+    console.log('[AUTH_LOGIN_TRACE] Step 7: Session cookie set successfully');
 
-    console.log(`[AUTH_LOGIN] Session cookie set successfully for "${normalizedEmail}". Login complete.`);
+    console.log('[AUTH_LOGIN_TRACE] Final response status: 200 OK');
 
     return NextResponse.json({
       success: true,
@@ -83,20 +108,40 @@ export async function POST(req: Request) {
     });
   } catch (error: unknown) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const rawErrorMessage = error instanceof Error ? error.message : String(error);
     const errorCode = (error as { code?: string })?.code;
 
-    // Log diagnostic failure details in Vercel Runtime Logs without leaking sensitive information
-    console.error(`[AUTH_LOGIN_ERROR] Exception occurred during login for "${normalizedEmail || 'unknown'}"`, {
+    // Sanitize any credentials, connection strings, or secrets from log
+    const sanitizedError = rawErrorMessage
+      .replace(/(password|secret|key|token)=[^& ]+/gi, '$1=***')
+      .replace(/:\/\/.*@/g, '://***@');
+
+    console.error('[AUTH_LOGIN_ERROR] Execution failed at step:', step, {
       errorName,
-      errorMessage,
       errorCode,
+      errorMessage: sanitizedError,
       stack: error instanceof Error ? error.stack : undefined,
     });
 
+    console.log('[AUTH_LOGIN_TRACE] Final response status: 500 Internal Server Error');
+
     return NextResponse.json(
-      { error: 'An unexpected error occurred during login' },
-      { status: 500 }
+      {
+        error: 'An unexpected error occurred during login',
+        diagnostic: {
+          failedStep: step,
+          errorName,
+          errorCode: errorCode || null,
+          details: sanitizedError,
+        },
+      },
+      {
+        status: 500,
+        headers: {
+          'x-auth-failed-step': step,
+          'x-auth-error-name': errorName,
+        },
+      }
     );
   }
 }
