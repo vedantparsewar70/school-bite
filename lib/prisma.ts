@@ -5,12 +5,7 @@ import os from 'os';
 import zlib from 'zlib';
 import { initialDbGzipBase64 } from './db-seed-data';
 
-function setupPrismaConnection(): { url: string } {
-  // If an external database URL is configured (e.g. Postgres / Supabase / Neon)
-  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:')) {
-    return { url: process.env.DATABASE_URL };
-  }
-
+export function ensureDatabaseFile(): string {
   const isServerless = Boolean(
     process.env.VERCEL ||
     process.env.AWS_LAMBDA_FUNCTION_NAME ||
@@ -23,7 +18,7 @@ function setupPrismaConnection(): { url: string } {
 
     let needsInit = true;
     try {
-      if (fs.existsSync(tmpDbPath) && fs.statSync(tmpDbPath).size > 0) {
+      if (fs.existsSync(tmpDbPath) && fs.statSync(tmpDbPath).size > 1000) {
         needsInit = false;
       }
     } catch {
@@ -34,7 +29,7 @@ function setupPrismaConnection(): { url: string } {
       try {
         const buffer = zlib.gunzipSync(Buffer.from(initialDbGzipBase64, 'base64'));
         fs.writeFileSync(tmpDbPath, buffer);
-        console.log(`[Prisma] Unpacked compressed seed database to ${tmpDbPath} (${buffer.length} bytes)`);
+        console.log(`[Prisma] Initialized SQLite seed database in /tmp (${buffer.length} bytes)`);
       } catch (err) {
         console.error('[Prisma] Failed to unpack seed database:', err);
       }
@@ -48,21 +43,21 @@ function setupPrismaConnection(): { url: string } {
 
     const formattedUrl = `file:${tmpDbPath.replace(/\\/g, '/')}`;
     process.env.DATABASE_URL = formattedUrl;
-    return { url: formattedUrl };
+    return formattedUrl;
   }
 
   // Local / Docker environment
-  if (process.env.DATABASE_URL) {
-    return { url: process.env.DATABASE_URL };
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('file:')) {
+    return process.env.DATABASE_URL;
   }
 
   const localDb = path.resolve(process.cwd(), 'prisma', 'dev.db');
   const formattedUrl = `file:${localDb.replace(/\\/g, '/')}`;
   process.env.DATABASE_URL = formattedUrl;
-  return { url: formattedUrl };
+  return formattedUrl;
 }
 
-const { url: activeDbUrl } = setupPrismaConnection();
+const activeDbUrl = ensureDatabaseFile();
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -76,7 +71,7 @@ export const prisma =
         url: activeDbUrl,
       },
     },
-    log: ['error'],
+    log: ['error', 'warn'],
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

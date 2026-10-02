@@ -4,9 +4,11 @@ import { cookies } from 'next/headers';
 import prisma from './prisma';
 import { UserRole } from '@/types';
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'super-secure-school-mealbox-jwt-secret-key-2026'
-);
+function getJwtSecret(): Uint8Array {
+  const secretKey =
+    process.env.JWT_SECRET || 'super-secure-school-mealbox-jwt-secret-key-2026';
+  return new TextEncoder().encode(secretKey);
+}
 
 export const TOKEN_COOKIE_NAME = 'school_auth_token';
 
@@ -31,12 +33,12 @@ export async function createSessionToken(payload: TokenPayload): Promise<string>
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(SECRET);
+    .sign(getJwtSecret());
 }
 
 export async function verifySessionToken(token: string): Promise<TokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return payload as unknown as TokenPayload;
   } catch {
     return null;
