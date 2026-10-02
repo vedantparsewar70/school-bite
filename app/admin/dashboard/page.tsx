@@ -16,8 +16,12 @@ import {
   FileSpreadsheet,
   PlusCircle,
   ShieldCheck,
+  ShieldAlert,
   RefreshCw,
 } from 'lucide-react';
+import ChildAvatar from '@/components/ChildAvatar';
+import MealIcon from '@/components/MealIcon';
+import VegBadge from '@/components/VegBadge';
 import { formatINR, formatDateTimePretty, getOrderStatusColor } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 
@@ -111,12 +115,12 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* KPI Cards Grid (Requirement 10: Includes Allergy Alerts Today) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
         {/* Card 1: Today's Orders */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-2">
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Orders</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today&apos;s Orders</span>
             <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <UtensilsCrossed className="w-4 h-4" />
             </div>
@@ -126,9 +130,9 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Card 2: Today's Revenue */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-2">
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Revenue</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today&apos;s Revenue</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -137,20 +141,45 @@ export default function AdminDashboardPage() {
           <p className="text-[11px] text-slate-400">All-time: {formatINR(stats?.totalRevenue || 0)}</p>
         </div>
 
-        {/* Card 3: Pending Kitchen Orders */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-2">
+        {/* Card 3: Allergy Alerts Today (Requirement 10) */}
+        <Link
+          href="/admin/orders?allergyFilter=WITH_ALERTS"
+          className={`p-5 rounded-3xl border shadow-2xs space-y-2 transition-all block hover:scale-102 cursor-pointer ${
+            (stats?.todayAllergyAlertsCount || 0) > 0
+              ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-200 shadow-rose-500/10'
+              : 'bg-white border-slate-100 hover:border-slate-200'
+          }`}
+          title="Click to view orders with allergy alerts"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Orders</span>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <span className="text-xs font-black uppercase tracking-wider text-rose-800">
+              ⚠ Allergy Alerts
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-3xl font-black text-rose-700">{stats?.todayAllergyAlertsCount || 0}</p>
+          <p className="text-[11px] text-rose-800 font-bold flex items-center gap-1">
+            <span>View affected orders</span>
+            <ArrowRight className="w-3 h-3" />
+          </p>
+        </Link>
+
+        {/* Card 4: Pending Kitchen Orders */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Prep</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-black text-rose-600">{stats?.pendingOrdersCount || 0}</p>
-          <p className="text-[11px] text-slate-400">To be prepared & served</p>
+          <p className="text-3xl font-black text-slate-800">{stats?.pendingOrdersCount || 0}</p>
+          <p className="text-[11px] text-slate-400">To be served</p>
         </div>
 
-        {/* Card 4: Students Served */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-2">
+        {/* Card 5: Students Served */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2 col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Students Served</span>
             <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -158,7 +187,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-3xl font-black text-purple-700">{stats?.studentsServedCount || 0}</p>
-          <p className="text-[11px] text-slate-400">Of {stats?.totalStudents || 0} registered students</p>
+          <p className="text-[11px] text-slate-400">Registered: {stats?.totalStudents || 0}</p>
         </div>
       </div>
 
@@ -259,10 +288,22 @@ export default function AdminDashboardPage() {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         {o.items?.map((it: any, idx: number) => (
-                          <div key={idx} className="text-[11px] text-slate-700">
-                            <strong>{it.mealName}</strong> for {it.studentName} (Class {it.grade}-{it.division})
+                          <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-700">
+                            <MealIcon name={it.mealName} category={it.mealCategory} size="sm" />
+                            <div>
+                              <div>
+                                <strong className="text-slate-900">{it.mealName}</strong> for{' '}
+                                <span className="text-slate-800 font-semibold">{it.studentName}</span> (Class {it.grade}-{it.division})
+                              </div>
+                              {it.hasAllergyAlert && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 mt-0.5">
+                                  <ShieldAlert className="w-3 h-3 text-rose-600" />
+                                  <span>⚠ Allergy: {it.conflictAllergens}</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

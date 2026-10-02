@@ -24,19 +24,25 @@ export interface StudentData {
   rollNo: string;
   studentId: string;
   allergies?: string | null;
+  allergiesList?: string[];
+  dietaryRestrictions?: string | null;
+  foodPreference?: string | null;
+  notes?: string | null;
   isVegetarian: boolean;
   profilePhoto?: string | null;
   isActive: boolean;
+  allergyAlertStatus?: 'NO_ALLERGY' | 'ALLERGY_RECORDED' | 'CONFLICT_DETECTED';
 }
 
 export interface MealData {
   id: string;
   name: string;
   description: string;
-  category: string;
+  category: string; // BREAKFAST, LUNCH, SNACK, BEVERAGE
   isVegetarian: boolean;
   ingredients?: string | null;
   allergens?: string | null;
+  allergensList?: string[];
   calories?: number | null;
   price: number;
   imageUrl?: string | null;
@@ -62,11 +68,14 @@ export interface CartItem {
   mealId: string;
   mealName: string;
   mealPrice: number;
+  mealCategory?: string;
   mealImage?: string | null;
   isVegetarian: boolean;
   date: string; // "YYYY-MM-DD"
   quantity: number;
   orderingDeadline?: string;
+  hasAllergyAlert?: boolean;
+  conflictAllergens?: string[];
 }
 
 export interface OrderItemData {
@@ -85,6 +94,8 @@ export interface OrderItemData {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  hasAllergyAlert?: boolean;
+  conflictAllergens?: string | null;
 }
 
 export interface PaymentData {

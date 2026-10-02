@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { isDeadlinePassed } from '@/lib/utils';
 import { CartItem, PaymentMethod } from '@/types';
+import { checkMealAllergy, getSystemSetting } from '@/lib/allergy';
 
 export async function GET() {
   try {
@@ -49,6 +50,8 @@ export async function GET() {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
+        hasAllergyAlert: item.hasAllergyAlert,
+        conflictAllergens: item.conflictAllergens,
       })),
       payments: order.payments.map((p) => ({
         id: p.id,
@@ -159,6 +162,32 @@ export async function POST(req: Request) {
       }
     }
 
+    // Evaluate allergy status for all items in the cart
+    const evaluatedCartItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const allergyResult = await checkMealAllergy(item.studentId, item.mealId);
+        return {
+          ...item,
+          hasAllergyAlert: allergyResult.hasConflict,
+          conflictAllergens: allergyResult.matchingAllergens.join(', ') || null,
+        };
+      })
+    );
+
+    // Verify school allergy policy
+    const allowAllergySetting = await getSystemSetting('ALLOW_ALLERGY_ORDERS', 'true');
+    if (allowAllergySetting !== 'true') {
+      const conflictingItem = evaluatedCartItems.find((it) => it.hasAllergyAlert);
+      if (conflictingItem) {
+        return NextResponse.json(
+          {
+            error: `Meal "${conflictingItem.mealName}" contains allergen (${conflictingItem.conflictAllergens}) conflicting with ${conflictingItem.studentName}'s profile. Ordering meals with allergy warnings is currently restricted by school policy.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Calculate total amount
     const totalAmount = cartItems.reduce((acc, it) => acc + it.mealPrice * it.quantity, 0);
 
@@ -224,13 +253,15 @@ export async function POST(req: Request) {
           orderStatus: 'CONFIRMED',
           notes: notes || null,
           items: {
-            create: cartItems.map((item) => ({
+            create: evaluatedCartItems.map((item) => ({
               studentId: item.studentId,
               mealId: item.mealId,
               date: item.date,
               quantity: item.quantity,
               unitPrice: item.mealPrice,
               totalPrice: item.mealPrice * item.quantity,
+              hasAllergyAlert: item.hasAllergyAlert,
+              conflictAllergens: item.conflictAllergens,
             })),
           },
           payments: {

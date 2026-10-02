@@ -34,6 +34,8 @@ export async function GET() {
     const todayRevenue = todayItems.reduce((sum, item) => sum + item.totalPrice, 0);
     const todayOrdersCount = new Set(todayItems.map((i) => i.orderId)).size;
     const studentsServedCount = new Set(todayItems.map((i) => i.studentId)).size;
+    const todayAllergyAlertsCount = todayItems.filter((i) => i.hasAllergyAlert).reduce((sum, i) => sum + i.quantity, 0);
+    const todayAllergyOrdersCount = new Set(todayItems.filter((i) => i.hasAllergyAlert).map((i) => i.orderId)).size;
 
     // All-time meals sold
     const allActiveItems = await prisma.orderItem.findMany({
@@ -76,12 +78,16 @@ export async function GET() {
       totalAmount: o.totalAmount,
       orderStatus: o.orderStatus,
       paymentStatus: o.paymentStatus,
+      hasAnyAllergyAlert: o.items.some((it) => it.hasAllergyAlert),
       createdAt: o.createdAt.toISOString(),
       items: o.items.map((it) => ({
         mealName: it.meal.name,
+        mealCategory: it.meal.category,
         studentName: it.student.name,
         grade: it.student.grade,
         division: it.student.division,
+        hasAllergyAlert: it.hasAllergyAlert,
+        conflictAllergens: it.conflictAllergens,
         date: it.date,
         quantity: it.quantity,
       })),
@@ -98,6 +104,8 @@ export async function GET() {
         totalMealsSold,
         totalRevenue,
         studentsServedCount,
+        todayAllergyAlertsCount,
+        todayAllergyOrdersCount,
       },
       recentOrders: formattedRecentOrders,
     });

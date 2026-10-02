@@ -20,6 +20,9 @@ import { useCart } from '@/components/CartContext';
 import { useToast } from '@/components/ToastContext';
 import { formatINR, formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/utils';
 import VegBadge from '@/components/VegBadge';
+import ChildAvatar from '@/components/ChildAvatar';
+import MealIcon from '@/components/MealIcon';
+import MealCategoryBadge from '@/components/MealCategoryBadge';
 import { MenuDayItem } from '@/types';
 
 export default function ParentDashboard() {
@@ -256,29 +259,15 @@ export default function ParentDashboard() {
                 className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-amber-100 shrink-0 border border-amber-200">
-                    <img
-                      src={
-                        child.profilePhoto ||
-                        'https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80'
-                      }
-                      alt={child.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <ChildAvatar size="md" />
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{child.name}</h4>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="font-bold text-slate-900 text-sm">{child.name}</h4>
+                      <VegBadge isVegetarian={child.isVegetarian} size="sm" />
+                    </div>
                     <p className="text-[11px] text-slate-500">
                       Class {child.grade}-{child.division} • Roll: {child.rollNo}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <VegBadge isVegetarian={child.isVegetarian} size="sm" />
-                      {child.allergies && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-rose-50 text-rose-700 font-semibold rounded-md border border-rose-100">
-                          {child.allergies}
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
 
@@ -320,46 +309,37 @@ export default function ParentDashboard() {
               {todayMenu.slice(0, 4).map((menuItem) => (
                 <div
                   key={menuItem.id}
-                  className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                  className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3"
                 >
-                  <div className="h-32 relative overflow-hidden bg-slate-100">
-                    <img
-                      src={
-                        menuItem.meal.imageUrl ||
-                        'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&auto=format&fit=crop&q=80'
-                      }
-                      alt={menuItem.meal.name}
-                      className="w-full h-full object-cover"
+                  <div className="flex items-start gap-3">
+                    <MealIcon
+                      name={menuItem.meal.name}
+                      category={menuItem.meal.category}
+                      size="md"
+                      className="shrink-0"
                     />
-                    <div className="absolute top-2 left-2">
-                      <VegBadge isVegetarian={menuItem.meal.isVegetarian} size="sm" />
-                    </div>
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-black/60 text-white rounded-md">
-                      Qty: {menuItem.availableQuantity} left
-                    </span>
-                  </div>
-
-                  <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm leading-tight">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <MealCategoryBadge category={menuItem.meal.category} size="sm" />
+                      <h4 className="font-extrabold text-slate-900 text-sm leading-tight truncate">
                         {menuItem.meal.name}
                       </h4>
-                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                        {menuItem.meal.description}
+                      <p className="text-xs font-black text-amber-600">
+                        {formatINR(menuItem.meal.price)}
                       </p>
                     </div>
+                  </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                      <span className="font-extrabold text-amber-700 text-sm">
-                        {formatINR(menuItem.meal.price)}
-                      </span>
-                      <Link
-                        href={`/parent/menu?date=${todayStr}`}
-                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-xs transition-colors"
-                      >
-                        Select Meal
-                      </Link>
-                    </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Available ({menuItem.availableQuantity} left)
+                    </span>
+                    <Link
+                      href={`/parent/menu?date=${todayStr}`}
+                      className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                    >
+                      Select
+                    </Link>
                   </div>
                 </div>
               ))}

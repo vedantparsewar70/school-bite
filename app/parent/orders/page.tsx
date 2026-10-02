@@ -18,6 +18,8 @@ import {
 import { useToast } from '@/components/ToastContext';
 import { useAuth } from '@/components/AuthContext';
 import VegBadge from '@/components/VegBadge';
+import ChildAvatar from '@/components/ChildAvatar';
+import MealIcon from '@/components/MealIcon';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 import {
   formatINR,
@@ -203,23 +205,29 @@ function OrdersPageContent() {
                 {/* Items in this order */}
                 <div className="py-3 divide-y divide-slate-100">
                   {order.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <VegBadge isVegetarian={item.isVegetarian} size="sm" />
-                          <span className="font-bold text-slate-800">{item.mealName}</span>
-                          <span className="text-slate-400">× {item.quantity}</span>
+                    <div key={idx} className="py-3 flex items-center justify-between text-xs gap-3">
+                      <div className="flex items-center gap-3">
+                        <MealIcon name={item.mealName} category={item.mealCategory} size="sm" />
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <VegBadge isVegetarian={item.isVegetarian} size="sm" />
+                            <span className="font-bold text-slate-800 text-sm">{item.mealName}</span>
+                            <span className="text-slate-400 font-semibold">× {item.quantity}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <ChildAvatar size="xs" />
+                            <span>
+                              For: <strong className="text-slate-700">{item.studentName}</strong> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-semibold text-amber-700">
+                            Scheduled for: {formatDatePretty(item.date)}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-500">
-                          For: <strong className="text-slate-700">{item.studentName}</strong> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
-                        </p>
-                        <p className="text-[11px] font-semibold text-amber-700">
-                          Scheduled for: {formatDatePretty(item.date)}
-                        </p>
                       </div>
 
-                      <div className="text-right">
-                        <span className="font-extrabold text-slate-900">{formatINR(item.totalPrice)}</span>
+                      <div className="text-right shrink-0">
+                        <span className="font-extrabold text-slate-900 text-sm">{formatINR(item.totalPrice)}</span>
                       </div>
                     </div>
                   ))}

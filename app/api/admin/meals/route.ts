@@ -5,9 +5,32 @@ import { getCurrentUser } from '@/lib/auth';
 export async function GET() {
   try {
     const meals = await prisma.meal.findMany({
+      include: {
+        mealAllergens: {
+          include: { allergen: true },
+        },
+      },
       orderBy: { name: 'asc' },
     });
-    return NextResponse.json({ meals });
+
+    const formatted = meals.map((m) => {
+      const allergensList = m.mealAllergens.map((ma) => ma.allergen.name);
+      if (m.allergens && allergensList.length === 0) {
+        m.allergens.split(/[,;]/).forEach((p) => {
+          const t = p.trim();
+          if (t && !allergensList.includes(t)) allergensList.push(t);
+        });
+      }
+
+      return {
+        ...m,
+        allergensList,
+        allergens: allergensList.join(', ') || m.allergens || null,
+        imageUrl: null, // Ensure no photos
+      };
+    });
+
+    return NextResponse.json({ meals: formatted });
   } catch (error) {
     console.error('Error fetching meals:', error);
     return NextResponse.json({ error: 'Failed to fetch meals' }, { status: 500 });
@@ -29,9 +52,9 @@ export async function POST(req: Request) {
       isVegetarian = true,
       ingredients,
       allergens,
+      allergensList,
       calories,
       price,
-      imageUrl,
     } = body;
 
     if (!name || !description || price === undefined) {
@@ -41,19 +64,51 @@ export async function POST(req: Request) {
       );
     }
 
+    // Build unified allergens array
+    let finalAllergens: string[] = [];
+    if (Array.isArray(allergensList)) {
+      finalAllergens = [...allergensList];
+    } else if (typeof allergens === 'string' && allergens.trim()) {
+      finalAllergens = allergens.split(/[,;]/).map((a: string) => a.trim()).filter(Boolean);
+    }
+
     const meal = await prisma.meal.create({
       data: {
         name: name.trim(),
         description: description.trim(),
-        category,
+        category: category.toUpperCase().trim(),
         isVegetarian: Boolean(isVegetarian),
         ingredients: ingredients?.trim() || null,
-        allergens: allergens?.trim() || null,
+        allergens: finalAllergens.join(', ') || null,
         calories: calories ? Number(calories) : null,
         price: Number(price),
-        imageUrl: imageUrl?.trim() || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop&q=80',
+        imageUrl: null,
       },
     });
+
+    // Create relational allergens
+    for (const alg of finalAllergens) {
+      if (!alg || alg.toLowerCase() === 'none') continue;
+      const allergenRecord = await prisma.allergen.upsert({
+        where: { name: alg },
+        update: {},
+        create: { name: alg },
+      });
+
+      await prisma.mealAllergen.upsert({
+        where: {
+          mealId_allergenId: {
+            mealId: meal.id,
+            allergenId: allergenRecord.id,
+          },
+        },
+        update: {},
+        create: {
+          mealId: meal.id,
+          allergenId: allergenRecord.id,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, meal }, { status: 201 });
   } catch (error) {
@@ -78,13 +133,20 @@ export async function PUT(req: Request) {
       isVegetarian,
       ingredients,
       allergens,
+      allergensList,
       calories,
       price,
-      imageUrl,
     } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Meal ID is required' }, { status: 400 });
+    }
+
+    let finalAllergens: string[] = [];
+    if (Array.isArray(allergensList)) {
+      finalAllergens = [...allergensList];
+    } else if (typeof allergens === 'string') {
+      finalAllergens = allergens.split(/[,;]/).map((a: string) => a.trim()).filter(Boolean);
     }
 
     const updated = await prisma.meal.update({
@@ -92,15 +154,33 @@ export async function PUT(req: Request) {
       data: {
         name: name !== undefined ? name.trim() : undefined,
         description: description !== undefined ? description.trim() : undefined,
-        category: category !== undefined ? category : undefined,
+        category: category !== undefined ? category.toUpperCase().trim() : undefined,
         isVegetarian: isVegetarian !== undefined ? Boolean(isVegetarian) : undefined,
         ingredients: ingredients !== undefined ? ingredients?.trim() || null : undefined,
-        allergens: allergens !== undefined ? allergens?.trim() || null : undefined,
+        allergens: finalAllergens.join(', ') || null,
         calories: calories !== undefined ? (calories ? Number(calories) : null) : undefined,
         price: price !== undefined ? Number(price) : undefined,
-        imageUrl: imageUrl !== undefined ? imageUrl?.trim() || null : undefined,
+        imageUrl: null,
       },
     });
+
+    // Reset and sync meal_allergens relation
+    await prisma.mealAllergen.deleteMany({ where: { mealId: id } });
+    for (const alg of finalAllergens) {
+      if (!alg || alg.toLowerCase() === 'none') continue;
+      const allergenRecord = await prisma.allergen.upsert({
+        where: { name: alg },
+        update: {},
+        create: { name: alg },
+      });
+
+      await prisma.mealAllergen.create({
+        data: {
+          mealId: id,
+          allergenId: allergenRecord.id,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, meal: updated });
   } catch (error) {

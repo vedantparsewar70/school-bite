@@ -18,6 +18,7 @@ import {
 import { useCart } from '@/components/CartContext';
 import { useAuth } from '@/components/AuthContext';
 import VegBadge from '@/components/VegBadge';
+import MealIcon from '@/components/MealIcon';
 import { formatINR, formatDatePretty } from '@/lib/utils';
 
 export default function CartPage() {
@@ -114,16 +115,11 @@ export default function CartPage() {
                         className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors"
                       >
                         <div className="flex items-center gap-3.5">
-                          <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-                            <img
-                              src={
-                                item.mealImage ||
-                                'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=200&auto=format&fit=crop&q=80'
-                              }
-                              alt={item.mealName}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                          <MealIcon
+                            name={item.mealName}
+                            category={item.mealCategory}
+                            size="md"
+                          />
 
                           <div>
                             <div className="flex items-center gap-2">
@@ -179,12 +175,12 @@ export default function CartPage() {
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-2">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-amber-500" />
-                Special Preparation Notes / Allergy Reminders
+                Special Preparation Notes
               </label>
               <textarea
                 value={orderNotes}
                 onChange={(e) => setOrderNotes(e.target.value)}
-                placeholder="e.g. Mild spice for Aarav; Anaya has lactose intolerance - please omit butter/ghee."
+                placeholder="e.g. Mild spice for Aarav; please pack extra spoon."
                 rows={2}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
               />

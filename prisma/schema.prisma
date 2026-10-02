@@ -31,39 +31,81 @@ model Parent {
 }
 
 model Student {
-  id           String      @id @default(cuid())
-  parentId     String
-  parent       Parent      @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  name         String
-  dob          String?
-  grade        String      // Class, e.g. "5"
-  division     String      // Division, e.g. "A"
-  rollNo       String
-  studentId    String      @unique // e.g. "STU-2026-081"
-  allergies    String?     // e.g. "Peanuts, Dairy"
-  isVegetarian Boolean     @default(true)
-  profilePhoto String?
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  orderItems   OrderItem[]
+  id                  String           @id @default(cuid())
+  parentId            String
+  parent              Parent           @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  name                String
+  dob                 String?
+  grade               String           // Class, e.g. "5"
+  division            String           // Division, e.g. "A"
+  rollNo              String
+  studentId           String           @unique // e.g. "STU-2026-081"
+  allergies           String?          // e.g. "Peanuts, Dairy" (legacy string kept for quick display)
+  dietaryRestrictions String?         // e.g. "No outside food", "Halal", "Gluten-free"
+  foodPreference      String?          // e.g. "Vegetarian", "Jain", "Vegan"
+  notes               String?          // e.g. "Requires allergy awareness."
+  isVegetarian        Boolean          @default(true)
+  profilePhoto        String?
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  orderItems          OrderItem[]
+  studentAllergies    StudentAllergy[]
+}
+
+model Allergy {
+  id        String           @id @default(cuid())
+  name      String           @unique // e.g. "Peanuts", "Milk", "Egg", "Soy", "Wheat", "Tree Nuts", "Other"
+  createdAt DateTime         @default(now())
+  students  StudentAllergy[]
+}
+
+model StudentAllergy {
+  id         String   @id @default(cuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  allergyId  String
+  allergy    Allergy  @relation(fields: [allergyId], references: [id], onDelete: Cascade)
+  customNote String?  // For "Other: ______"
+  createdAt  DateTime @default(now())
+
+  @@unique([studentId, allergyId])
 }
 
 model Meal {
-  id              String      @id @default(cuid())
-  name            String
-  description     String
-  category        String      @default("LUNCH") // LUNCH, SNACKS, BEVERAGE
-  isVegetarian    Boolean     @default(true)
-  ingredients     String?
-  allergens       String?
-  calories        Int?
-  price           Float
-  imageUrl        String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  menus           Menu[]
-  orderItems      OrderItem[]
+  id            String         @id @default(cuid())
+  name          String
+  description   String
+  category      String         @default("LUNCH") // BREAKFAST, LUNCH, SNACK, BEVERAGE
+  isVegetarian  Boolean        @default(true)
+  ingredients   String?
+  allergens     String?
+  calories      Int?
+  price         Float
+  imageUrl      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  menus         Menu[]
+  orderItems    OrderItem[]
+  mealAllergens MealAllergen[]
+}
+
+model Allergen {
+  id        String         @id @default(cuid())
+  name      String         @unique // e.g. "Milk", "Peanuts", "Egg", "Soy", "Wheat", "Tree Nuts"
+  createdAt DateTime       @default(now())
+  meals     MealAllergen[]
+}
+
+model MealAllergen {
+  id         String   @id @default(cuid())
+  mealId     String
+  meal       Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  allergenId String
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([mealId, allergenId])
 }
 
 model Menu {
@@ -96,18 +138,26 @@ model Order {
 }
 
 model OrderItem {
-  id         String   @id @default(cuid())
-  orderId    String
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  studentId  String
-  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  mealId     String
-  meal       Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
-  date       String   // Meal date "YYYY-MM-DD"
-  quantity   Int      @default(1)
-  unitPrice  Float
-  totalPrice Float
-  createdAt  DateTime @default(now())
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  studentId         String
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mealId            String
+  meal              Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  date              String   // Meal date "YYYY-MM-DD"
+  quantity          Int      @default(1)
+  unitPrice         Float
+  totalPrice        Float
+  hasAllergyAlert   Boolean  @default(false)
+  conflictAllergens String?  // e.g. "Milk"
+  createdAt         DateTime @default(now())
+}
+
+model SystemSetting {
+  key       String   @id // e.g. "ALLOW_ALLERGY_ORDERS"
+  value     String   // e.g. "true" or "false"
+  updatedAt DateTime @updatedAt
 }
 
 model Payment {
