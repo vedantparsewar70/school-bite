@@ -64,10 +64,12 @@ export async function POST(req: Request) {
         walletBalance: user.parent?.walletBalance ?? 0,
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'An unexpected error occurred during login';
     return NextResponse.json(
-      { error: 'An unexpected error occurred during login' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
