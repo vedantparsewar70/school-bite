@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import prisma, { ensureDatabaseFile } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { comparePassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
 import { UserRole } from '@/types';
 
@@ -36,10 +36,7 @@ export async function POST(req: Request) {
     console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail})`);
 
     step = '3_DATABASE_CHECK';
-    console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection/check started');
-    const resolvedDbTarget = ensureDatabaseFile();
-    const isFileTarget = resolvedDbTarget.startsWith('file:');
-    console.log(`[AUTH_LOGIN_TRACE] Step 3: Database ready (type: ${isFileTarget ? 'sqlite_file' : 'external'})`);
+    console.log('[AUTH_LOGIN_TRACE] Step 3: PostgreSQL database connection check started');
 
     step = '4_USER_LOOKUP';
     console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);

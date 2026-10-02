@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import prisma, { ensureDatabaseFile } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    ensureDatabaseFile();
-
     const { name, email, phone, password, confirmPassword } = await req.json();
 
     if (!name || !email || !password) {

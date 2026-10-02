@@ -1,0 +1,1021 @@
+{
+  "User": [
+    {
+      "id": "cmuqpomks000jxa4w4qlkmyet",
+      "email": "admin@school.com",
+      "passwordHash": "$2b$10$pr2NF3EZE.rggvI2xus7WOsjF3vLSs.O4wjxOhqv4KufEaL/AtJQK",
+      "name": "R. K. Verma (Admin)",
+      "phone": "+91 98100 12345",
+      "role": "ADMIN",
+      "createdAt": 1790930340172,
+      "updatedAt": 1790930340172
+    },
+    {
+      "id": "cmuqpomkx000kxa4wks4zkhct",
+      "email": "parent@example.com",
+      "passwordHash": "$2b$10$SDunzMX6skX.DM413tHcjeXztdLynW/1FHRRywBVs/tOPBkb9kT52",
+      "name": "Pooja Sharma",
+      "phone": "+91 98765 43210",
+      "role": "PARENT",
+      "createdAt": 1790930340178,
+      "updatedAt": 1790930340178
+    },
+    {
+      "id": "cmuqpoml4000mxa4wai1yqe3z",
+      "email": "vikram@example.com",
+      "passwordHash": "$2b$10$SDunzMX6skX.DM413tHcjeXztdLynW/1FHRRywBVs/tOPBkb9kT52",
+      "name": "Vikram Malhotra",
+      "phone": "+91 97112 34567",
+      "role": "PARENT",
+      "createdAt": 1790930340185,
+      "updatedAt": 1790930340185
+    }
+  ],
+  "Parent": [
+    {
+      "id": "cmuqpomkx000lxa4woyhtdjo5",
+      "userId": "cmuqpomkx000kxa4wks4zkhct",
+      "walletBalance": 500.0,
+      "createdAt": 1790930340178,
+      "updatedAt": 1790930340178
+    },
+    {
+      "id": "cmuqpoml4000nxa4w18rz101t",
+      "userId": "cmuqpoml4000mxa4wai1yqe3z",
+      "walletBalance": 350.0,
+      "createdAt": 1790930340185,
+      "updatedAt": 1790930340185
+    }
+  ],
+  "Student": [
+    {
+      "id": "cmuqpomlb000pxa4wnchj1tgv",
+      "parentId": "cmuqpomkx000lxa4woyhtdjo5",
+      "name": "Aarav Sharma",
+      "dob": "2015-04-12",
+      "grade": "5",
+      "division": "A",
+      "rollNo": "12",
+      "studentId": "STU-2026-012",
+      "allergies": "Milk, Peanuts",
+      "isVegetarian": 1,
+      "profilePhoto": null,
+      "isActive": 1,
+      "createdAt": 1790930340191,
+      "updatedAt": 1790930340191,
+      "dietaryRestrictions": "No outside junk food",
+      "foodPreference": "Vegetarian",
+      "notes": "Requires strict allergy awareness for dairy & peanuts."
+    },
+    {
+      "id": "cmuqpomli000uxa4wb4saj2yh",
+      "parentId": "cmuqpomkx000lxa4woyhtdjo5",
+      "name": "Anaya Sharma",
+      "dob": "2017-09-24",
+      "grade": "3",
+      "division": "B",
+      "rollNo": "07",
+      "studentId": "STU-2026-037",
+      "allergies": "",
+      "isVegetarian": 1,
+      "profilePhoto": null,
+      "isActive": 1,
+      "createdAt": 1790930340198,
+      "updatedAt": 1790930340198,
+      "dietaryRestrictions": "Low spice",
+      "foodPreference": "Vegetarian",
+      "notes": "No known allergies"
+    },
+    {
+      "id": "cmuqpomll000wxa4wdody7u3o",
+      "parentId": "cmuqpoml4000nxa4w18rz101t",
+      "name": "Kabir Malhotra",
+      "dob": "2014-11-15",
+      "grade": "6",
+      "division": "A",
+      "rollNo": "18",
+      "studentId": "STU-2026-088",
+      "allergies": "Wheat",
+      "isVegetarian": 0,
+      "profilePhoto": null,
+      "isActive": 1,
+      "createdAt": 1790930340202,
+      "updatedAt": 1790930340202,
+      "dietaryRestrictions": "Gluten sensitivity",
+      "foodPreference": "Non-Vegetarian",
+      "notes": "Avoid wheat and gluten-based dough."
+    }
+  ],
+  "Meal": [
+    {
+      "id": "cmuqpomlr000zxa4wnmbtiwrq",
+      "name": "Paneer Rice Bowl",
+      "description": "Cottage cheese cubes simmered in mildly spiced tomato-cashew gravy served with steamed basmati rice, dal tadka, and crisp cucumber salad.",
+      "category": "LUNCH",
+      "isVegetarian": 1,
+      "ingredients": "Basmati Rice, Paneer, Tomatoes, Cashew Paste, Toor Dal, Spices, Cucumber",
+      "allergens": "Milk, Cashew",
+      "calories": 460,
+      "price": 100.0,
+      "imageUrl": null,
+      "createdAt": 1790930340208,
+      "updatedAt": 1790930340208
+    },
+    {
+      "id": "cmuqpomlv0013xa4w1cloxy4k",
+      "name": "Deluxe Veg Thali",
+      "description": "Wholesome balanced meal: 2 whole wheat Phulkas, Paneer Makhani, Dal Tadka, Jeera Rice, Boondi Raita, and Gulab Jamun dessert.",
+      "category": "LUNCH",
+      "isVegetarian": 1,
+      "ingredients": "Whole Wheat Atta, Paneer, Butter, Toor Dal, Jeera Rice, Curd, Gulab Jamun",
+      "allergens": "Wheat, Milk, Gluten",
+      "calories": 620,
+      "price": 120.0,
+      "imageUrl": null,
+      "createdAt": 1790930340212,
+      "updatedAt": 1790930340212
+    },
+    {
+      "id": "cmuqpomm00018xa4wizaekzvh",
+      "name": "Rajma Chawal Bowl",
+      "description": "Slow-simmered Kashmiri red kidney beans in aromatic spiced onion-tomato gravy, served over fragrant steamed jeera rice with pickled onions.",
+      "category": "LUNCH",
+      "isVegetarian": 1,
+      "ingredients": "Red Kidney Beans, Basmati Rice, Cumin, Tomatoes, Onions, Ginger Garlic, Ghee",
+      "allergens": "",
+      "calories": 410,
+      "price": 90.0,
+      "imageUrl": null,
+      "createdAt": 1790930340216,
+      "updatedAt": 1790930340216
+    },
+    {
+      "id": "cmuqpomm30019xa4wokwgpxm0",
+      "name": "Creamy Garden Veg Pasta",
+      "description": "Durum wheat penne tossed in rich homemade b\u00e9chamel sauce with fresh broccoli, sweet corn, tricolor bell peppers, and warm garlic toast.",
+      "category": "LUNCH",
+      "isVegetarian": 1,
+      "ingredients": "Durum Wheat Penne, Milk, Butter, Broccoli, Sweet Corn, Bell Peppers, Oregano, Cheese",
+      "allergens": "Wheat, Milk, Gluten",
+      "calories": 480,
+      "price": 95.0,
+      "imageUrl": null,
+      "createdAt": 1790930340220,
+      "updatedAt": 1790930340220
+    },
+    {
+      "id": "cmuqpomm7001exa4wdor9k7pg",
+      "name": "South Indian Masala Idli & Sambar",
+      "description": "Steamed fluffy rice cakes saut\u00e9ed with mustard seeds, curry leaves, and podi spice, served with piping hot vegetable sambar & coconut dip.",
+      "category": "BREAKFAST",
+      "isVegetarian": 1,
+      "ingredients": "Rice, Urad Dal, Curry Leaves, Mustard Seeds, Drumstick, Pumpkin, Toor Dal, Coconut",
+      "allergens": "Mustard",
+      "calories": 340,
+      "price": 75.0,
+      "imageUrl": null,
+      "createdAt": 1790930340223,
+      "updatedAt": 1790930340223
+    },
+    {
+      "id": "cmuqpommb001hxa4w2num75db",
+      "name": "Nutritious Veg Pulao & Raita",
+      "description": "Fragrant basmati rice gently spiced with star anise, cloves, green peas, carrots, and french beans. Served with chilled cucumber-mint raita.",
+      "category": "LUNCH",
+      "isVegetarian": 1,
+      "ingredients": "Basmati Rice, Green Peas, Carrots, Beans, Mint, Curd, Cumin, Cow Ghee",
+      "allergens": "Milk",
+      "calories": 390,
+      "price": 85.0,
+      "imageUrl": null,
+      "createdAt": 1790930340227,
+      "updatedAt": 1790930340227
+    },
+    {
+      "id": "cmuqpommf001kxa4wsaphea2k",
+      "name": "Fresh Fruit & Nut Box",
+      "description": "Chilled freshly sliced apple, seedless pomegranate arils, papaya cubes, seedless green grapes, topped with honey-roasted almonds & walnuts.",
+      "category": "SNACK",
+      "isVegetarian": 1,
+      "ingredients": "Apple, Pomegranate, Papaya, Grapes, Almonds, Walnuts, Honey",
+      "allergens": "Tree Nuts",
+      "calories": 210,
+      "price": 60.0,
+      "imageUrl": null,
+      "createdAt": 1790930340231,
+      "updatedAt": 1790930340231
+    },
+    {
+      "id": "cmuqpommi001nxa4wnke51sap",
+      "name": "Grilled Corn & Cheese Sandwich",
+      "description": "Multi-grain bread stuffed with sweet corn kernels, melted cheddar cheese, bell peppers, and mild green herb sauce toasted until golden crisp.",
+      "category": "SNACK",
+      "isVegetarian": 1,
+      "ingredients": "Multigrain Bread, Sweet Corn, Cheese, Capsicum, Butter, Mint Chutney",
+      "allergens": "Wheat, Milk, Gluten",
+      "calories": 310,
+      "price": 70.0,
+      "imageUrl": null,
+      "createdAt": 1790930340235,
+      "updatedAt": 1790930340235
+    }
+  ],
+  "Menu": [
+    {
+      "id": "cmuqpommm001txa4whb4trzg0",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-02",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340239,
+      "updatedAt": 1790930340239
+    },
+    {
+      "id": "cmuqpommq001vxa4w17l1sfmg",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "date": "2026-10-02",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340243,
+      "updatedAt": 1790930340243
+    },
+    {
+      "id": "cmuqpommu001xxa4wnfku9z3v",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-02",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340246,
+      "updatedAt": 1790930340246
+    },
+    {
+      "id": "cmuqpommw001zxa4wz40rj1c7",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-02",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340249,
+      "updatedAt": 1790930340249
+    },
+    {
+      "id": "cmuqpomn10021xa4wdaytvgic",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-03",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340254,
+      "updatedAt": 1790930340254
+    },
+    {
+      "id": "cmuqpomn50023xa4w8ojlfh39",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "date": "2026-10-03",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340257,
+      "updatedAt": 1790930340257
+    },
+    {
+      "id": "cmuqpomn80025xa4wu1x77nmc",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "date": "2026-10-03",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340260,
+      "updatedAt": 1790930340260
+    },
+    {
+      "id": "cmuqpomna0027xa4wtq0aeeub",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-03",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340263,
+      "updatedAt": 1790930340263
+    },
+    {
+      "id": "cmuqpomne0029xa4wwh15nia6",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "date": "2026-10-04",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340266,
+      "updatedAt": 1790930340266
+    },
+    {
+      "id": "cmuqpomni002bxa4wtloizjaa",
+      "mealId": "cmuqpommb001hxa4w2num75db",
+      "date": "2026-10-04",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340270,
+      "updatedAt": 1790930340270
+    },
+    {
+      "id": "cmuqpomnm002dxa4wysccqs5e",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-04",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340274,
+      "updatedAt": 1790930340274
+    },
+    {
+      "id": "cmuqpomno002fxa4wwyulvd3s",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-05",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340277,
+      "updatedAt": 1790930340277
+    },
+    {
+      "id": "cmuqpomnq002hxa4wni3cl0db",
+      "mealId": "cmuqpommi001nxa4wnke51sap",
+      "date": "2026-10-05",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340279,
+      "updatedAt": 1790930340279
+    },
+    {
+      "id": "cmuqpomnu002jxa4ws58z2fko",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-05",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340283,
+      "updatedAt": 1790930340283
+    },
+    {
+      "id": "cmuqpomnx002lxa4wp3nwpj39",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-06",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340286,
+      "updatedAt": 1790930340286
+    },
+    {
+      "id": "cmuqpomo0002nxa4wlb7ebae5",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "date": "2026-10-06",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340289,
+      "updatedAt": 1790930340289
+    },
+    {
+      "id": "cmuqpomo3002pxa4w3ahwzgjt",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-06",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340291,
+      "updatedAt": 1790930340291
+    },
+    {
+      "id": "cmuqpomo6002rxa4wzpr2lxuh",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-06",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340294,
+      "updatedAt": 1790930340294
+    },
+    {
+      "id": "cmuqpomo9002txa4w5qw9ip4y",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-07",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340297,
+      "updatedAt": 1790930340297
+    },
+    {
+      "id": "cmuqpomoc002vxa4wajezeyvq",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "date": "2026-10-07",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340301,
+      "updatedAt": 1790930340301
+    },
+    {
+      "id": "cmuqpomog002xxa4w6ewaum3m",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "date": "2026-10-07",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340304,
+      "updatedAt": 1790930340304
+    },
+    {
+      "id": "cmuqpomoi002zxa4w9emurg7g",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-07",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340307,
+      "updatedAt": 1790930340307
+    },
+    {
+      "id": "cmuqpomol0031xa4w8dknvj23",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "date": "2026-10-08",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340310,
+      "updatedAt": 1790930340310
+    },
+    {
+      "id": "cmuqpomoo0033xa4wrgu4xehr",
+      "mealId": "cmuqpommb001hxa4w2num75db",
+      "date": "2026-10-08",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340312,
+      "updatedAt": 1790930340312
+    },
+    {
+      "id": "cmuqpomor0035xa4wzfwhafht",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-08",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340315,
+      "updatedAt": 1790930340315
+    },
+    {
+      "id": "cmuqpomou0037xa4w8f3urdh9",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-09",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340318,
+      "updatedAt": 1790930340318
+    },
+    {
+      "id": "cmuqpomox0039xa4wf9xce9yc",
+      "mealId": "cmuqpommi001nxa4wnke51sap",
+      "date": "2026-10-09",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340321,
+      "updatedAt": 1790930340321
+    },
+    {
+      "id": "cmuqpomp0003bxa4wq68dtg9e",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-09",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340324,
+      "updatedAt": 1790930340324
+    },
+    {
+      "id": "cmuqpomp2003dxa4wqk6ro03r",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-10",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340327,
+      "updatedAt": 1790930340327
+    },
+    {
+      "id": "cmuqpomp5003fxa4wk9mompjh",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "date": "2026-10-10",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340330,
+      "updatedAt": 1790930340330
+    },
+    {
+      "id": "cmuqpomp9003hxa4wuho2zd3r",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-10",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340333,
+      "updatedAt": 1790930340333
+    },
+    {
+      "id": "cmuqpompc003jxa4wmrh4fbvc",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-10",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340336,
+      "updatedAt": 1790930340336
+    },
+    {
+      "id": "cmuqpompf003lxa4wz9bk1qx6",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-11",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340339,
+      "updatedAt": 1790930340339
+    },
+    {
+      "id": "cmuqpompi003nxa4w27srly3b",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "date": "2026-10-11",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340343,
+      "updatedAt": 1790930340343
+    },
+    {
+      "id": "cmuqpompm003pxa4w3pqzngs9",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "date": "2026-10-11",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340346,
+      "updatedAt": 1790930340346
+    },
+    {
+      "id": "cmuqpompp003rxa4wlzj7zo46",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "date": "2026-10-11",
+      "availableQuantity": 45,
+      "maxQuantity": 50,
+      "orderingDeadline": "08:30",
+      "isActive": 1,
+      "createdAt": 1790930340350,
+      "updatedAt": 1790930340350
+    }
+  ],
+  "Order": [
+    {
+      "id": "ORD-2026-000101",
+      "parentId": "cmuqpomkx000lxa4woyhtdjo5",
+      "totalAmount": 190.0,
+      "paymentStatus": "PAID",
+      "orderStatus": "COLLECTED",
+      "notes": "No spice for Aarav",
+      "createdAt": 1790843940352,
+      "updatedAt": 1790930340353
+    },
+    {
+      "id": "ORD-2026-000123",
+      "parentId": "cmuqpomkx000lxa4woyhtdjo5",
+      "totalAmount": 195.0,
+      "paymentStatus": "PAID",
+      "orderStatus": "PREPARING",
+      "notes": "Allergy alert: Parent acknowledged Milk warning for Aarav",
+      "createdAt": 1790930340356,
+      "updatedAt": 1790930340357
+    },
+    {
+      "id": "ORD-2026-000124",
+      "parentId": "cmuqpoml4000nxa4w18rz101t",
+      "totalAmount": 120.0,
+      "paymentStatus": "PAID",
+      "orderStatus": "CONFIRMED",
+      "notes": "Parent acknowledged wheat warning for Kabir",
+      "createdAt": 1790930340359,
+      "updatedAt": 1790930340361
+    },
+    {
+      "id": "ORD-2026-000125",
+      "parentId": "cmuqpomkx000lxa4woyhtdjo5",
+      "totalAmount": 210.0,
+      "paymentStatus": "PAID",
+      "orderStatus": "CONFIRMED",
+      "notes": "Packed lunch box",
+      "createdAt": 1790930340363,
+      "updatedAt": 1790930340365
+    }
+  ],
+  "Payment": [
+    {
+      "id": "PAY-2026-9001",
+      "orderId": "ORD-2026-000101",
+      "amount": 190.0,
+      "paymentMethod": "UPI",
+      "status": "SUCCESS",
+      "transactionRef": "UPI-982103847291",
+      "upiId": "sharma.pooja@okhdfcbank",
+      "cardLastFour": null,
+      "bankName": null,
+      "createdAt": 1790843940352
+    },
+    {
+      "id": "PAY-2026-9145",
+      "orderId": "ORD-2026-000123",
+      "amount": 195.0,
+      "paymentMethod": "UPI",
+      "status": "SUCCESS",
+      "transactionRef": "UPI-984210491823",
+      "upiId": "sharma.pooja@okhdfcbank",
+      "cardLastFour": null,
+      "bankName": null,
+      "createdAt": 1790930340356
+    },
+    {
+      "id": "PAY-2026-9146",
+      "orderId": "ORD-2026-000124",
+      "amount": 120.0,
+      "paymentMethod": "CARD",
+      "status": "SUCCESS",
+      "transactionRef": "CARD-TXN-491203",
+      "upiId": null,
+      "cardLastFour": "4242",
+      "bankName": null,
+      "createdAt": 1790930340359
+    },
+    {
+      "id": "PAY-2026-9147",
+      "orderId": "ORD-2026-000125",
+      "amount": 210.0,
+      "paymentMethod": "NET_BANKING",
+      "status": "SUCCESS",
+      "transactionRef": "NETB-849201948",
+      "upiId": null,
+      "cardLastFour": null,
+      "bankName": "HDFC Bank",
+      "createdAt": 1790930340363
+    }
+  ],
+  "Allergy": [
+    {
+      "id": "cmuqpomf20000xa4wnhnkr3y9",
+      "name": "Milk",
+      "createdAt": 1790930339967
+    },
+    {
+      "id": "cmuqpomf60001xa4wu4if6mbp",
+      "name": "Peanuts",
+      "createdAt": 1790930339970
+    },
+    {
+      "id": "cmuqpomf80002xa4wncntqj46",
+      "name": "Egg",
+      "createdAt": 1790930339973
+    },
+    {
+      "id": "cmuqpomfd0003xa4whktemn3h",
+      "name": "Soy",
+      "createdAt": 1790930339977
+    },
+    {
+      "id": "cmuqpomfi0004xa4wklafyv2z",
+      "name": "Wheat",
+      "createdAt": 1790930339982
+    },
+    {
+      "id": "cmuqpomfk0005xa4wem3b4eso",
+      "name": "Tree Nuts",
+      "createdAt": 1790930339984
+    },
+    {
+      "id": "cmuqpomfo0006xa4w9ltt3090",
+      "name": "Fish",
+      "createdAt": 1790930339989
+    },
+    {
+      "id": "cmuqpomfs0007xa4w3d9irh3u",
+      "name": "Shellfish",
+      "createdAt": 1790930339992
+    },
+    {
+      "id": "cmuqpomfv0008xa4wyzgmfwzs",
+      "name": "Sesame",
+      "createdAt": 1790930339995
+    }
+  ],
+  "StudentAllergy": [
+    {
+      "id": "cmuqpomlb000rxa4wcft9isab",
+      "studentId": "cmuqpomlb000pxa4wnchj1tgv",
+      "allergyId": "cmuqpomf20000xa4wnhnkr3y9",
+      "customNote": null,
+      "createdAt": 1790930340191
+    },
+    {
+      "id": "cmuqpomlb000sxa4w7bxg2x03",
+      "studentId": "cmuqpomlb000pxa4wnchj1tgv",
+      "allergyId": "cmuqpomf60001xa4wu4if6mbp",
+      "customNote": null,
+      "createdAt": 1790930340191
+    },
+    {
+      "id": "cmuqpomll000yxa4w6ev33wmh",
+      "studentId": "cmuqpomll000wxa4wdody7u3o",
+      "allergyId": "cmuqpomfi0004xa4wklafyv2z",
+      "customNote": null,
+      "createdAt": 1790930340202
+    }
+  ],
+  "Allergen": [
+    {
+      "id": "cmuqpomfx0009xa4wsz1t03b3",
+      "name": "Milk",
+      "createdAt": 1790930339997
+    },
+    {
+      "id": "cmuqpomg1000axa4w7drr1s9o",
+      "name": "Peanuts",
+      "createdAt": 1790930340002
+    },
+    {
+      "id": "cmuqpomg5000bxa4w9dez0izx",
+      "name": "Tree Nuts",
+      "createdAt": 1790930340005
+    },
+    {
+      "id": "cmuqpomg7000cxa4wvbvi9faf",
+      "name": "Wheat",
+      "createdAt": 1790930340008
+    },
+    {
+      "id": "cmuqpomgc000dxa4w2jn6c3dr",
+      "name": "Egg",
+      "createdAt": 1790930340013
+    },
+    {
+      "id": "cmuqpomgg000exa4wwwa6dzqd",
+      "name": "Soy",
+      "createdAt": 1790930340016
+    },
+    {
+      "id": "cmuqpomgi000fxa4wzwev9g4y",
+      "name": "Cashew",
+      "createdAt": 1790930340019
+    },
+    {
+      "id": "cmuqpomgl000gxa4wfu2u66h2",
+      "name": "Gluten",
+      "createdAt": 1790930340022
+    },
+    {
+      "id": "cmuqpomgp000hxa4wp46ot5jf",
+      "name": "Mustard",
+      "createdAt": 1790930340026
+    },
+    {
+      "id": "cmuqpomgs000ixa4wvbvxu9u3",
+      "name": "Sesame",
+      "createdAt": 1790930340029
+    }
+  ],
+  "MealAllergen": [
+    {
+      "id": "cmuqpomlr0011xa4w60nhm9xo",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "allergenId": "cmuqpomfx0009xa4wsz1t03b3",
+      "createdAt": 1790930340208
+    },
+    {
+      "id": "cmuqpomlr0012xa4w3caik994",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "allergenId": "cmuqpomgi000fxa4wzwev9g4y",
+      "createdAt": 1790930340208
+    },
+    {
+      "id": "cmuqpomlw0015xa4wssh1mn7u",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "allergenId": "cmuqpomg7000cxa4wvbvi9faf",
+      "createdAt": 1790930340212
+    },
+    {
+      "id": "cmuqpomlw0016xa4wts1sju3d",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "allergenId": "cmuqpomfx0009xa4wsz1t03b3",
+      "createdAt": 1790930340212
+    },
+    {
+      "id": "cmuqpomlw0017xa4wll5c3vie",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "allergenId": "cmuqpomgl000gxa4wfu2u66h2",
+      "createdAt": 1790930340212
+    },
+    {
+      "id": "cmuqpomm3001bxa4w3j4za93d",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "allergenId": "cmuqpomg7000cxa4wvbvi9faf",
+      "createdAt": 1790930340220
+    },
+    {
+      "id": "cmuqpomm3001cxa4wdb48lp5r",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "allergenId": "cmuqpomfx0009xa4wsz1t03b3",
+      "createdAt": 1790930340220
+    },
+    {
+      "id": "cmuqpomm3001dxa4w8a2zsig6",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "allergenId": "cmuqpomgl000gxa4wfu2u66h2",
+      "createdAt": 1790930340220
+    },
+    {
+      "id": "cmuqpomm7001gxa4w5t3biyol",
+      "mealId": "cmuqpomm7001exa4wdor9k7pg",
+      "allergenId": "cmuqpomgp000hxa4wp46ot5jf",
+      "createdAt": 1790930340223
+    },
+    {
+      "id": "cmuqpommb001jxa4w40rphdda",
+      "mealId": "cmuqpommb001hxa4w2num75db",
+      "allergenId": "cmuqpomfx0009xa4wsz1t03b3",
+      "createdAt": 1790930340227
+    },
+    {
+      "id": "cmuqpommf001mxa4w4j2yn9u8",
+      "mealId": "cmuqpommf001kxa4wsaphea2k",
+      "allergenId": "cmuqpomg5000bxa4w9dez0izx",
+      "createdAt": 1790930340231
+    },
+    {
+      "id": "cmuqpommi001pxa4wo6q16yee",
+      "mealId": "cmuqpommi001nxa4wnke51sap",
+      "allergenId": "cmuqpomg7000cxa4wvbvi9faf",
+      "createdAt": 1790930340235
+    },
+    {
+      "id": "cmuqpommi001qxa4wi9jlx6qk",
+      "mealId": "cmuqpommi001nxa4wnke51sap",
+      "allergenId": "cmuqpomfx0009xa4wsz1t03b3",
+      "createdAt": 1790930340235
+    },
+    {
+      "id": "cmuqpommi001rxa4wn6efmb1k",
+      "mealId": "cmuqpommi001nxa4wnke51sap",
+      "allergenId": "cmuqpomgl000gxa4wfu2u66h2",
+      "createdAt": 1790930340235
+    }
+  ],
+  "SystemSetting": [
+    {
+      "key": "ALLOW_ALLERGY_ORDERS",
+      "value": "true",
+      "updatedAt": 1790930475795
+    }
+  ],
+  "OrderItem": [
+    {
+      "id": "cmuqpompt003txa4wpsdvam36",
+      "orderId": "ORD-2026-000101",
+      "studentId": "cmuqpomlb000pxa4wnchj1tgv",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-01",
+      "quantity": 1,
+      "unitPrice": 100.0,
+      "totalPrice": 100.0,
+      "hasAllergyAlert": 1,
+      "conflictAllergens": "Milk",
+      "createdAt": 1790930340353
+    },
+    {
+      "id": "cmuqpompt003uxa4w0m3663y4",
+      "orderId": "ORD-2026-000101",
+      "studentId": "cmuqpomli000uxa4wb4saj2yh",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-01",
+      "quantity": 1,
+      "unitPrice": 90.0,
+      "totalPrice": 90.0,
+      "hasAllergyAlert": 0,
+      "conflictAllergens": null,
+      "createdAt": 1790930340353
+    },
+    {
+      "id": "cmuqpompx003wxa4wfd3ohwog",
+      "orderId": "ORD-2026-000123",
+      "studentId": "cmuqpomlb000pxa4wnchj1tgv",
+      "mealId": "cmuqpomlr000zxa4wnmbtiwrq",
+      "date": "2026-10-02",
+      "quantity": 1,
+      "unitPrice": 100.0,
+      "totalPrice": 100.0,
+      "hasAllergyAlert": 1,
+      "conflictAllergens": "Milk",
+      "createdAt": 1790930340357
+    },
+    {
+      "id": "cmuqpompx003xxa4w3niypgt9",
+      "orderId": "ORD-2026-000123",
+      "studentId": "cmuqpomli000uxa4wb4saj2yh",
+      "mealId": "cmuqpomm30019xa4wokwgpxm0",
+      "date": "2026-10-02",
+      "quantity": 1,
+      "unitPrice": 95.0,
+      "totalPrice": 95.0,
+      "hasAllergyAlert": 0,
+      "conflictAllergens": null,
+      "createdAt": 1790930340357
+    },
+    {
+      "id": "cmuqpomq0003zxa4wjbmhmiuq",
+      "orderId": "ORD-2026-000124",
+      "studentId": "cmuqpomll000wxa4wdody7u3o",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "date": "2026-10-02",
+      "quantity": 1,
+      "unitPrice": 120.0,
+      "totalPrice": 120.0,
+      "hasAllergyAlert": 1,
+      "conflictAllergens": "Wheat",
+      "createdAt": 1790930340361
+    },
+    {
+      "id": "cmuqpomq40041xa4wnedlpu0j",
+      "orderId": "ORD-2026-000125",
+      "studentId": "cmuqpomlb000pxa4wnchj1tgv",
+      "mealId": "cmuqpomlv0013xa4w1cloxy4k",
+      "date": "2026-10-03",
+      "quantity": 1,
+      "unitPrice": 120.0,
+      "totalPrice": 120.0,
+      "hasAllergyAlert": 1,
+      "conflictAllergens": "Milk",
+      "createdAt": 1790930340365
+    },
+    {
+      "id": "cmuqpomq40042xa4w50hu7m13",
+      "orderId": "ORD-2026-000125",
+      "studentId": "cmuqpomli000uxa4wb4saj2yh",
+      "mealId": "cmuqpomm00018xa4wizaekzvh",
+      "date": "2026-10-03",
+      "quantity": 1,
+      "unitPrice": 90.0,
+      "totalPrice": 90.0,
+      "hasAllergyAlert": 0,
+      "conflictAllergens": null,
+      "createdAt": 1790930340365
+    }
+  ]
+}

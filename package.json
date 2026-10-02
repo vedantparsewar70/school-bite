@@ -6,6 +6,10 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:import-sqlite": "npx tsx scripts/restore-to-postgres.ts",
     "start": "next start",
     "lint": "eslint"
   },
