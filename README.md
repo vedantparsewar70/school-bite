@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NutriKids — School Canteen Meal Ordering & Management System
 
-## Getting Started
+> A modern, responsive, full-stack web application designed for Indian schools to streamline canteen operations, enable advance healthy meal scheduling for parents, and simplify lunch prep for kitchen staff.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🌟 Key Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 👨‍👩‍👧‍👦 Parent Portal
+- **Account & Profile**: Secure registration with ₹500 welcome meal wallet credit, profile management, and contact updates.
+- **Multi-Child Management**: Register multiple children with Class, Division, Roll Number, Student ID, Allergies/Dietary alerts, and Pure Veg / Non-Veg classification.
+- **Daily & Weekly Menus**: Visual menu browser featuring Indian school lunches with high-res photos, ingredients, calorie counts, prices in ₹, available stock, and cutoff deadlines.
+- **Child-Specific Meal Selection**: Select different meals for different siblings (e.g., Aarav gets *Paneer Rice Bowl* while Anaya gets *Creamy Veg Pasta*) across different dates in a single checkout.
+- **Multi-Child Cart**: Shopping cart grouped cleanly by child and scheduled date with quantity controls and special chef preparation notes.
+- **Simulated Payment Gateway**: Tailored for Indian schools with UPI (GPay, PhonePe, Paytm, custom VPA), RuPay/Cards, Net Banking (SBI, HDFC, ICICI, Axis), and instant 1-click School Meal Wallet.
+- **Order Tracking & Vouchers**: Real-time status tracking (*Confirmed → Preparing → Ready → Collected*). Printable official canteen tokens/vouchers with QR code mock.
+- **Cancellation & Instant Refund**: Cancel meals prior to the 08:30 AM cutoff deadline with automatic stock restoration and wallet refund.
+- **Payment History**: Detailed transaction log with transaction IDs, order references, payment modes, and date/status filters.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🏫 School & Canteen Admin Portal
+- **Operations Dashboard**: Real-time KPI tiles for *Today's Orders*, *Revenue (₹)*, *Pending Orders*, *Meals Sold*, and *Students Served*.
+- **Live Status Controller**: Quickly advance orders through fulfillment stages (*Confirmed → Preparing → Ready → Collected*).
+- **Master Meal Catalog**: Create, edit, and categorize recipes with allergens, ingredients, calories, and prices.
+- **Date Scheduling & Quotas**: Publish daily menus for specific dates, configure preparation quotas (e.g. 50 portions), and set order cutoff deadlines (e.g. 08:30 AM).
+- **Dedicated Kitchen Display System (KDS)**:
+  - Simplified, high-contrast, tablet/desktop optimized view.
+  - Aggregated meal prep targets (e.g., *Paneer Rice Bowl — 75*, *Veg Thali — 62*, *Total: 216*).
+  - Classroom & Division breakdown for distribution.
+  - Student checklist highlighting allergy alerts.
+  - One-click bulk status updating (*Mark All in Prep*, *Mark All Ready*, *Mark All Collected*).
+  - Print Kitchen Preparation Sheet & One-Click CSV Export.
+- **Sales & Operations Reports**:
+  - Daily, weekly, and monthly sales aggregations.
+  - Most ordered meals ranking with visual progress bars.
+  - Order volume breakdown by Class and Division.
+  - Comprehensive CSV audit export.
+- **Accounts Directory**: Overview of enrolled parents, student profiles, and prepaid wallet balances.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🔑 Demo Credentials
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Role | Email | Password | Details |
+| :--- | :--- | :--- | :--- |
+| **Parent** | `parent@example.com` | `Parent123` | Pre-registered with 2 children (*Aarav Sharma* & *Anaya Sharma*), ₹500 wallet balance, and active orders. |
+| **Canteen Admin** | `admin@school.com` | `Admin123` | Full administrative control, kitchen view, menu management, and sales reports. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> *Quick-fill buttons are integrated directly into the login screen for instant one-click testing.*
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🛠 Tech Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Lucide React Icons, Canvas-Confetti
+- **Backend**: Next.js API Routes & Server Actions
+- **Database**: SQLite with Prisma ORM 6 (file: `prisma/dev.db`)
+- **Authentication**: JWT session tokens via `jose` with HTTP-Only secure cookies and `bcryptjs` password hashing
+- **Currency & Localization**: Indian Rupee (₹ INR), Indian FSSAI Veg/Non-Veg badges, date formatting for Indian school terms
+
+---
+
+## 🚀 Running Locally
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Sync database and generate Prisma Client**:
+   ```bash
+   npx prisma db push
+   ```
+
+3. **Seed demo Indian school meals and sample orders**:
+   ```bash
+   npx tsx prisma/seed.ts
+   ```
+
+4. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:3000` (or `http://localhost:3001` if port 3000 is occupied).
+
+5. **Run End-to-End Automated Integration Test**:
+   ```bash
+   npx tsx test-e2e.ts
+   ```

@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String   @default("PARENT") // "PARENT" | "ADMIN"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  parent       Parent?
+}
+
+model Parent {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletBalance Float     @default(500.0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  students      Student[]
+  orders        Order[]
+}
+
+model Student {
+  id           String      @id @default(cuid())
+  parentId     String
+  parent       Parent      @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  name         String
+  dob          String?
+  grade        String      // Class, e.g. "5"
+  division     String      // Division, e.g. "A"
+  rollNo       String
+  studentId    String      @unique // e.g. "STU-2026-081"
+  allergies    String?     // e.g. "Peanuts, Dairy"
+  isVegetarian Boolean     @default(true)
+  profilePhoto String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  orderItems   OrderItem[]
+}
+
+model Meal {
+  id              String      @id @default(cuid())
+  name            String
+  description     String
+  category        String      @default("LUNCH") // LUNCH, SNACKS, BEVERAGE
+  isVegetarian    Boolean     @default(true)
+  ingredients     String?
+  allergens       String?
+  calories        Int?
+  price           Float
+  imageUrl        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  menus           Menu[]
+  orderItems      OrderItem[]
+}
+
+model Menu {
+  id               String   @id @default(cuid())
+  mealId           String
+  meal             Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  date             String   // "YYYY-MM-DD"
+  availableQuantity Int     @default(50)
+  maxQuantity      Int      @default(50)
+  orderingDeadline String   @default("08:30") // Cutoff time "HH:mm" on that date or previous day
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([mealId, date])
+}
+
+model Order {
+  id            String      @id // e.g. "ORD-2026-000123"
+  parentId      String
+  parent        Parent      @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  totalAmount   Float
+  paymentStatus String      @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  orderStatus   String      @default("CONFIRMED") // CONFIRMED, PREPARING, READY, COLLECTED, CANCELLED
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  items         OrderItem[]
+  payments      Payment[]
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mealId     String
+  meal       Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  date       String   // Meal date "YYYY-MM-DD"
+  quantity   Int      @default(1)
+  unitPrice  Float
+  totalPrice Float
+  createdAt  DateTime @default(now())
+}
+
+model Payment {
+  id             String   @id // e.g. "PAY-2026-98124"
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount         Float
+  paymentMethod  String   // "UPI", "CARD", "NET_BANKING", "WALLET"
+  status         String   @default("SUCCESS") // "SUCCESS", "PENDING", "FAILED"
+  transactionRef String   // e.g. "TXN-UPI-98421049"
+  upiId          String?
+  cardLastFour   String?
+  bankName       String?
+  createdAt      DateTime @default(now())
+}

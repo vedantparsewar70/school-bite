@@ -1,0 +1,588 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import {
+  Users,
+  Plus,
+  Edit2,
+  Trash2,
+  UtensilsCrossed,
+  AlertCircle,
+  Eye,
+  X,
+  CheckCircle2,
+  Calendar,
+  Sparkles,
+  Camera,
+} from 'lucide-react';
+import { useAuth } from '@/components/AuthContext';
+import { useToast } from '@/components/ToastContext';
+import VegBadge from '@/components/VegBadge';
+import { StudentData } from '@/types';
+
+export default function ChildrenPage() {
+  const { user, refreshUser } = useAuth();
+  const { showToast } = useToast();
+
+  const [children, setChildren] = useState<StudentData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingChild, setEditingChild] = useState<StudentData | null>(null);
+  const [viewingChild, setViewingChild] = useState<StudentData | null>(null);
+
+  // Form states
+  const [formName, setFormName] = useState('');
+  const [formDob, setFormDob] = useState('');
+  const [formGrade, setFormGrade] = useState('5');
+  const [formDivision, setFormDivision] = useState('A');
+  const [formRollNo, setFormRollNo] = useState('');
+  const [formStudentId, setFormStudentId] = useState('');
+  const [formAllergies, setFormAllergies] = useState('');
+  const [formIsVeg, setFormIsVeg] = useState(true);
+  const [formPhoto, setFormPhoto] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchChildren = async () => {
+    try {
+      const res = await fetch('/api/parent/children');
+      if (res.ok) {
+        const data = await res.json();
+        setChildren(data.students || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch children:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChildren();
+  }, []);
+
+  const openAddModal = () => {
+    setEditingChild(null);
+    setFormName('');
+    setFormDob('2016-05-15');
+    setFormGrade('5');
+    setFormDivision('A');
+    setFormRollNo('');
+    setFormStudentId(`STU-2026-${Math.floor(100 + Math.random() * 900)}`);
+    setFormAllergies('');
+    setFormIsVeg(true);
+    setFormPhoto('https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80');
+    setIsAddModalOpen(true);
+  };
+
+  const openEditModal = (child: StudentData) => {
+    setEditingChild(child);
+    setFormName(child.name);
+    setFormDob(child.dob || '');
+    setFormGrade(child.grade);
+    setFormDivision(child.division);
+    setFormRollNo(child.rollNo);
+    setFormStudentId(child.studentId);
+    setFormAllergies(child.allergies || '');
+    setFormIsVeg(child.isVegetarian);
+    setFormPhoto(child.profilePhoto || '');
+    setIsAddModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      if (editingChild) {
+        // Update
+        const res = await fetch('/api/parent/children', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingChild.id,
+            name: formName,
+            dob: formDob,
+            grade: formGrade,
+            division: formDivision,
+            rollNo: formRollNo,
+            allergies: formAllergies,
+            isVegetarian: formIsVeg,
+            profilePhoto: formPhoto,
+          }),
+        });
+
+        if (res.ok) {
+          showToast(`Updated profile for ${formName}`, 'success');
+          setIsAddModalOpen(false);
+          await fetchChildren();
+          await refreshUser();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to update child', 'error');
+        }
+      } else {
+        // Create
+        const res = await fetch('/api/parent/children', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formName,
+            dob: formDob,
+            grade: formGrade,
+            division: formDivision,
+            rollNo: formRollNo,
+            studentId: formStudentId,
+            allergies: formAllergies,
+            isVegetarian: formIsVeg,
+            profilePhoto: formPhoto,
+          }),
+        });
+
+        if (res.ok) {
+          showToast(`Added ${formName} to your children list!`, 'success');
+          setIsAddModalOpen(false);
+          await fetchChildren();
+          await refreshUser();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to add child', 'error');
+        }
+      }
+    } catch {
+      showToast('Network error saving child details', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (childId: string, name: string) => {
+    if (!confirm(`Are you sure you want to deactivate ${name}?`)) return;
+
+    try {
+      const res = await fetch(`/api/parent/children?id=${childId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        showToast(`Removed ${name}`, 'info');
+        await fetchChildren();
+        await refreshUser();
+      } else {
+        showToast('Failed to remove child', 'error');
+      }
+    } catch {
+      showToast('Network error while deleting child', 'error');
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Top Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <Users className="w-7 h-7 text-amber-500" />
+            <span>My Children</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Register your children with their class, division, and dietary restrictions to order customized meals.
+          </p>
+        </div>
+
+        <button
+          onClick={openAddModal}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Another Child</span>
+        </button>
+      </div>
+
+      {/* Children Cards Grid */}
+      {loading ? (
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : children.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-4 max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <Users className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">No Children Registered Yet</h3>
+          <p className="text-xs text-slate-500">
+            Add your child's school details to customize their daily lunch and snack orders.
+          </p>
+          <button
+            onClick={openAddModal}
+            className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-amber-600 transition-colors"
+          >
+            Add Your First Child
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {children.map((child) => (
+            <div
+              key={child.id}
+              className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl transition-all space-y-5 flex flex-col justify-between"
+            >
+              <div>
+                {/* Child Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-amber-100 border border-amber-200 shrink-0 shadow-xs">
+                      <img
+                        src={
+                          child.profilePhoto ||
+                          'https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80'
+                        }
+                        alt={child.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-extrabold text-slate-900 text-base">{child.name}</h3>
+                        <VegBadge isVegetarian={child.isVegetarian} size="sm" />
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400 font-semibold">{child.studentId}</span>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full">
+                    Class {child.grade}-{child.division}
+                  </span>
+                </div>
+
+                {/* Details Grid */}
+                <div className="mt-4 grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Class</p>
+                    <p className="text-sm font-extrabold text-slate-800">{child.grade}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Division</p>
+                    <p className="text-sm font-extrabold text-slate-800">{child.division}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Roll No.</p>
+                    <p className="text-sm font-extrabold text-slate-800">{child.rollNo}</p>
+                  </div>
+                </div>
+
+                {/* Allergies / Notes */}
+                <div className="mt-3.5 space-y-1">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Dietary Restrictions & Allergies
+                  </p>
+                  {child.allergies ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-semibold rounded-lg border border-rose-200">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{child.allergies}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-100">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> No known allergies
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setViewingChild(child)}
+                    className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                    title="View Student ID Card"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => openEditModal(child)}
+                    className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
+                    title="Edit Child Details"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(child.id, child.name)}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                    title="Deactivate Child"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <Link
+                  href={`/parent/menu?childId=${child.id}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                >
+                  <UtensilsCrossed className="w-3.5 h-3.5" />
+                  <span>Order Meal</span>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add / Edit Child Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-100">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">
+                  {editingChild ? `Edit Child: ${editingChild.name}` : 'Register a Child'}
+                </h3>
+                <p className="text-xs text-slate-500">Provide child school credentials and dietary needs</p>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Student Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. Aarav Sharma"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={formDob}
+                    onChange={(e) => setFormDob(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Student ID No. *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formStudentId}
+                    onChange={(e) => setFormStudentId(e.target.value)}
+                    placeholder="e.g. STU-2026-012"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Class / Grade *
+                  </label>
+                  <select
+                    value={formGrade}
+                    onChange={(e) => setFormGrade(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                  >
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((g) => (
+                      <option key={g} value={g}>
+                        Class {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Division *
+                  </label>
+                  <select
+                    value={formDivision}
+                    onChange={(e) => setFormDivision(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                  >
+                    {['A', 'B', 'C', 'D', 'E'].map((d) => (
+                      <option key={d} value={d}>
+                        Div {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Roll No *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formRollNo}
+                    onChange={(e) => setFormRollNo(e.target.value)}
+                    placeholder="12"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Food Dietary Category
+                </label>
+                <div className="flex items-center gap-4 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                    <input
+                      type="radio"
+                      name="dietType"
+                      checked={formIsVeg === true}
+                      onChange={() => setFormIsVeg(true)}
+                      className="accent-emerald-600"
+                    />
+                    <VegBadge isVegetarian={true} showLabel={true} />
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                    <input
+                      type="radio"
+                      name="dietType"
+                      checked={formIsVeg === false}
+                      onChange={() => setFormIsVeg(false)}
+                      className="accent-rose-600"
+                    />
+                    <VegBadge isVegetarian={false} showLabel={true} />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Allergies / Dietary Restrictions (if any)
+                </label>
+                <input
+                  type="text"
+                  value={formAllergies}
+                  onChange={(e) => setFormAllergies(e.target.value)}
+                  placeholder="e.g. Peanuts, Lactose Intolerant, Gluten Sensitive"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">This will be highlighted to the canteen chef.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Profile Photo URL (optional)
+                </label>
+                <input
+                  type="url"
+                  value={formPhoto}
+                  onChange={(e) => setFormPhoto(e.target.value)}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+                >
+                  {submitting ? 'Saving...' : editingChild ? 'Save Changes' : 'Register Child'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Child ID Card Modal */}
+      {viewingChild && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 space-y-6 text-center">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                School Student ID
+              </span>
+              <button
+                onClick={() => setViewingChild(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="w-24 h-24 rounded-full overflow-hidden mx-auto border-4 border-amber-300 shadow-md">
+              <img
+                src={
+                  viewingChild.profilePhoto ||
+                  'https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80'
+                }
+                alt={viewingChild.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-center gap-1.5">
+                <h3 className="text-xl font-extrabold text-slate-900">{viewingChild.name}</h3>
+                <VegBadge isVegetarian={viewingChild.isVegetarian} size="md" />
+              </div>
+              <p className="font-mono text-xs font-bold text-amber-700">{viewingChild.studentId}</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl text-xs">
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Class</p>
+                <p className="font-extrabold text-slate-800">{viewingChild.grade}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Division</p>
+                <p className="font-extrabold text-slate-800">{viewingChild.division}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Roll No</p>
+                <p className="font-extrabold text-slate-800">{viewingChild.rollNo}</p>
+              </div>
+            </div>
+
+            {viewingChild.allergies && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-medium">
+                ⚠️ Allergy: {viewingChild.allergies}
+              </div>
+            )}
+
+            <Link
+              href={`/parent/menu?childId=${viewingChild.id}`}
+              onClick={() => setViewingChild(null)}
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              <span>Select Meals for {viewingChild.name.split(' ')[0]}</span>
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
