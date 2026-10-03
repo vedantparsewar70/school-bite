@@ -5,7 +5,7 @@ const isVercel = Boolean(process.env.VERCEL);
 const nextConfig: NextConfig = {
   // Use standalone only when not on Vercel (e.g. Docker VPS builds)
   ...(isVercel ? {} : { output: "standalone" }),
-  serverExternalPackages: ["@prisma/client", "prisma"],
+  serverExternalPackages: ["firebase-admin", "@prisma/client", "prisma"],
   outputFileTracingIncludes: {
     '/**': ['./node_modules/.prisma/client/**/*', './prisma/**/*'],
   },

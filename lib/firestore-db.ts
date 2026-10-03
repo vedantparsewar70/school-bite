@@ -1,0 +1,1261 @@
+import { db } from './firebase-admin';
+import type { DocumentSnapshot, Query, DocumentReference } from 'firebase-admin/firestore';
+
+export interface DbUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  phone?: string | null;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+  parent?: DbParent | null;
+}
+
+export interface DbParent {
+  id: string;
+  userId: string;
+  walletBalance: number;
+  createdAt: Date;
+  updatedAt: Date;
+  user: DbUser;
+  students: DbStudent[];
+  orders: DbOrder[];
+}
+
+export interface DbAllergy {
+  id: string;
+  name: string;
+  createdAt: Date;
+}
+
+export interface DbStudentAllergy {
+  id: string;
+  studentId: string;
+  allergyId: string;
+  customNote?: string | null;
+  createdAt: Date;
+  allergy: DbAllergy;
+}
+
+export interface DbStudent {
+  id: string;
+  parentId: string;
+  name: string;
+  dob?: string | null;
+  grade: string;
+  division: string;
+  rollNo: string;
+  studentId: string;
+  allergies?: string | null;
+  dietaryRestrictions?: string | null;
+  foodPreference?: string | null;
+  notes?: string | null;
+  isVegetarian: boolean;
+  profilePhoto?: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  parent: DbParent;
+  studentAllergies: DbStudentAllergy[];
+  orderItems: DbOrderItem[];
+}
+
+export interface DbAllergen {
+  id: string;
+  name: string;
+  createdAt: Date;
+}
+
+export interface DbMealAllergen {
+  id: string;
+  mealId: string;
+  allergenId: string;
+  createdAt: Date;
+  allergen: DbAllergen;
+}
+
+export interface DbMeal {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  isVegetarian: boolean;
+  ingredients?: string | null;
+  allergens?: string | null;
+  calories?: number | null;
+  price: number;
+  imageUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  mealAllergens: DbMealAllergen[];
+}
+
+export interface DbMenu {
+  id: string;
+  mealId: string;
+  meal: DbMeal;
+  date: string;
+  availableQuantity: number;
+  maxQuantity: number;
+  orderingDeadline: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DbOrderItem {
+  id: string;
+  orderId: string;
+  studentId: string;
+  mealId: string;
+  date: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  hasAllergyAlert: boolean;
+  conflictAllergens?: string | null;
+  createdAt: Date;
+  student: DbStudent;
+  meal: DbMeal;
+  order: DbOrder;
+}
+
+export interface DbPayment {
+  id: string;
+  orderId: string;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  transactionRef: string;
+  upiId?: string | null;
+  cardLastFour?: string | null;
+  bankName?: string | null;
+  createdAt: Date;
+  order?: DbOrder;
+}
+
+export interface DbOrder {
+  id: string;
+  parentId: string;
+  totalAmount: number;
+  paymentStatus: string;
+  orderStatus: string;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  items: DbOrderItem[];
+  payments: DbPayment[];
+  parent: DbParent;
+}
+
+export interface DbSystemSetting {
+  key: string;
+  value: string;
+  updatedAt: Date;
+}
+
+// Helper to generate cuid-like unique id
+export function generateId(prefix: string = ''): string {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).substring(2, 9);
+  return `${prefix}${ts}${rand}`;
+}
+
+// Convert Firestore doc to JS object
+function docData(doc: DocumentSnapshot): any {
+  if (!doc.exists) return null;
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+  };
+}
+
+export class FirestoreDbAdapter {
+  // SystemSetting
+  systemSetting = {
+    findUnique: async ({ where }: { where: { key: string } }): Promise<DbSystemSetting | null> => {
+      const snap = await db.collection('systemSettings').doc(where.key).get();
+      return docData(snap);
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbSystemSetting> => {
+      const ref = db.collection('systemSettings').doc(where.key);
+      const snap = await ref.get();
+      const now = new Date().toISOString();
+      if (snap.exists) {
+        await ref.set({ ...update, updatedAt: now }, { merge: true });
+      } else {
+        await ref.set({ ...create, key: where.key, updatedAt: now });
+      }
+      const updatedSnap = await ref.get();
+      return docData(updatedSnap);
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('systemSettings').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+    create: async ({ data }: any): Promise<DbSystemSetting> => {
+      const key = data.key;
+      await db.collection('systemSettings').doc(key).set({ ...data, updatedAt: new Date().toISOString() });
+      return data;
+    },
+  };
+
+  // User
+  user = {
+    findUnique: async ({ where, include }: any): Promise<DbUser | null> => {
+      let doc: any = null;
+      if (where.id) {
+        const snap = await db.collection('users').doc(where.id).get();
+        doc = docData(snap);
+      } else if (where.email) {
+        const snap = await db.collection('users').where('email', '==', where.email.toLowerCase()).limit(1).get();
+        if (!snap.empty) {
+          doc = docData(snap.docs[0]);
+        }
+      }
+
+      if (!doc) return null;
+
+      if (include?.parent) {
+        const parentSnap = await db.collection('parents').where('userId', '==', doc.id).limit(1).get();
+        if (!parentSnap.empty) {
+          const parentData = docData(parentSnap.docs[0]);
+          if (include.parent.include?.students) {
+            const studentsSnap = await db
+              .collection('students')
+              .where('parentId', '==', parentData.id)
+              .where('isActive', '==', true)
+              .get();
+            const students = studentsSnap.docs.map((d) => docData(d)).sort((a: any, b: any) => a.name.localeCompare(b.name));
+            parentData.students = students;
+          }
+          doc.parent = parentData;
+        } else {
+          doc.parent = null;
+        }
+      }
+      return doc;
+    },
+    create: async ({ data, include }: any): Promise<DbUser> => {
+      const userId = data.id || generateId('usr_');
+      const now = new Date().toISOString();
+      const userRef = db.collection('users').doc(userId);
+
+      const { parent: parentCreate, ...userData } = data;
+      const userObj = {
+        id: userId,
+        ...userData,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await userRef.set(userObj);
+
+      let createdParent = null;
+      if (parentCreate?.create) {
+        const parentId = generateId('par_');
+        const parentObj = {
+          id: parentId,
+          userId,
+          walletBalance: parentCreate.create.walletBalance ?? 500,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await db.collection('parents').doc(parentId).set(parentObj);
+        createdParent = parentObj;
+      }
+
+      const res: any = { ...userObj };
+      if (include?.parent) {
+        res.parent = createdParent;
+      }
+      return res;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbUser> => {
+      const snap = await db.collection('users').doc(where.id).get();
+      if (snap.exists) {
+        await db.collection('users').doc(where.id).set(update, { merge: true });
+      } else {
+        await db.collection('users').doc(where.id).set({ id: where.id, ...create });
+      }
+      return docData(await db.collection('users').doc(where.id).get());
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('users').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Parent
+  parent = {
+    findUnique: async ({ where, include }: any): Promise<DbParent | null> => {
+      let pDoc: any = null;
+      if (where.id) {
+        const snap = await db.collection('parents').doc(where.id).get();
+        pDoc = docData(snap);
+      } else if (where.userId) {
+        const snap = await db.collection('parents').where('userId', '==', where.userId).limit(1).get();
+        if (!snap.empty) pDoc = docData(snap.docs[0]);
+      }
+      if (!pDoc) return null;
+
+      if (include?.user) {
+        const uSnap = await db.collection('users').doc(pDoc.userId).get();
+        pDoc.user = docData(uSnap);
+      }
+      if (include?.students) {
+        const sSnap = await db.collection('students').where('parentId', '==', pDoc.id).get();
+        pDoc.students = sSnap.docs.map((d) => docData(d));
+      }
+      return pDoc;
+    },
+    findMany: async ({ include, orderBy }: any = {}): Promise<DbParent[]> => {
+      const snap = await db.collection('parents').get();
+      let parents = snap.docs.map((d) => docData(d));
+
+      if (include) {
+        for (const p of parents) {
+          if (include.user) {
+            const uSnap = await db.collection('users').doc(p.userId).get();
+            p.user = docData(uSnap);
+          }
+          if (include.students) {
+            const sSnap = await db.collection('students').where('parentId', '==', p.id).get();
+            p.students = sSnap.docs.map((d) => docData(d));
+          }
+          if (include.orders) {
+            const oSnap = await db.collection('orders').where('parentId', '==', p.id).get();
+            p.orders = oSnap.docs.map((d) => docData(d));
+          }
+        }
+      }
+      if (orderBy?.createdAt === 'desc') {
+        parents.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      return parents;
+    },
+    update: async ({ where, data }: any): Promise<DbParent> => {
+      const ref = db.collection('parents').doc(where.id);
+      const now = new Date().toISOString();
+      const updateData: any = { updatedAt: now };
+
+      if (data.walletBalance !== undefined) {
+        if (typeof data.walletBalance === 'object' && data.walletBalance.increment !== undefined) {
+          const current = (await ref.get()).data()?.walletBalance || 0;
+          updateData.walletBalance = current + data.walletBalance.increment;
+        } else if (typeof data.walletBalance === 'object' && data.walletBalance.decrement !== undefined) {
+          const current = (await ref.get()).data()?.walletBalance || 0;
+          updateData.walletBalance = current - data.walletBalance.decrement;
+        } else {
+          updateData.walletBalance = Number(data.walletBalance);
+        }
+      }
+
+      await ref.set(updateData, { merge: true });
+      return docData(await ref.get());
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbParent> => {
+      const ref = db.collection('parents').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    count: async (): Promise<number> => {
+      const snap = await db.collection('parents').count().get();
+      return snap.data().count;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('parents').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Student
+  student = {
+    findMany: async ({ where, include, orderBy }: any = {}): Promise<DbStudent[]> => {
+      let query: Query = db.collection('students');
+      if (where?.parentId) {
+        query = query.where('parentId', '==', where.parentId);
+      }
+      if (where?.isActive !== undefined) {
+        query = query.where('isActive', '==', where.isActive);
+      }
+      const snap = await query.get();
+      let list = snap.docs.map((d) => docData(d));
+
+      for (const st of list) {
+        if (!st.studentAllergies) st.studentAllergies = [];
+        if (!st.orderItems) st.orderItems = [];
+      }
+
+      if (include?.studentAllergies) {
+        for (const st of list) {
+          const saSnap = await db.collection('studentAllergies').where('studentId', '==', st.id).get();
+          const saList = saSnap.docs.map((d) => docData(d));
+          if (include.studentAllergies.include?.allergy) {
+            for (const sa of saList) {
+              const aSnap = await db.collection('allergies').doc(sa.allergyId).get();
+              sa.allergy = docData(aSnap);
+            }
+          }
+          st.studentAllergies = saList;
+        }
+      }
+
+      if (include?.orderItems) {
+        for (const st of list) {
+          const oiSnap = await db.collection('orderItems').where('studentId', '==', st.id).get();
+          st.orderItems = oiSnap.docs.map((d) => docData(d));
+        }
+      }
+
+      if (include?.parent) {
+        for (const st of list) {
+          const pSnap = await db.collection('parents').doc(st.parentId).get();
+          const pData = docData(pSnap);
+          if (pData && include.parent.include?.user) {
+            const uSnap = await db.collection('users').doc(pData.userId).get();
+            pData.user = docData(uSnap);
+          }
+          st.parent = pData;
+        }
+      }
+
+      if (orderBy?.name === 'asc') {
+        list.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      }
+      return list;
+    },
+    findUnique: async ({ where, include }: any): Promise<DbStudent | null> => {
+      let st: any = null;
+      if (where.id) {
+        const snap = await db.collection('students').doc(where.id).get();
+        st = docData(snap);
+      } else if (where.studentId) {
+        const snap = await db.collection('students').where('studentId', '==', where.studentId).limit(1).get();
+        if (!snap.empty) st = docData(snap.docs[0]);
+      }
+      if (!st) return null;
+      if (!st.studentAllergies) st.studentAllergies = [];
+      if (!st.orderItems) st.orderItems = [];
+
+      if (include?.studentAllergies) {
+        const saSnap = await db.collection('studentAllergies').where('studentId', '==', st.id).get();
+        const saList = saSnap.docs.map((d) => docData(d));
+        if (include.studentAllergies.include?.allergy) {
+          for (const sa of saList) {
+            const aSnap = await db.collection('allergies').doc(sa.allergyId).get();
+            sa.allergy = docData(aSnap);
+          }
+        }
+        st.studentAllergies = saList;
+      }
+      return st;
+    },
+    findFirst: async ({ where, include }: any): Promise<DbStudent | null> => {
+      let query: Query = db.collection('students');
+      if (where.id) query = query.where('__name__', '==', where.id);
+      if (where.parentId) query = query.where('parentId', '==', where.parentId);
+      if (where.studentId) query = query.where('studentId', '==', where.studentId);
+      const snap = await query.limit(1).get();
+      if (snap.empty) return null;
+      const st = docData(snap.docs[0]);
+      if (!st.studentAllergies) st.studentAllergies = [];
+      if (!st.orderItems) st.orderItems = [];
+      return st;
+    },
+    create: async ({ data, include }: any): Promise<DbStudent> => {
+      const id = data.id || generateId('stu_');
+      const now = new Date().toISOString();
+      const obj = {
+        id,
+        studentAllergies: [],
+        orderItems: [],
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.collection('students').doc(id).set(obj);
+      return obj;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbStudent> => {
+      const ref = db.collection('students').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    update: async ({ where, data }: any): Promise<DbStudent> => {
+      const ref = db.collection('students').doc(where.id);
+      const now = new Date().toISOString();
+      await ref.set({ ...data, updatedAt: now }, { merge: true });
+      return docData(await ref.get());
+    },
+    count: async ({ where }: any = {}): Promise<number> => {
+      let query: Query = db.collection('students');
+      if (where?.isActive !== undefined) {
+        query = query.where('isActive', '==', where.isActive);
+      }
+      const snap = await query.count().get();
+      return snap.data().count;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('students').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Allergy
+  allergy = {
+    findMany: async (): Promise<DbAllergy[]> => {
+      const snap = await db.collection('allergies').get();
+      return snap.docs.map((d) => docData(d));
+    },
+    create: async ({ data }: any): Promise<DbAllergy> => {
+      const id = data.id || generateId('alg_');
+      const obj = { id, ...data, createdAt: new Date().toISOString() };
+      await db.collection('allergies').doc(id).set(obj);
+      return obj;
+    },
+    upsert: async ({ where, create, update }: any): Promise<DbAllergy> => {
+      if (where.id) {
+        const snap = await db.collection('allergies').doc(where.id).get();
+        if (snap.exists) {
+          await db.collection('allergies').doc(where.id).set(update, { merge: true });
+          return docData(await db.collection('allergies').doc(where.id).get());
+        }
+        const obj = { id: where.id, ...create, createdAt: new Date().toISOString() };
+        await db.collection('allergies').doc(where.id).set(obj);
+        return obj;
+      }
+      if (where.name) {
+        const snap = await db.collection('allergies').where('name', '==', where.name).limit(1).get();
+        if (!snap.empty) return docData(snap.docs[0]);
+      }
+      const id = generateId('alg_');
+      const obj = { id, ...(create || update), createdAt: new Date().toISOString() };
+      await db.collection('allergies').doc(id).set(obj);
+      return obj;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('allergies').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // StudentAllergy
+  studentAllergy = {
+    deleteMany: async ({ where }: any = {}): Promise<any> => {
+      let query: Query = db.collection('studentAllergies');
+      if (where?.studentId) query = query.where('studentId', '==', where.studentId);
+      const snap = await query.get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+    upsert: async ({ where, create, update }: any): Promise<DbStudentAllergy> => {
+      const studentId = where.studentId_allergyId?.studentId || create?.studentId;
+      const allergyId = where.studentId_allergyId?.allergyId || create?.allergyId;
+      const id = where.id || `${studentId}_${allergyId}`;
+      const ref = db.collection('studentAllergies').doc(id);
+      const data = {
+        id,
+        studentId,
+        allergyId,
+        ...(create || update),
+        createdAt: new Date().toISOString(),
+      };
+      await ref.set(data, { merge: true });
+      return data as any;
+    },
+    create: async ({ data }: any): Promise<DbStudentAllergy> => {
+      const id = data.id || `${data.studentId}_${data.allergyId}`;
+      const obj = { id, ...data, createdAt: new Date().toISOString() };
+      await db.collection('studentAllergies').doc(id).set(obj, { merge: true });
+      return obj as any;
+    },
+  };
+
+  // Meal
+  meal = {
+    findMany: async ({ include, orderBy }: any = {}): Promise<DbMeal[]> => {
+      const snap = await db.collection('meals').get();
+      let list = snap.docs.map((d) => docData(d));
+      for (const m of list) {
+        if (!m.mealAllergens) m.mealAllergens = [];
+      }
+      if (include?.mealAllergens) {
+        for (const m of list) {
+          const maSnap = await db.collection('mealAllergens').where('mealId', '==', m.id).get();
+          const maList = maSnap.docs.map((d) => docData(d));
+          if (include.mealAllergens.include?.allergen) {
+            for (const ma of maList) {
+              const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
+              ma.allergen = docData(aSnap);
+            }
+          }
+          m.mealAllergens = maList;
+        }
+      }
+      if (orderBy?.name === 'asc') {
+        list.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      }
+      return list;
+    },
+    findUnique: async ({ where, include }: any): Promise<DbMeal | null> => {
+      const snap = await db.collection('meals').doc(where.id).get();
+      const m = docData(snap);
+      if (!m) return null;
+      if (!m.mealAllergens) m.mealAllergens = [];
+
+      if (include?.mealAllergens) {
+        const maSnap = await db.collection('mealAllergens').where('mealId', '==', m.id).get();
+        const maList = maSnap.docs.map((d) => docData(d));
+        if (include.mealAllergens.include?.allergen) {
+          for (const ma of maList) {
+            const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
+            ma.allergen = docData(aSnap);
+          }
+        }
+        m.mealAllergens = maList;
+      }
+      return m;
+    },
+    create: async ({ data }: any): Promise<DbMeal> => {
+      const id = data.id || generateId('mel_');
+      const now = new Date().toISOString();
+      const obj = { id, mealAllergens: [], ...data, createdAt: now, updatedAt: now };
+      await db.collection('meals').doc(id).set(obj);
+      return obj;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbMeal> => {
+      const ref = db.collection('meals').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    update: async ({ where, data }: any): Promise<DbMeal> => {
+      const ref = db.collection('meals').doc(where.id);
+      const now = new Date().toISOString();
+      await ref.set({ ...data, updatedAt: now }, { merge: true });
+      return docData(await ref.get());
+    },
+    delete: async ({ where }: any): Promise<any> => {
+      await db.collection('meals').doc(where.id).delete();
+      return { id: where.id };
+    },
+    count: async (args?: any): Promise<number> => {
+      const snap = await db.collection('meals').count().get();
+      return snap.data().count;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('meals').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Allergen
+  allergen = {
+    findMany: async (): Promise<DbAllergen[]> => {
+      const snap = await db.collection('allergens').get();
+      return snap.docs.map((d) => docData(d));
+    },
+    create: async ({ data }: any): Promise<DbAllergen> => {
+      const id = data.id || generateId('aln_');
+      const obj = { id, ...data, createdAt: new Date().toISOString() };
+      await db.collection('allergens').doc(id).set(obj);
+      return obj;
+    },
+    upsert: async ({ where, create, update }: any): Promise<DbAllergen> => {
+      if (where.id) {
+        const snap = await db.collection('allergens').doc(where.id).get();
+        if (snap.exists) {
+          await db.collection('allergens').doc(where.id).set(update, { merge: true });
+          return docData(await db.collection('allergens').doc(where.id).get());
+        }
+        const obj = { id: where.id, ...create, createdAt: new Date().toISOString() };
+        await db.collection('allergens').doc(where.id).set(obj);
+        return obj;
+      }
+      if (where.name) {
+        const snap = await db.collection('allergens').where('name', '==', where.name).limit(1).get();
+        if (!snap.empty) return docData(snap.docs[0]);
+      }
+      const id = generateId('aln_');
+      const obj = { id, ...(create || update), createdAt: new Date().toISOString() };
+      await db.collection('allergens').doc(id).set(obj);
+      return obj;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('allergens').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // MealAllergen
+  mealAllergen = {
+    create: async ({ data }: any): Promise<DbMealAllergen> => {
+      const id = `${data.mealId}_${data.allergenId}`;
+      const obj = { id, ...data, createdAt: new Date().toISOString() };
+      await db.collection('mealAllergens').doc(id).set(obj, { merge: true });
+      return obj as any;
+    },
+    deleteMany: async ({ where }: any = {}): Promise<any> => {
+      let query: Query = db.collection('mealAllergens');
+      if (where?.mealId) query = query.where('mealId', '==', where.mealId);
+      const snap = await query.get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+    upsert: async ({ where, create, update }: any): Promise<DbMealAllergen> => {
+      const mealId = where.mealId_allergenId?.mealId || create?.mealId;
+      const allergenId = where.mealId_allergenId?.allergenId || create?.allergenId;
+      const id = where.id || `${mealId}_${allergenId}`;
+      const ref = db.collection('mealAllergens').doc(id);
+      const data = { id, mealId, allergenId, ...(create || update), createdAt: new Date().toISOString() };
+      await ref.set(data, { merge: true });
+      return data as any;
+    },
+  };
+
+  // Menu
+  menu = {
+    findMany: async ({ where, include, orderBy }: any = {}): Promise<DbMenu[]> => {
+      let query: Query = db.collection('menus');
+      if (where?.date) query = query.where('date', '==', where.date);
+      if (where?.isActive !== undefined) query = query.where('isActive', '==', where.isActive);
+      const snap = await query.get();
+      let list = snap.docs.map((d) => docData(d));
+
+      if (include?.meal) {
+        for (const mn of list) {
+          const mSnap = await db.collection('meals').doc(mn.mealId).get();
+          const mealObj = docData(mSnap);
+          if (mealObj && include.meal.include?.mealAllergens) {
+            const maSnap = await db.collection('mealAllergens').where('mealId', '==', mealObj.id).get();
+            const maList = maSnap.docs.map((d) => docData(d));
+            if (include.meal.include.mealAllergens.include?.allergen) {
+              for (const ma of maList) {
+                const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
+                ma.allergen = docData(aSnap);
+              }
+            }
+            mealObj.mealAllergens = maList;
+          }
+          mn.meal = mealObj;
+        }
+      }
+
+      if (orderBy?.date) {
+        list.sort((a: any, b: any) => (orderBy.date === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)));
+      }
+      return list;
+    },
+    findUnique: async ({ where, include }: any): Promise<DbMenu | null> => {
+      let doc: any = null;
+      if (where.id) {
+        const snap = await db.collection('menus').doc(where.id).get();
+        doc = docData(snap);
+      } else if (where.mealId_date) {
+        const snap = await db
+          .collection('menus')
+          .where('mealId', '==', where.mealId_date.mealId)
+          .where('date', '==', where.mealId_date.date)
+          .limit(1)
+          .get();
+        if (!snap.empty) doc = docData(snap.docs[0]);
+      }
+      if (!doc) return null;
+      if (include?.meal) {
+        const mSnap = await db.collection('meals').doc(doc.mealId).get();
+        doc.meal = docData(mSnap);
+      }
+      return doc;
+    },
+    findFirst: async ({ where }: any): Promise<DbMenu | null> => {
+      let query: Query = db.collection('menus');
+      if (where.mealId) query = query.where('mealId', '==', where.mealId);
+      if (where.date) query = query.where('date', '==', where.date);
+      const snap = await query.limit(1).get();
+      if (snap.empty) return null;
+      return docData(snap.docs[0]);
+    },
+    upsert: async ({ where, create, update }: any): Promise<DbMenu> => {
+      const mealId = where.mealId_date?.mealId || create.mealId;
+      const date = where.mealId_date?.date || create.date;
+      const id = where.id || `${mealId}_${date}`;
+      const ref = db.collection('menus').doc(id);
+      const snap = await ref.get();
+      const now = new Date().toISOString();
+      if (snap.exists) {
+        await ref.set({ ...update, updatedAt: now }, { merge: true });
+      } else {
+        await ref.set({ id, ...create, createdAt: now, updatedAt: now });
+      }
+      return docData(await ref.get());
+    },
+    update: async ({ where, data }: any): Promise<DbMenu> => {
+      let ref: DocumentReference;
+      if (where.id) {
+        ref = db.collection('menus').doc(where.id);
+      } else if (where.mealId_date) {
+        ref = db.collection('menus').doc(`${where.mealId_date.mealId}_${where.mealId_date.date}`);
+      } else {
+        throw new Error('Invalid where clause for menu update');
+      }
+
+      const updateData: any = { updatedAt: new Date().toISOString() };
+      if (data.availableQuantity !== undefined) {
+        if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
+          const current = (await ref.get()).data()?.availableQuantity || 0;
+          updateData.availableQuantity = current - data.availableQuantity.decrement;
+        } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
+          const current = (await ref.get()).data()?.availableQuantity || 0;
+          updateData.availableQuantity = current + data.availableQuantity.increment;
+        } else {
+          updateData.availableQuantity = Number(data.availableQuantity);
+        }
+      }
+      if (data.orderingDeadline !== undefined) updateData.orderingDeadline = data.orderingDeadline;
+      if (data.maxQuantity !== undefined) updateData.maxQuantity = data.maxQuantity;
+      if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+      await ref.set(updateData, { merge: true });
+      return docData(await ref.get());
+    },
+    updateMany: async ({ where, data }: any): Promise<any> => {
+      let query: Query = db.collection('menus');
+      if (where.mealId) query = query.where('mealId', '==', where.mealId);
+      if (where.date) query = query.where('date', '==', where.date);
+      const snap = await query.get();
+
+      for (const d of snap.docs) {
+        const currentData = d.data();
+        let newQty = currentData.availableQuantity || 0;
+        if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
+          newQty += data.availableQuantity.increment;
+        } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
+          newQty -= data.availableQuantity.decrement;
+        }
+        await d.ref.set({ availableQuantity: newQty, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+      return { count: snap.docs.length };
+    },
+    delete: async ({ where }: any): Promise<any> => {
+      await db.collection('menus').doc(where.id).delete();
+      return { id: where.id };
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('menus').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Order
+  order = {
+    findMany: async ({ where, include, orderBy, take }: any = {}): Promise<DbOrder[]> => {
+      let query: Query = db.collection('orders');
+      if (where?.parentId) {
+        query = query.where('parentId', '==', where.parentId);
+      }
+      if (where?.orderStatus) {
+        query = query.where('orderStatus', '==', where.orderStatus);
+      }
+
+      const snap = await query.get();
+      let orders = snap.docs.map((d) => docData(d));
+
+      if (include?.items) {
+        for (const ord of orders) {
+          const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
+          const items = itemsSnap.docs.map((d) => docData(d));
+          if (include.items.include) {
+            for (const item of items) {
+              if (include.items.include.student) {
+                const sSnap = await db.collection('students').doc(item.studentId).get();
+                item.student = docData(sSnap);
+              }
+              if (include.items.include.meal) {
+                const mSnap = await db.collection('meals').doc(item.mealId).get();
+                item.meal = docData(mSnap);
+              }
+            }
+          }
+          ord.items = items;
+        }
+      }
+
+      if (include?.payments) {
+        for (const ord of orders) {
+          const paySnap = await db.collection('payments').where('orderId', '==', ord.id).get();
+          ord.payments = paySnap.docs.map((d) => docData(d));
+        }
+      }
+
+      if (include?.parent) {
+        for (const ord of orders) {
+          const pSnap = await db.collection('parents').doc(ord.parentId).get();
+          const parentData = docData(pSnap);
+          if (parentData && include.parent.include?.user) {
+            const uSnap = await db.collection('users').doc(parentData.userId).get();
+            parentData.user = docData(uSnap);
+          }
+          ord.parent = parentData;
+        }
+      }
+
+      if (orderBy?.createdAt === 'desc') {
+        orders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+
+      if (take && typeof take === 'number') {
+        orders = orders.slice(0, take);
+      }
+
+      return orders;
+    },
+    findUnique: async ({ where, include }: any): Promise<DbOrder | null> => {
+      const snap = await db.collection('orders').doc(where.id).get();
+      const ord = docData(snap);
+      if (!ord) return null;
+
+      if (include?.items) {
+        const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
+        const items = itemsSnap.docs.map((d) => docData(d));
+        for (const item of items) {
+          if (include.items.include?.student) {
+            const sSnap = await db.collection('students').doc(item.studentId).get();
+            item.student = docData(sSnap);
+          }
+          if (include.items.include?.meal) {
+            const mSnap = await db.collection('meals').doc(item.mealId).get();
+            item.meal = docData(mSnap);
+          }
+        }
+        ord.items = items;
+      }
+
+      if (include?.payments) {
+        const paySnap = await db.collection('payments').where('orderId', '==', ord.id).get();
+        ord.payments = paySnap.docs.map((d) => docData(d));
+      }
+
+      if (include?.parent) {
+        const pSnap = await db.collection('parents').doc(ord.parentId).get();
+        const parentData = docData(pSnap);
+        if (parentData && include.parent.include?.user) {
+          const uSnap = await db.collection('users').doc(parentData.userId).get();
+          parentData.user = docData(uSnap);
+        }
+        ord.parent = parentData;
+      }
+
+      return ord;
+    },
+    findFirst: async ({ where, include }: any): Promise<DbOrder | null> => {
+      let query: Query = db.collection('orders');
+      if (where.id) query = query.where('__name__', '==', where.id);
+      if (where.parentId) query = query.where('parentId', '==', where.parentId);
+      const snap = await query.limit(1).get();
+      if (snap.empty) return null;
+      const ord = docData(snap.docs[0]);
+
+      if (include?.items) {
+        const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
+        ord.items = itemsSnap.docs.map((d) => docData(d));
+      }
+      return ord;
+    },
+    create: async ({ data, include }: any): Promise<DbOrder> => {
+      const orderId = data.id || generateId('ORD-');
+      const now = new Date().toISOString();
+      const { items: itemsCreate, payments: paymentsCreate, ...orderFields } = data;
+
+      const orderObj = {
+        id: orderId,
+        ...orderFields,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.collection('orders').doc(orderId).set(orderObj);
+
+      const createdItems = [];
+      if (itemsCreate?.create) {
+        for (const item of itemsCreate.create) {
+          const itemId = generateId('oit_');
+          const itemObj = {
+            id: itemId,
+            orderId,
+            ...item,
+            createdAt: now,
+          };
+          await db.collection('orderItems').doc(itemId).set(itemObj);
+          createdItems.push(itemObj);
+        }
+      }
+
+      const createdPayments = [];
+      if (paymentsCreate?.create) {
+        const payList = Array.isArray(paymentsCreate.create) ? paymentsCreate.create : [paymentsCreate.create];
+        for (const pay of payList) {
+          const payId = pay.id || generateId('PAY-');
+          const payObj = {
+            id: payId,
+            orderId,
+            ...pay,
+            createdAt: now,
+          };
+          await db.collection('payments').doc(payId).set(payObj);
+          createdPayments.push(payObj);
+        }
+      }
+
+      const res: any = { ...orderObj };
+      if (include?.items) res.items = createdItems;
+      if (include?.payments) res.payments = createdPayments;
+      return res;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbOrder> => {
+      const ref = db.collection('orders').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    update: async ({ where, data }: any): Promise<DbOrder> => {
+      const ref = db.collection('orders').doc(where.id);
+      const now = new Date().toISOString();
+      await ref.set({ ...data, updatedAt: now }, { merge: true });
+      return docData(await ref.get());
+    },
+    updateMany: async ({ where, data }: any): Promise<any> => {
+      if (where?.id?.in) {
+        const ids: string[] = where.id.in;
+        let count = 0;
+        for (const id of ids) {
+          await db.collection('orders').doc(id).set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+          count++;
+        }
+        return { count };
+      }
+      return { count: 0 };
+    },
+    count: async ({ where }: any = {}): Promise<number> => {
+      let query: Query = db.collection('orders');
+      if (where?.orderStatus) {
+        query = query.where('orderStatus', '==', where.orderStatus);
+      }
+      const snap = await query.count().get();
+      return snap.data().count;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('orders').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // OrderItem
+  orderItem = {
+    findMany: async ({ where, include }: any = {}): Promise<DbOrderItem[]> => {
+      let query: Query = db.collection('orderItems');
+      if (where?.orderId) query = query.where('orderId', '==', where.orderId);
+      if (where?.date) query = query.where('date', '==', where.date);
+
+      const snap = await query.get();
+      let items = snap.docs.map((d) => docData(d));
+
+      if (where?.order?.orderStatus?.in) {
+        const allowedStatuses = where.order.orderStatus.in;
+        const validItems = [];
+        for (const item of items) {
+          const oSnap = await db.collection('orders').doc(item.orderId).get();
+          const ord = docData(oSnap);
+          if (ord && allowedStatuses.includes(ord.orderStatus)) {
+            item.order = ord;
+            validItems.push(item);
+          }
+        }
+        items = validItems;
+      }
+
+      if (include) {
+        for (const item of items) {
+          if (include.meal) {
+            const mSnap = await db.collection('meals').doc(item.mealId).get();
+            item.meal = docData(mSnap);
+          }
+          if (include.student) {
+            const sSnap = await db.collection('students').doc(item.studentId).get();
+            item.student = docData(sSnap);
+          }
+          if (include.order && !item.order) {
+            const oSnap = await db.collection('orders').doc(item.orderId).get();
+            const ordData = docData(oSnap);
+            if (ordData && include.order.include?.parent) {
+              const pSnap = await db.collection('parents').doc(ordData.parentId).get();
+              const pData = docData(pSnap);
+              if (pData && include.order.include.parent.include?.user) {
+                const uSnap = await db.collection('users').doc(pData.userId).get();
+                pData.user = docData(uSnap);
+              }
+              ordData.parent = pData;
+            }
+            item.order = ordData;
+          }
+        }
+      }
+
+      return items;
+    },
+    create: async ({ data }: any): Promise<DbOrderItem> => {
+      const id = data.id || generateId('oit_');
+      const now = new Date().toISOString();
+      const obj = { id, ...data, createdAt: now };
+      await db.collection('orderItems').doc(id).set(obj);
+      return obj as any;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbOrderItem> => {
+      const ref = db.collection('orderItems').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    count: async ({ where }: any = {}): Promise<number> => {
+      const snap = await db.collection('orderItems').count().get();
+      return snap.data().count;
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('orderItems').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // Payment
+  payment = {
+    findMany: async ({ where, include, orderBy }: any = {}): Promise<DbPayment[]> => {
+      let query: Query = db.collection('payments');
+      if (where?.orderId) query = query.where('orderId', '==', where.orderId);
+      const snap = await query.get();
+      let list = snap.docs.map((d) => docData(d));
+
+      if (where?.order?.parentId) {
+        const targetParentId = where.order.parentId;
+        const filtered = [];
+        for (const p of list) {
+          const oSnap = await db.collection('orders').doc(p.orderId).get();
+          const ord = docData(oSnap);
+          if (ord && ord.parentId === targetParentId) {
+            p.order = ord;
+            filtered.push(p);
+          }
+        }
+        list = filtered;
+      }
+
+      if (include?.order) {
+        for (const p of list) {
+          if (!p.order) {
+            const oSnap = await db.collection('orders').doc(p.orderId).get();
+            p.order = docData(oSnap);
+          }
+        }
+      }
+
+      if (orderBy?.createdAt === 'desc') {
+        list.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+
+      return list;
+    },
+    create: async ({ data }: any): Promise<DbPayment> => {
+      const id = data.id || generateId('PAY-');
+      const now = new Date().toISOString();
+      const obj = { id, ...data, createdAt: now };
+      await db.collection('payments').doc(id).set(obj);
+      return obj;
+    },
+    upsert: async ({ where, update, create }: any): Promise<DbPayment> => {
+      const ref = db.collection('payments').doc(where.id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.set(update, { merge: true });
+      } else {
+        await ref.set({ id: where.id, ...create });
+      }
+      return docData(await ref.get());
+    },
+    deleteMany: async (): Promise<any> => {
+      const snap = await db.collection('payments').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return { count: snap.docs.length };
+    },
+  };
+
+  // $disconnect for compatibility
+  $disconnect = async (): Promise<void> => {};
+
+  // $transaction
+  $transaction = async (callback: (tx: this) => Promise<any>): Promise<any> => {
+    return callback(this);
+  };
+}
+
+export const firestoreDb = new FirestoreDbAdapter();
+export default firestoreDb;
