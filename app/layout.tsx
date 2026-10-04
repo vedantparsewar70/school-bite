@@ -10,9 +10,24 @@ import Footer from '@/components/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'NutriKids - School Canteen Meal Ordering & Management System',
+  title: 'School-Bite - School Meal Pre-Ordering Platform | S.B. Patil School',
   description:
-    'Modern meal ordering portal for Indian schools. Select wholesome, chef-curated meals for your children, schedule weekly lunches, and manage payments effortlessly.',
+    'School-Bite is a school meal pre-ordering platform that allows parents to select fresh, wholesome canteen meals for their children at S.B. Patil School and make online payments.',
+  keywords: [
+    'School-Bite',
+    'S.B. Patil School',
+    'school canteen',
+    'school meal pre-ordering',
+    'student lunch order',
+    'pure vegetarian school meal',
+    'Ravet Pune',
+  ],
+  openGraph: {
+    title: 'School-Bite - School Meal Pre-Ordering Platform',
+    description:
+      'School meal pre-ordering made simple for parents of S.B. Patil School students.',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({

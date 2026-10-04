@@ -8,9 +8,7 @@ import {
   Clock,
   Calendar,
   Eye,
-  XCircle,
   CheckCircle2,
-  Printer,
   AlertCircle,
   Search,
   Filter,
@@ -20,13 +18,11 @@ import { useAuth } from '@/components/AuthContext';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
-import OrderReceiptModal from '@/components/OrderReceiptModal';
 import {
   formatINR,
   formatDatePretty,
   formatDateTimePretty,
   getOrderStatusColor,
-  isDeadlinePassed,
 } from '@/lib/utils';
 
 function OrdersPageContent() {
@@ -38,10 +34,7 @@ function OrdersPageContent() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -61,48 +54,6 @@ function OrdersPageContent() {
     fetchOrders();
   }, []);
 
-  const handleCancelOrder = async (order: any) => {
-    // Check if cancellation deadline has passed
-    const canCancel = !order.items.some((it: any) => isDeadlinePassed(it.date, '08:30'));
-    if (!canCancel) {
-      showToast('Cannot cancel order: The cancellation deadline (08:30 AM) for one or more meals has passed.', 'error');
-      return;
-    }
-
-    if (
-      !confirm(
-        `Are you sure you want to cancel Order ${order.id}? The amount of ${formatINR(
-          order.totalAmount
-        )} will be refunded immediately to your Parent Meal Wallet.`
-      )
-    ) {
-      return;
-    }
-
-    setCancellingId(order.id);
-    try {
-      const res = await fetch('/api/parent/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        showToast(data.message || 'Order cancelled successfully', 'success');
-        await fetchOrders();
-        await refreshUser();
-      } else {
-        showToast(data.error || 'Failed to cancel order', 'error');
-      }
-    } catch {
-      showToast('Network error while cancelling order', 'error');
-    } finally {
-      setCancellingId(null);
-    }
-  };
-
   const filteredOrders = orders.filter((o) => {
     if (statusFilter === 'ALL') return true;
     return o.orderStatus === statusFilter;
@@ -118,7 +69,7 @@ function OrdersPageContent() {
             <span>Order History & Tracking</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Track daily lunch status from preparation to pickup. Cancel upcoming meals before the cutoff deadline.
+            Track daily lunch status from preparation to pickup.
           </p>
         </div>
 
@@ -165,10 +116,6 @@ function OrdersPageContent() {
           {filteredOrders.map((order) => {
             const statusStyle = getOrderStatusColor(order.orderStatus);
             const isHighlighted = order.id === highlightedOrderId;
-            // Can cancel if order not cancelled/collected and deadline not passed
-            const canCancel =
-              order.orderStatus === 'CONFIRMED' &&
-              !order.items.some((it: any) => isDeadlinePassed(it.date, '08:30'));
 
             return (
               <div
@@ -233,53 +180,16 @@ function OrdersPageContent() {
                   ))}
                 </div>
 
-                {/* Footer Actions */}
+                {/* Footer Info */}
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="text-slate-400 text-[11px]">
                     Payment Ref: {order.payments?.[0]?.transactionRef || 'PAID'} • {order.payments?.[0]?.paymentMethod || 'UPI'}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* View Voucher / Receipt */}
-                    <button
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setIsReceiptModalOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Print Voucher</span>
-                    </button>
-
-                    {/* Cancel Order (if allowed) */}
-                    {canCancel && (
-                      <button
-                        onClick={() => handleCancelOrder(order)}
-                        disabled={cancellingId === order.id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl font-bold transition-colors"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        <span>{cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-
-      {/* Printable Receipt Modal */}
-      {isReceiptModalOpen && selectedOrder && (
-        <OrderReceiptModal
-          order={selectedOrder}
-          onClose={() => {
-            setIsReceiptModalOpen(false);
-            setSelectedOrder(null);
-          }}
-        />
       )}
     </div>
   );

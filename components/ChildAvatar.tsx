@@ -25,7 +25,7 @@ const iconSizes = {
 };
 
 /**
- * Standard generic empty child avatar (WhatsApp-style neutral circular silhouette)
+ * Standard generic empty child avatar (neutral circular silhouette)
  * No photographic imagery allowed.
  */
 export default function ChildAvatar({ size = 'md', className = '' }: ChildAvatarProps) {

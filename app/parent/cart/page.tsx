@@ -12,7 +12,6 @@ import {
   UtensilsCrossed,
   Calendar,
   AlertCircle,
-  FileText,
   ShieldCheck,
 } from 'lucide-react';
 import { useCart } from '@/components/CartContext';
@@ -25,7 +24,6 @@ export default function CartPage() {
   const router = useRouter();
   const { cartItems, updateQuantity, removeFromCart, clearCart, subtotal, totalItems } = useCart();
   const { user } = useAuth();
-  const [orderNotes, setOrderNotes] = useState('');
 
   // Group cart items by student and date for crystal clear visual organization
   const groupedByChildAndDate: Record<string, typeof cartItems> = {};
@@ -36,10 +34,6 @@ export default function CartPage() {
   });
 
   const handleProceedToCheckout = () => {
-    // Save optional notes in sessionStorage
-    if (orderNotes) {
-      sessionStorage.setItem('nutribox_order_notes', orderNotes);
-    }
     router.push('/parent/checkout');
   };
 
@@ -171,20 +165,6 @@ export default function CartPage() {
               );
             })}
 
-            {/* Special Instructions / Chef Notes */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-amber-500" />
-                Special Preparation Notes
-              </label>
-              <textarea
-                value={orderNotes}
-                onChange={(e) => setOrderNotes(e.target.value)}
-                placeholder="e.g. Mild spice for Aarav; please pack extra spoon."
-                rows={2}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-              />
-            </div>
           </div>
 
           {/* Right: Order Summary Box */}
@@ -203,7 +183,7 @@ export default function CartPage() {
                 <span className="font-bold text-slate-800">{formatINR(subtotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>School Canteen Subsidy / Taxes (0%)</span>
+                <span>Taxes & Fees</span>
                 <span className="font-bold text-emerald-600">₹0</span>
               </div>
 
@@ -213,13 +193,6 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* Wallet quick indicator */}
-            {user?.walletBalance !== undefined && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 flex items-center justify-between">
-                <span>Available Meal Wallet:</span>
-                <span className="font-extrabold">{formatINR(user.walletBalance)}</span>
-              </div>
-            )}
 
             <button
               onClick={handleProceedToCheckout}
@@ -231,7 +204,7 @@ export default function CartPage() {
 
             <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Simulated INR Payment • 100% Secure</span>
+              <span>Cashless Payment • 100% Secure</span>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import React from 'react';
 import { X, Printer, CheckCircle2, ShieldCheck, Utensils, QrCode } from 'lucide-react';
 import { formatINR, formatDateTimePretty, formatDatePretty } from '@/lib/utils';
 import VegBadge from './VegBadge';
+import { BUSINESS_CONFIG } from '@/lib/business-config';
 
 interface OrderReceiptModalProps {
   order: any;
@@ -54,9 +55,11 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500 text-white mb-2 shadow-md">
               <Utensils className="w-6 h-6" />
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">NUTRIKIDS CANTEEN</h2>
-            <p className="text-xs text-slate-500 font-medium">St. Jude's Modern International School</p>
-            <p className="text-[11px] text-slate-400">FSSAI Lic. No: 11526002000841 | GSTIN: 27AABCS1429B1Z8</p>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{BUSINESS_CONFIG.brandName.toUpperCase()}</h2>
+            <p className="text-xs text-slate-500 font-medium">School Meal Pre-Ordering Service</p>
+            <p className="text-[11px] text-slate-400">
+              {BUSINESS_CONFIG.schoolName} Canteen • Ravet, Pune
+            </p>
           </div>
 
           {/* Meta Details */}
@@ -118,7 +121,7 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
               <span>{formatINR(order.totalAmount)}</span>
             </div>
             <div className="flex justify-between text-slate-600">
-              <span>Canteen Subsidy / Taxes (GST 0%)</span>
+              <span>Taxes & Fees</span>
               <span className="text-emerald-600 font-medium">₹0</span>
             </div>
             <div className="flex justify-between text-base font-extrabold text-slate-900 border-t border-slate-200 pt-2">
@@ -144,8 +147,8 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
 
           {/* Footer note */}
           <div className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-4">
-            <p>Thank you for choosing hygienic, healthy food for your child.</p>
-            <p className="mt-0.5">NutriKids Canteen Portal • Generated automatically</p>
+            <p>Thank you for ordering with us.</p>
+            <p className="mt-0.5">{BUSINESS_CONFIG.brandName} Canteen Portal • Generated automatically</p>
           </div>
         </div>
       </div>

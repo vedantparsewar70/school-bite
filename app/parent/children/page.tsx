@@ -32,8 +32,8 @@ export default function ChildrenPage() {
   // Form states
   const [formName, setFormName] = useState('');
   const [formDob, setFormDob] = useState('');
-  const [formGrade, setFormGrade] = useState('5');
-  const [formDivision, setFormDivision] = useState('A');
+  const [formGrade, setFormGrade] = useState('');
+  const [formDivision, setFormDivision] = useState('');
   const [formRollNo, setFormRollNo] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
   const [formIsVeg, setFormIsVeg] = useState(true);
@@ -66,11 +66,11 @@ export default function ChildrenPage() {
   const openAddModal = () => {
     setEditingChild(null);
     setFormName('');
-    setFormDob('2016-05-15');
-    setFormGrade('5');
-    setFormDivision('A');
+    setFormDob('');
+    setFormGrade('');
+    setFormDivision('');
     setFormRollNo('');
-    setFormStudentId(`STU-2026-${Math.floor(100 + Math.random() * 900)}`);
+    setFormStudentId('');
     setFormIsVeg(true);
     setFormDietaryRestrictions('');
     setFormFoodPreference('Vegetarian');
@@ -165,10 +165,10 @@ export default function ChildrenPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
             <Users className="w-7 h-7 text-amber-500" />
-            <span>My Children</span>
+            <span>Select Child</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Manage your children&apos;s school class, division, and meal preferences.
+            Select a child below to view and order Tomorrow&apos;s Meal, or add a new child.
           </p>
         </div>
 
@@ -177,7 +177,7 @@ export default function ChildrenPage() {
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Another Child</span>
+          <span>Add Child</span>
         </button>
       </div>
 
@@ -189,15 +189,16 @@ export default function ChildrenPage() {
       ) : children.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-4 max-w-lg mx-auto">
           <ChildAvatar size="xl" className="mx-auto" />
-          <h3 className="text-lg font-bold text-slate-800">No Children Registered Yet</h3>
+          <h3 className="text-lg font-bold text-slate-800">No Children Added Yet</h3>
           <p className="text-xs text-slate-500">
-            Add your child&apos;s school details to customize and order their daily meals.
+            Please add your child&apos;s details to start ordering nutritious school meals.
           </p>
           <button
             onClick={openAddModal}
-            className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-amber-600 transition-colors cursor-pointer"
+            className="px-6 py-3 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-amber-600 transition-colors cursor-pointer inline-flex items-center gap-2"
           >
-            Add Your First Child
+            <Plus className="w-4 h-4" />
+            <span>Add Child</span>
           </button>
         </div>
       ) : (
@@ -214,10 +215,7 @@ export default function ChildrenPage() {
                     <div className="flex items-center gap-3.5">
                       <ChildAvatar size="lg" />
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-extrabold text-slate-900 text-base">{child.name}</h3>
-                          <VegBadge isVegetarian={child.isVegetarian} size="sm" />
-                        </div>
+                        <h3 className="font-extrabold text-slate-900 text-base">{child.name}</h3>
                         <span className="text-[11px] font-mono text-slate-400 font-semibold">{child.studentId}</span>
                       </div>
                     </div>
@@ -275,7 +273,7 @@ export default function ChildrenPage() {
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
                   >
                     <UtensilsCrossed className="w-3.5 h-3.5" />
-                    <span>Order Meal</span>
+                    <span>Select & Order Tomorrow&apos;s Meal →</span>
                   </Link>
                 </div>
               </div>
@@ -321,43 +319,30 @@ export default function ChildrenPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    value={formDob}
-                    onChange={(e) => setFormDob(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Student ID No. *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formStudentId}
-                    onChange={(e) => setFormStudentId(e.target.value)}
-                    placeholder="e.g. STU-2026-012"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-900"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={formDob}
+                  onChange={(e) => setFormDob(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Class / Grade *
                   </label>
                   <select
+                    required
                     value={formGrade}
                     onChange={(e) => setFormGrade(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
                   >
+                    <option value="" disabled>Select Class (e.g. Class 5)</option>
                     {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((g) => (
                       <option key={g} value={g}>
                         Class {g}
@@ -371,10 +356,12 @@ export default function ChildrenPage() {
                     Division *
                   </label>
                   <select
+                    required
                     value={formDivision}
                     onChange={(e) => setFormDivision(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
                   >
+                    <option value="" disabled>Select Div (e.g. Div A)</option>
                     {['A', 'B', 'C', 'D', 'E'].map((d) => (
                       <option key={d} value={d}>
                         Div {d}
@@ -392,88 +379,13 @@ export default function ChildrenPage() {
                     required
                     value={formRollNo}
                     onChange={(e) => setFormRollNo(e.target.value)}
-                    placeholder="12"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                    placeholder="e.g. 12"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
                   />
                 </div>
               </div>
 
-              {/* Diet Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Food Dietary Category
-                </label>
-                <div className="flex items-center gap-4 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                    <input
-                      type="radio"
-                      name="dietType"
-                      checked={formIsVeg === true}
-                      onChange={() => {
-                        setFormIsVeg(true);
-                        setFormFoodPreference('Vegetarian');
-                      }}
-                      className="accent-emerald-600"
-                    />
-                    <VegBadge isVegetarian={true} showLabel={true} />
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                    <input
-                      type="radio"
-                      name="dietType"
-                      checked={formIsVeg === false}
-                      onChange={() => {
-                        setFormIsVeg(false);
-                        setFormFoodPreference('Non-Vegetarian');
-                      }}
-                      className="accent-rose-600"
-                    />
-                    <VegBadge isVegetarian={false} showLabel={true} />
-                  </label>
-                </div>
-              </div>
 
-              {/* Dietary Restrictions & Notes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Dietary Restrictions
-                  </label>
-                  <input
-                    type="text"
-                    value={formDietaryRestrictions}
-                    onChange={(e) => setFormDietaryRestrictions(e.target.value)}
-                    placeholder="e.g. No outside food, Jain food, Halal"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Food Preferences
-                  </label>
-                  <input
-                    type="text"
-                    value={formFoodPreference}
-                    onChange={(e) => setFormFoodPreference(e.target.value)}
-                    placeholder="e.g. Vegetarian, Mild spice, Extra salad"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Special Notes
-                </label>
-                <textarea
-                  rows={2}
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  placeholder="e.g. Any special instructions for teachers or staff."
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                />
-              </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                 <button
@@ -520,7 +432,6 @@ export default function ChildrenPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-1.5">
                 <h3 className="text-xl font-extrabold text-slate-900">{viewingChild.name}</h3>
-                <VegBadge isVegetarian={viewingChild.isVegetarian} size="md" />
               </div>
               <p className="font-mono text-xs font-bold text-amber-700">{viewingChild.studentId}</p>
             </div>
@@ -540,38 +451,12 @@ export default function ChildrenPage() {
               </div>
             </div>
 
-            {/* Profile fields: Diet, Allergies, Restrictions, Notes */}
-            <div className="space-y-2.5 text-left text-xs bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Diet</span>
-                <span className="font-bold text-slate-800">
-                  {viewingChild.isVegetarian ? 'Vegetarian' : 'Non-Vegetarian'}
-                </span>
+            {viewingChild.notes && (
+              <div className="text-left text-xs bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Notes</span>
+                <span className="text-slate-700 italic">{viewingChild.notes}</span>
               </div>
-
-
-
-              {viewingChild.dietaryRestrictions && (
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Dietary Restrictions</span>
-                  <span className="text-slate-800 font-medium">{viewingChild.dietaryRestrictions}</span>
-                </div>
-              )}
-
-              {viewingChild.foodPreference && (
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Food Preferences</span>
-                  <span className="text-slate-800 font-medium">{viewingChild.foodPreference}</span>
-                </div>
-              )}
-
-              {viewingChild.notes && (
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Notes</span>
-                  <span className="text-slate-700 italic">{viewingChild.notes}</span>
-                </div>
-              )}
-            </div>
+            )}
 
             <Link
               href={`/parent/menu?childId=${viewingChild.id}`}

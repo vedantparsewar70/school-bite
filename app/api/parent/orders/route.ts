@@ -89,6 +89,7 @@ export async function POST(req: Request) {
       cardLastFour,
       bankName,
       notes,
+      idempotencyKey,
     }: {
       cartItems: CartItem[];
       paymentMethod: PaymentMethod;
@@ -96,7 +97,34 @@ export async function POST(req: Request) {
       cardLastFour?: string;
       bankName?: string;
       notes?: string;
+      idempotencyKey?: string;
     } = body;
+
+    // Check for duplicate submission using idempotency key if provided
+    if (idempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { id: idempotencyKey },
+        include: {
+          items: {
+            include: {
+              student: true,
+              meal: true,
+            },
+          },
+          payments: true,
+        },
+      });
+
+      if (existingOrder) {
+        return NextResponse.json({
+          success: true,
+          orderId: existingOrder.id,
+          totalAmount: existingOrder.totalAmount,
+          order: existingOrder,
+          isDuplicateSubmission: true,
+        });
+      }
+    }
 
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
@@ -189,44 +217,32 @@ export async function POST(req: Request) {
     }
 
     // Calculate total amount
-    const totalAmount = cartItems.reduce((acc, it) => acc + it.mealPrice * it.quantity, 0);
+    const totalAmount = cartItems.reduce(
+      (acc, it) => acc + Number(it.mealPrice ?? (it as any).price ?? (it as any).meal?.price ?? 0) * it.quantity,
+      0
+    );
 
-    // If payment method is WALLET, check sufficient balance
-    if (paymentMethod === 'WALLET') {
-      if (parentRecord.walletBalance < totalAmount) {
-        return NextResponse.json(
-          {
-            error: `Insufficient wallet balance. You have ₹${parentRecord.walletBalance}, but order total is ₹${totalAmount}. Please recharge wallet or select another payment method.`,
-          },
-          { status: 400 }
-        );
-      }
+    // Validate payment credentials
+    if (paymentMethod === 'UPI' && upiId && !upiId.includes('@')) {
+      return NextResponse.json(
+        { error: 'Please enter a valid UPI ID format (e.g. mobile@upi or username@okbank)' },
+        { status: 400 }
+      );
     }
 
     // Generate IDs
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
-    const orderId = `ORD-2026-${randomSuffix}`;
+    const orderId = idempotencyKey ? idempotencyKey : `ORD-2026-${randomSuffix}`;
     const paymentId = `PAY-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     const txnRef =
       paymentMethod === 'UPI'
         ? `UPI-${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`
         : paymentMethod === 'CARD'
         ? `CARD-${Date.now().toString().slice(-8)}`
-        : paymentMethod === 'WALLET'
-        ? `WLT-${Date.now().toString().slice(-8)}`
         : `NETB-${Date.now().toString().slice(-8)}`;
 
-    // Execute atomic transaction: create Order, OrderItems, Payment, decrement stock, and deduct wallet if used
+    // Execute atomic transaction: create Order, OrderItems, Payment, and decrement stock
     const result = await prisma.$transaction(async (tx) => {
-      // Deduct wallet if applicable
-      if (paymentMethod === 'WALLET') {
-        await tx.parent.update({
-          where: { id: parentRecord.id },
-          data: {
-            walletBalance: { decrement: totalAmount },
-          },
-        });
-      }
 
       // Decrement availableQuantity for each menu item
       for (const item of cartItems) {
@@ -253,16 +269,19 @@ export async function POST(req: Request) {
           orderStatus: 'CONFIRMED',
           notes: notes || null,
           items: {
-            create: evaluatedCartItems.map((item) => ({
-              studentId: item.studentId,
-              mealId: item.mealId,
-              date: item.date,
-              quantity: item.quantity,
-              unitPrice: item.mealPrice,
-              totalPrice: item.mealPrice * item.quantity,
-              hasAllergyAlert: item.hasAllergyAlert,
-              conflictAllergens: item.conflictAllergens,
-            })),
+            create: evaluatedCartItems.map((item) => {
+              const uPrice = Number(item.mealPrice ?? (item as any).price ?? (item as any).meal?.price ?? 0);
+              return {
+                studentId: item.studentId,
+                mealId: item.mealId,
+                date: item.date,
+                quantity: item.quantity,
+                unitPrice: uPrice,
+                totalPrice: uPrice * item.quantity,
+                hasAllergyAlert: item.hasAllergyAlert || false,
+                conflictAllergens: item.conflictAllergens || null,
+              };
+            }),
           },
           payments: {
             create: {
@@ -389,18 +408,11 @@ export async function PATCH(req: Request) {
         });
       }
 
-      // 3. Refund to wallet (or refund if wallet payment)
-      await tx.parent.update({
-        where: { id: user.parentId },
-        data: {
-          walletBalance: { increment: order.totalAmount },
-        },
-      });
     });
 
     return NextResponse.json({
       success: true,
-      message: `Order ${orderId} cancelled successfully and ₹${order.totalAmount} refunded to your wallet.`,
+      message: `Order ${orderId} cancelled successfully and ₹${order.totalAmount} refunded to your original payment source.`,
     });
   } catch (error) {
     console.error('Error cancelling order:', error);

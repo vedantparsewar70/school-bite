@@ -18,7 +18,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
-import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor } from '@/lib/utils';
+import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor, getTodayString, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 
@@ -142,6 +142,40 @@ function AdminOrdersContent() {
             <span className="font-extrabold text-slate-800 uppercase tracking-wider">Order Filters</span>
           </div>
 
+          {/* Quick Date Filters */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setDateFilter(getOffsetDateString(1))}
+              className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                dateFilter === getOffsetDateString(1)
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tomorrow&apos;s Orders
+            </button>
+            <button
+              onClick={() => setDateFilter(getTodayString())}
+              className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                dateFilter === getTodayString()
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter('')}
+              className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                !dateFilter
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Dates
+            </button>
+          </div>
+
           {/* Quick Allergy Filter Tabs */}
           <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
             <button
@@ -152,7 +186,7 @@ function AdminOrdersContent() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              All Orders
+              All Status
             </button>
             <button
               onClick={() => setAllergyFilter('WITH_ALERTS')}
@@ -163,17 +197,7 @@ function AdminOrdersContent() {
               }`}
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>With Allergy Alerts</span>
-            </button>
-            <button
-              onClick={() => setAllergyFilter('NO_ALERTS')}
-              className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
-                allergyFilter === 'NO_ALERTS'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Without Alerts
+              <span>Allergy Alerts</span>
             </button>
           </div>
 
@@ -304,6 +328,10 @@ function AdminOrdersContent() {
                               <span className="font-bold text-slate-800">{it.studentName}</span>
                             </div>
                           ))}
+                          <div className="text-[10px] text-slate-500 pt-0.5">
+                            Parent: <strong className="text-slate-700">{o.parentName}</strong>
+                            {o.parentPhone && <span className="text-slate-400"> • {o.parentPhone}</span>}
+                          </div>
                         </div>
                       </td>
 

@@ -163,6 +163,16 @@ export function generateId(prefix: string = ''): string {
   return `${prefix}${ts}${rand}`;
 }
 
+export function cleanDoc<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 // Convert Firestore doc to JS object
 function docData(doc: DocumentSnapshot): any {
   if (!doc.exists) return null;
@@ -762,9 +772,11 @@ export class FirestoreDbAdapter {
     findMany: async ({ where, include, orderBy }: any = {}): Promise<DbMenu[]> => {
       let query: Query = db.collection('menus');
       if (where?.date) query = query.where('date', '==', where.date);
-      if (where?.isActive !== undefined) query = query.where('isActive', '==', where.isActive);
       const snap = await query.get();
       let list = snap.docs.map((d) => docData(d));
+      if (where?.isActive !== undefined) {
+        list = list.filter((m: any) => Boolean(m.isActive) === Boolean(where.isActive));
+      }
 
       if (include?.meal) {
         for (const mn of list) {
@@ -822,14 +834,38 @@ export class FirestoreDbAdapter {
     upsert: async ({ where, create, update }: any): Promise<DbMenu> => {
       const mealId = where.mealId_date?.mealId || create.mealId;
       const date = where.mealId_date?.date || create.date;
-      const id = where.id || `${mealId}_${date}`;
-      const ref = db.collection('menus').doc(id);
-      const snap = await ref.get();
+      let ref: DocumentReference;
+      let docExists = false;
+
+      if (where.id) {
+        ref = db.collection('menus').doc(where.id);
+        const snap = await ref.get();
+        docExists = snap.exists;
+      } else if (where.mealId_date) {
+        const qSnap = await db.collection('menus')
+          .where('mealId', '==', where.mealId_date.mealId)
+          .where('date', '==', where.mealId_date.date)
+          .limit(1)
+          .get();
+        if (!qSnap.empty) {
+          ref = qSnap.docs[0].ref;
+          docExists = true;
+        } else {
+          ref = db.collection('menus').doc(`${mealId}_${date}`);
+        }
+      } else {
+        const id = where.id || `${mealId}_${date}`;
+        ref = db.collection('menus').doc(id);
+        const snap = await ref.get();
+        docExists = snap.exists;
+      }
+
       const now = new Date().toISOString();
-      if (snap.exists) {
+      if (docExists) {
         await ref.set({ ...update, updatedAt: now }, { merge: true });
       } else {
-        await ref.set({ id, ...create, createdAt: now, updatedAt: now });
+        const newId = ref.id;
+        await ref.set({ id: newId, mealId, date, ...create, createdAt: now, updatedAt: now });
       }
       return docData(await ref.get());
     },
@@ -838,7 +874,16 @@ export class FirestoreDbAdapter {
       if (where.id) {
         ref = db.collection('menus').doc(where.id);
       } else if (where.mealId_date) {
-        ref = db.collection('menus').doc(`${where.mealId_date.mealId}_${where.mealId_date.date}`);
+        const qSnap = await db.collection('menus')
+          .where('mealId', '==', where.mealId_date.mealId)
+          .where('date', '==', where.mealId_date.date)
+          .limit(1)
+          .get();
+        if (!qSnap.empty) {
+          ref = qSnap.docs[0].ref;
+        } else {
+          ref = db.collection('menus').doc(`${where.mealId_date.mealId}_${where.mealId_date.date}`);
+        }
       } else {
         throw new Error('Invalid where clause for menu update');
       }
@@ -1013,24 +1058,24 @@ export class FirestoreDbAdapter {
       const now = new Date().toISOString();
       const { items: itemsCreate, payments: paymentsCreate, ...orderFields } = data;
 
-      const orderObj = {
+      const orderObj = cleanDoc({
         id: orderId,
         ...orderFields,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       await db.collection('orders').doc(orderId).set(orderObj);
 
       const createdItems = [];
       if (itemsCreate?.create) {
         for (const item of itemsCreate.create) {
           const itemId = generateId('oit_');
-          const itemObj = {
+          const itemObj = cleanDoc({
             id: itemId,
             orderId,
             ...item,
             createdAt: now,
-          };
+          });
           await db.collection('orderItems').doc(itemId).set(itemObj);
           createdItems.push(itemObj);
         }
@@ -1041,12 +1086,12 @@ export class FirestoreDbAdapter {
         const payList = Array.isArray(paymentsCreate.create) ? paymentsCreate.create : [paymentsCreate.create];
         for (const pay of payList) {
           const payId = pay.id || generateId('PAY-');
-          const payObj = {
+          const payObj = cleanDoc({
             id: payId,
             orderId,
             ...pay,
             createdAt: now,
-          };
+          });
           await db.collection('payments').doc(payId).set(payObj);
           createdPayments.push(payObj);
         }

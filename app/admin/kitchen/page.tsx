@@ -202,7 +202,7 @@ function KitchenPageContent() {
 
       {/* Printable Sheet Header */}
       <div className="hidden print:block text-center border-b pb-4 mb-4">
-        <h1 className="text-2xl font-black text-black">NUTRIBOX CANTEEN - KITCHEN PREPARATION SHEET</h1>
+        <h1 className="text-2xl font-black text-black">SCHOOL-BITE CANTEEN - KITCHEN PREPARATION SHEET (S.B. PATIL SCHOOL)</h1>
         <p className="text-sm font-bold text-gray-700">
           Date: {formatDatePretty(date)} | Total Meals: {kitchenData?.totalMeals || 0} | Allergy Alerts: {kitchenData?.allergyAlertsCount || 0}
         </p>

@@ -17,6 +17,10 @@ import {
   ShieldCheck,
   Flame,
   Check,
+  CheckSquare,
+  Square,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import VegBadge from '@/components/VegBadge';
 import MealIcon from '@/components/MealIcon';
@@ -39,6 +43,12 @@ const COMMON_ALLERGEN_TAGS = [
 
 export default function AdminMenuPage() {
   const { showToast } = useToast();
+
+  const tomorrowDate = getOffsetDateString(1);
+  const [activeTab, setActiveTab] = useState<'tomorrow' | 'catalog'>('tomorrow');
+  const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
+  const [publishingTomorrow, setPublishingTomorrow] = useState(false);
+  const [tomorrowSearch, setTomorrowSearch] = useState('');
 
   const [meals, setMeals] = useState<MealData[]>([]);
   const [scheduledMenus, setScheduledMenus] = useState<MenuDayItem[]>([]);
@@ -75,9 +85,10 @@ export default function AdminMenuPage() {
 
   const fetchData = async () => {
     try {
-      const [mealsRes, menusRes, settingsRes] = await Promise.all([
+      const [mealsRes, menusRes, tomorrowMenusRes, settingsRes] = await Promise.all([
         fetch('/api/admin/meals'),
         fetch(`/api/admin/menus?date=${selectedDate}`),
+        fetch(`/api/admin/menus?date=${tomorrowDate}`),
         fetch('/api/admin/settings'),
       ]);
 
@@ -88,6 +99,13 @@ export default function AdminMenuPage() {
       if (menusRes.ok) {
         const s = await menusRes.json();
         setScheduledMenus(s.menus || []);
+      }
+      if (tomorrowMenusRes.ok) {
+        const tm = await tomorrowMenusRes.json();
+        const activeTomorrowIds = (tm.menus || [])
+          .filter((item: any) => Boolean(item.isActive))
+          .map((item: any) => item.mealId);
+        setSelectedMealIds(activeTomorrowIds);
       }
       if (settingsRes.ok) {
         const sett = await settingsRes.json();
@@ -105,6 +123,49 @@ export default function AdminMenuPage() {
   useEffect(() => {
     fetchData();
   }, [selectedDate]);
+
+  const handleSelectAllTomorrow = () => {
+    setSelectedMealIds(meals.map((m) => m.id));
+  };
+
+  const handleUnselectAllTomorrow = () => {
+    setSelectedMealIds([]);
+  };
+
+  const handleToggleTomorrowMeal = (mealId: string) => {
+    setSelectedMealIds((prev) =>
+      prev.includes(mealId) ? prev.filter((id) => id !== mealId) : [...prev, mealId]
+    );
+  };
+
+  const handlePublishTomorrowMenu = async () => {
+    setPublishingTomorrow(true);
+    try {
+      const res = await fetch('/api/admin/menus/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: tomorrowDate,
+          selectedMealIds,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(
+          `Published ${selectedMealIds.length} food items for Tomorrow (${formatDatePretty(tomorrowDate)})!`,
+          'success'
+        );
+        await fetchData();
+      } else {
+        showToast(data.error || 'Failed to publish menu', 'error');
+      }
+    } catch {
+      showToast('Network error while publishing menu', 'error');
+    } finally {
+      setPublishingTomorrow(false);
+    }
+  };
 
   // Toggle Policy Setting
   const handleTogglePolicy = async () => {
@@ -310,6 +371,227 @@ export default function AdminMenuPage() {
         </div>
       </div>
 
+      {/* View Switcher Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('tomorrow')}
+          className={`px-5 py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
+            activeTab === 'tomorrow'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Tomorrow&apos;s Menu ({formatDatePretty(tomorrowDate).split(',')[0]})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('catalog')}
+          className={`px-5 py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
+            activeTab === 'catalog'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <UtensilsCrossed className="w-4 h-4" />
+          <span>Master Recipes & Calendar</span>
+        </button>
+      </div>
+
+      {/* TAB 1: TOMORROW'S MENU MANAGEMENT */}
+      {activeTab === 'tomorrow' && (
+        <div className="space-y-6">
+          {/* Controls Card */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-600 text-white uppercase tracking-wider">
+                    TOMORROW&apos;S MENU
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900">
+                    {formatDatePretty(tomorrowDate)}
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Select which food items from the catalog will be available for parents to order for tomorrow.
+                </p>
+              </div>
+
+              {/* Action Buttons: Select All, Unselect All, Publish Menu */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleSelectAllTomorrow}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Select All</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnselectAllTomorrow}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Unselect All</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePublishTomorrowMenu}
+                  disabled={publishingTomorrow}
+                  className={`px-5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md transition-all flex items-center gap-2 cursor-pointer ${
+                    publishingTomorrow
+                      ? 'bg-purple-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/20'
+                  }`}
+                >
+                  {publishingTomorrow ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Publishing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Publish Menu</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Selection Status Counter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={tomorrowSearch}
+                  onChange={(e) => setTomorrowSearch(e.target.value)}
+                  placeholder="Search meals by name or category..."
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-700">
+                  {selectedMealIds.length} of {meals.length} items enabled
+                </span>
+                {selectedMealIds.length === 0 && (
+                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    No items selected
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Meals Selection Grid */}
+          {loading ? (
+            <div className="min-h-[30vh] flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : meals.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3 max-w-md mx-auto">
+              <UtensilsCrossed className="w-12 h-12 text-slate-300 mx-auto" />
+              <h3 className="text-base font-bold text-slate-800">No Meals In Catalog</h3>
+              <p className="text-xs text-slate-500">Create dishes in the Master Recipes tab first.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {meals
+                .filter((meal) => {
+                  if (!tomorrowSearch) return true;
+                  const q = tomorrowSearch.toLowerCase();
+                  return (
+                    meal.name.toLowerCase().includes(q) ||
+                    meal.category.toLowerCase().includes(q) ||
+                    (meal.ingredients && meal.ingredients.toLowerCase().includes(q))
+                  );
+                })
+                .map((meal) => {
+                  const isSelected = selectedMealIds.includes(meal.id);
+
+                  return (
+                    <div
+                      key={meal.id}
+                      onClick={() => handleToggleTomorrowMeal(meal.id)}
+                      className={`bg-white rounded-3xl p-5 border transition-all cursor-pointer flex flex-col justify-between space-y-4 ${
+                        isSelected
+                          ? 'border-purple-600 shadow-md ring-2 ring-purple-600/20'
+                          : 'border-slate-200/80 hover:border-slate-300 opacity-75 hover:opacity-100 shadow-2xs'
+                      }`}
+                    >
+                      <div>
+                        {/* Top: Meal Graphic + Name + Checkbox */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <MealIcon name={meal.name} category={meal.category} size="md" />
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <MealCategoryBadge category={meal.category} />
+                                <VegBadge isVegetarian={meal.isVegetarian} size="sm" />
+                              </div>
+                              <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
+                                {meal.name}
+                              </h4>
+                              <p className="text-sm font-black text-amber-700">
+                                {formatINR(meal.price)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Checkbox button */}
+                          <div
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                              isSelected
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'bg-slate-100 border border-slate-300 text-transparent hover:border-purple-400'
+                            }`}
+                          >
+                            <Check className="w-4 h-4 stroke-[3]" />
+                          </div>
+                        </div>
+
+                        {/* Description & Ingredients */}
+                        <p className="text-xs text-slate-600 line-clamp-2 mt-3 leading-relaxed">
+                          {meal.description}
+                        </p>
+                        {meal.ingredients && (
+                          <p className="text-[11px] text-slate-400 truncate mt-1">
+                            <strong className="text-slate-600">Ingredients:</strong> {meal.ingredients}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Status footer on card */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span
+                          className={`font-extrabold text-[11px] px-2.5 py-0.5 rounded-full ${
+                            isSelected
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isSelected ? '✓ Available Tomorrow' : 'Not Scheduled'}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {meal.calories ? `${meal.calories} kcal` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: MASTER CATALOG & CALENDAR */}
+      {activeTab === 'catalog' && (
+        <div className="space-y-8">
       {/* SECTION: School Allergy Policy Switch (Requirement 5) */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -572,6 +854,8 @@ export default function AdminMenuPage() {
           ))}
         </div>
       </div>
+        </div>
+      )}
 
       {/* CREATE / EDIT MEAL MODAL (Requirement 4: Multi-allergen tag selector) */}
       {isMealModalOpen && (

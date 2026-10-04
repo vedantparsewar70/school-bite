@@ -13,6 +13,7 @@ export function getFirebaseApp(): App {
   if (cachedApp) return cachedApp;
   if (getApps().length > 0) {
     cachedApp = getApps()[0];
+    hasConfiguredCredentials = true;
     return cachedApp;
   }
 
@@ -113,6 +114,11 @@ export const db: Firestore = new Proxy({} as Firestore, {
     }
     if (!cachedDb) {
       cachedDb = getFirestore(getFirebaseApp());
+      try {
+        cachedDb.settings({ ignoreUndefinedProperties: true });
+      } catch {
+        // already initialized or settings locked
+      }
     }
     const val = (cachedDb as any)[prop];
     return typeof val === 'function' ? val.bind(cachedDb) : val;
