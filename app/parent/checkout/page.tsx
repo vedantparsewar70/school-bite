@@ -7,7 +7,6 @@ import {
   CreditCard,
   QrCode,
   Building2,
-  Wallet,
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
@@ -32,31 +31,37 @@ export default function CheckoutPage() {
   const { showToast } = useToast();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
-  const [upiId, setUpiId] = useState('sharma.pooja@okhdfcbank');
+  const [upiId, setUpiId] = useState('');
   const [upiApp, setUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'custom'>('gpay');
-  const [cardHolder, setCardHolder] = useState('Pooja Sharma');
-  const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
-  const [cardExpiry, setCardExpiry] = useState('08/29');
-  const [cardCvv, setCardCvv] = useState('888');
+  const [cardHolder, setCardHolder] = useState(user?.name || '');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
   const [bankName, setBankName] = useState('State Bank of India');
   const [processing, setProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Stable idempotency key for this checkout attempt
+  const [idempotencyKey] = useState(
+    () => `ORD-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`
+  );
+
   useEffect(() => {
-    const savedNotes = sessionStorage.getItem('nutribox_order_notes');
+    const savedNotes = sessionStorage.getItem('schoolbite_order_notes');
     if (savedNotes) setNotes(savedNotes);
   }, []);
 
   if (cartItems.length === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-        <h2 className="text-xl font-bold text-slate-800">No items to checkout</h2>
-        <p className="text-xs text-slate-500">Your cart is empty. Please add meals from the menu first.</p>
+        <h2 className="text-xl font-bold text-slate-800">No items in Order Summary</h2>
+        <p className="text-xs text-slate-500">Your cart is empty. Please select meals from Tomorrow&apos;s Menu first.</p>
         <Link
           href="/parent/menu"
-          className="inline-block px-5 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md"
+          className="inline-block px-5 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-amber-600 transition-colors"
         >
-          View Menu
+          View Tomorrow&apos;s Menu
         </Link>
       </div>
     );
@@ -64,6 +69,8 @@ export default function CheckoutPage() {
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (processing) return; // Prevent duplicate clicks
+    setErrorMessage('');
     setProcessing(true);
 
     try {
@@ -77,24 +84,27 @@ export default function CheckoutPage() {
           cardLastFour: paymentMethod === 'CARD' ? cardNumber.slice(-4) : undefined,
           bankName: paymentMethod === 'NET_BANKING' ? bankName : undefined,
           notes,
+          idempotencyKey,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        setErrorMessage(data.error || 'Payment failed. Please verify and try again.');
         showToast(data.error || 'Payment failed. Please try again.', 'error');
         setProcessing(false);
         return;
       }
 
-      // Success
+      // Backend verified successful payment & created order
       clearCart();
-      sessionStorage.removeItem('nutribox_order_notes');
+      sessionStorage.removeItem('schoolbite_order_notes');
       await refreshUser();
-      showToast('Payment successful! Order confirmed.', 'success');
+      showToast('Payment verified successfully! Order placed.', 'success');
       router.push(`/parent/confirmation/${data.orderId}`);
     } catch {
+      setErrorMessage('A network error occurred while verifying payment. Please retry.');
       showToast('A network error occurred while processing payment', 'error');
       setProcessing(false);
     }
@@ -106,12 +116,22 @@ export default function CheckoutPage() {
       <div className="pb-4 border-b border-slate-200">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
           <CreditCard className="w-7 h-7 text-amber-500" />
-          <span>Complete Payment & Checkout</span>
+          <span>Order Summary & Payment</span>
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Simulated checkout for Indian Schools with UPI, RuPay/Cards, Net Banking, and School Meal Wallet.
+          Review your child&apos;s meal details and complete verified payment.
         </p>
       </div>
+
+      {errorMessage && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Payment Error</p>
+            <p>{errorMessage}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Payment Method & Parent Details */}
@@ -126,15 +146,15 @@ export default function CheckoutPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <div>
                 <p className="text-slate-400 font-bold uppercase text-[10px]">Name</p>
-                <p className="font-extrabold text-slate-800">{user?.name || 'Pooja Sharma'}</p>
+                <p className="font-extrabold text-slate-800">{user?.name || 'Parent Account'}</p>
               </div>
               <div>
                 <p className="text-slate-400 font-bold uppercase text-[10px]">Email</p>
-                <p className="font-medium text-slate-800 truncate">{user?.email || 'parent@example.com'}</p>
+                <p className="font-medium text-slate-800 truncate">{user?.email || 'Registered Email'}</p>
               </div>
               <div>
                 <p className="text-slate-400 font-bold uppercase text-[10px]">Phone</p>
-                <p className="font-medium text-slate-800">{user?.phone || '+91 98765 43210'}</p>
+                <p className="font-medium text-slate-800">{user?.phone || 'Registered Contact'}</p>
               </div>
             </div>
           </div>
@@ -147,16 +167,15 @@ export default function CheckoutPage() {
                 <span>Select Payment Method</span>
               </h3>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                100% Mock / Test Mode
+                Cashless Payment Gateway
               </span>
             </div>
 
             {/* Methods Tab */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {[
-                { id: 'UPI', label: 'UPI / QR', icon: QrCode, sub: 'GPay, PhonePe' },
-                { id: 'WALLET', label: 'Meal Wallet', icon: Wallet, sub: `Bal: ${formatINR(user?.walletBalance || 0)}` },
-                { id: 'CARD', label: 'Cards', icon: CreditCard, sub: 'Debit / Credit' },
+                { id: 'UPI', label: 'UPI / QR', icon: QrCode, sub: 'GPay, PhonePe, Paytm' },
+                { id: 'CARD', label: 'Cards', icon: CreditCard, sub: 'Debit / Credit / RuPay' },
                 { id: 'NET_BANKING', label: 'Net Banking', icon: Building2, sub: 'All Indian Banks' },
               ].map((m) => {
                 const isSelected = paymentMethod === m.id;
@@ -188,17 +207,15 @@ export default function CheckoutPage() {
               {paymentMethod === 'UPI' && (
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700">Quick UPI Apps:</span>
-                    <div className="flex gap-2">
-                      {['GPay', 'PhonePe', 'Paytm'].map((app) => (
-                        <button
+                    <span className="text-xs font-bold text-slate-700">Supported UPI:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map((app) => (
+                        <span
                           key={app}
-                          type="button"
-                          onClick={() => setUpiId(`sharma.pooja@ok${app.toLowerCase()}`)}
-                          className="px-2.5 py-1 bg-white border border-slate-200 hover:border-amber-400 rounded-lg text-xs font-semibold text-slate-700"
+                          className="px-2.5 py-0.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
                         >
                           {app}
-                        </button>
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -210,45 +227,11 @@ export default function CheckoutPage() {
                       required
                       value={upiId}
                       onChange={(e) => setUpiId(e.target.value)}
-                      placeholder="username@okhdfcbank"
+                      placeholder="e.g. mobileNumber@upi or username@okhdfcbank"
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">A mock payment confirmation will be simulated.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Direct online payment processed securely.</p>
                   </div>
-                </div>
-              )}
-
-              {paymentMethod === 'WALLET' && (
-                <div className="bg-emerald-50/70 p-5 rounded-2xl border border-emerald-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-emerald-900">Parent Meal Wallet Balance</p>
-                      <p className="text-2xl font-black text-emerald-800">{formatINR(user?.walletBalance || 0)}</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-bold">
-                      <Wallet className="w-6 h-6" />
-                    </div>
-                  </div>
-
-                  {(user?.walletBalance || 0) < subtotal ? (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs space-y-1">
-                      <p className="font-bold">⚠️ Insufficient Wallet Balance</p>
-                      <p>
-                        Your current balance is {formatINR(user?.walletBalance || 0)}, but order total is {formatINR(subtotal)}. Please recharge your wallet or choose UPI/Cards.
-                      </p>
-                      <Link
-                        href="/parent/profile"
-                        className="inline-block mt-1 font-bold text-rose-900 underline"
-                      >
-                        Recharge Wallet Now →
-                      </Link>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-emerald-700 font-medium">
-                      ✓ Instant 1-click deduction. Balance after order will be{' '}
-                      <strong>{formatINR((user?.walletBalance || 0) - subtotal)}</strong>.
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -261,6 +244,7 @@ export default function CheckoutPage() {
                       required
                       value={cardHolder}
                       onChange={(e) => setCardHolder(e.target.value)}
+                      placeholder="Name as on card"
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
                     />
                   </div>
@@ -272,6 +256,7 @@ export default function CheckoutPage() {
                       required
                       value={cardNumber}
                       onChange={(e) => setCardNumber(e.target.value)}
+                      placeholder="Enter 16-digit card number"
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
                     />
                   </div>
@@ -284,6 +269,7 @@ export default function CheckoutPage() {
                         required
                         value={cardExpiry}
                         onChange={(e) => setCardExpiry(e.target.value)}
+                        placeholder="MM/YY"
                         className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
                       />
                     </div>
@@ -295,6 +281,7 @@ export default function CheckoutPage() {
                         maxLength={4}
                         value={cardCvv}
                         onChange={(e) => setCardCvv(e.target.value)}
+                        placeholder="CVV"
                         className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
                       />
                     </div>
@@ -323,7 +310,7 @@ export default function CheckoutPage() {
               {/* Pay Button */}
               <button
                 type="submit"
-                disabled={processing || (paymentMethod === 'WALLET' && (user?.walletBalance || 0) < subtotal)}
+                disabled={processing}
                 className={`w-full py-4 rounded-2xl font-bold text-white text-sm sm:text-base shadow-lg transition-all flex items-center justify-center gap-2 mt-4 ${
                   processing
                     ? 'bg-amber-400 cursor-not-allowed'
@@ -333,12 +320,12 @@ export default function CheckoutPage() {
                 {processing ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Authorizing Payment of {formatINR(subtotal)}...</span>
+                    <span>Processing Payment of {formatINR(subtotal)}...</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5" />
-                    <span>Confirm & Pay {formatINR(subtotal)}</span>
+                    <span>Proceed to Payment ({formatINR(subtotal)})</span>
                   </>
                 )}
               </button>

@@ -2,12 +2,12 @@
 set -e
 
 # ========================================================
-# Vidyalaya NutriBox - One-Click VPS Deployment Script
+# SchoolBite - One-Click VPS Deployment Script
 # Supports: Ubuntu 20.04+, Debian 11+
 # ========================================================
 
 echo "===================================================="
-echo "🍱 Setting up Vidyalaya NutriBox on your VPS..."
+echo "🍱 Setting up SchoolBite on your VPS..."
 echo "===================================================="
 
 # 1. Check for Docker & Docker Compose
@@ -42,7 +42,7 @@ docker compose up -d --build
 # 4. Display status
 echo ""
 echo "===================================================="
-echo "🎉 Vidyalaya NutriBox is successfully deployed!"
+echo "🎉 SchoolBite is successfully deployed!"
 echo "===================================================="
 SERVER_IP=$(curl -s https://ifconfig.me || curl -s https://api.ipify.org || echo "YOUR_SERVER_IP")
 echo ""

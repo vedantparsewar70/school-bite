@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import {
   CheckCircle2,
-  Printer,
   ArrowRight,
   UtensilsCrossed,
   Calendar,
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 import { formatINR, formatDateTimePretty, formatDatePretty } from '@/lib/utils';
 import VegBadge from '@/components/VegBadge';
-import OrderReceiptModal from '@/components/OrderReceiptModal';
 
 export default function OrderConfirmationPage() {
   const params = useParams();
@@ -24,7 +22,6 @@ export default function OrderConfirmationPage() {
 
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   useEffect(() => {
     // Trigger celebratory confetti on mount
@@ -78,33 +75,41 @@ export default function OrderConfirmationPage() {
           <CheckCircle2 className="w-10 h-10" />
         </div>
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-          Payment Successful! 🎉
+          Order Successful
         </h1>
         <p className="text-sm text-slate-500 max-w-md mx-auto">
-          Your child's school lunch has been confirmed. The canteen team will prepare hot portions fresh on the selected dates.
+          Your meal order has been verified and confirmed with the S.B. Patil School canteen.
         </p>
       </div>
 
       {/* Confirmation Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6">
         {/* Order Meta Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-amber-50/60 border border-amber-100 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4 rounded-2xl bg-amber-50/60 border border-amber-100 text-xs">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400">Order ID</span>
-            <p className="font-mono font-extrabold text-slate-900 text-sm">{orderId}</p>
+            <p className="font-mono font-extrabold text-slate-900 text-sm truncate">{orderId}</p>
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Payment ID</span>
-            <p className="font-mono font-semibold text-slate-800 text-xs">{primaryPayment?.id || 'PAY-CONFIRMED'}</p>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Child Name</span>
+            <p className="font-extrabold text-slate-800 text-xs truncate">
+              {order?.items?.[0]?.studentName || 'Student'}
+            </p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Meal Date</span>
+            <p className="font-extrabold text-slate-800 text-xs truncate">
+              {order?.items?.[0]?.date ? formatDatePretty(order.items[0].date) : 'Tomorrow'}
+            </p>
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400">Total Paid</span>
             <p className="font-black text-amber-700 text-sm">{formatINR(order?.totalAmount || 0)}</p>
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Payment Status</span>
             <span className="inline-block mt-0.5 px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
-              CONFIRMED
+              SUCCESS
             </span>
           </div>
         </div>
@@ -141,37 +146,28 @@ export default function OrderConfirmationPage() {
         </div>
 
         {/* Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
-          <button
-            onClick={() => setIsReceiptModalOpen(true)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 hover:border-amber-400 text-slate-800 rounded-xl text-xs font-bold shadow-xs transition-colors"
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-slate-100">
+          <Link
+            href="/parent/children"
+            className="w-full sm:w-auto text-center px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
           >
-            <Printer className="w-4 h-4 text-amber-500" />
-            <span>Download / Print Receipt</span>
-          </button>
-
-          <div className="w-full sm:w-auto flex items-center gap-2">
-            <Link
-              href="/parent/orders"
-              className="w-full sm:w-auto text-center px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
-            >
-              View Order History
-            </Link>
-            <Link
-              href="/parent/menu"
-              className="w-full sm:w-auto text-center px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5"
-            >
-              <span>Order More</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+            Select Child
+          </Link>
+          <Link
+            href="/parent/orders"
+            className="w-full sm:w-auto text-center px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-colors"
+          >
+            Order History
+          </Link>
+          <Link
+            href="/parent/menu"
+            className="w-full sm:w-auto text-center px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5"
+          >
+            <span>Order More</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
-
-      {/* Receipt Modal */}
-      {isReceiptModalOpen && order && (
-        <OrderReceiptModal order={order} onClose={() => setIsReceiptModalOpen(false)} />
-      )}
     </div>
   );
 }

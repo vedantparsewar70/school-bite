@@ -1,5 +1,5 @@
 # ==========================================
-# Vidyalaya NutriBox - Multi-stage Dockerfile
+# SchoolBite - Multi-stage Dockerfile
 # Optimized for Next.js 16 Standalone + Prisma PostgreSQL
 # ==========================================
 

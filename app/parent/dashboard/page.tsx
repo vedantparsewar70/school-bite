@@ -6,7 +6,6 @@ import {
   Users,
   UtensilsCrossed,
   Calendar,
-  Wallet,
   Clock,
   ArrowRight,
   PlusCircle,
@@ -134,7 +133,7 @@ export default function ParentDashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         {/* Card 1: Children */}
         <Link
           href="/parent/children"
@@ -197,28 +196,6 @@ export default function ParentDashboard() {
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">Lunches pre-booked</p>
-        </Link>
-
-        {/* Card 4: Wallet Balance */}
-        <Link
-          href="/parent/profile"
-          className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md hover:border-emerald-200 transition-all group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Wallet Balance</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Wallet className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <p className="text-2xl sm:text-3xl font-extrabold text-emerald-700">
-              {formatINR(user?.walletBalance || 0)}
-            </p>
-            <span className="text-[11px] font-semibold text-emerald-600 flex items-center">
-              Top Up <ChevronRight className="w-3 h-3" />
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Instant 1-click checkout</p>
         </Link>
       </div>
 

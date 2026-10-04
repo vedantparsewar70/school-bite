@@ -76,7 +76,7 @@ export default function PaymentsPage() {
             <span>Payment History</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Audit trail of all online transactions, UPI references, and meal wallet debits.
+            Audit trail of all online transactions, UPI references, and card payments.
           </p>
         </div>
 

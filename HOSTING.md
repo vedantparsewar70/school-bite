@@ -1,4 +1,4 @@
-# 🚀 Hosting Guide: Vidyalaya NutriBox (Docker & VPS)
+# 🚀 Hosting Guide: SchoolBite (Docker & VPS)
 
 This guide walks you through deploying your **Next.js 16 + Prisma PostgreSQL** web application to any Virtual Private Server (VPS) or cloud host using Docker.
 
@@ -151,6 +151,6 @@ cp ./prisma/dev.db ./prisma/dev_backup_$(date +%Y%m%d_%H%M%S).db
 | :--- | :--- | :--- |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/dbname` |
 | `JWT_SECRET` | Secret key for JWT session tokens | Secure random string |
-| `NEXT_PUBLIC_APP_NAME` | Branding title shown across the UI | `Vidyalaya NutriBox` |
+| `NEXT_PUBLIC_APP_NAME` | Branding title shown across the UI | `SchoolBite` |
 | `SEED_ON_INIT` | Whether to run demo seed data on fresh launch | `false` |
 | `PORT` | Container internal port | `3000` |

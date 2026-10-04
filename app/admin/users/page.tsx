@@ -314,7 +314,7 @@ export default function AdminUsersPage() {
 
                       return (
                         <tr key={st.id} className="hover:bg-slate-50/60 transition-colors">
-                          {/* Profile (Generic WhatsApp Avatar - Requirement 1) */}
+                          {/* Profile (Generic Neutral Avatar - Requirement 1) */}
                           <td className="py-3.5 px-4 text-center">
                             <ChildAvatar size="sm" />
                           </td>
@@ -484,7 +484,7 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
-            {/* Circular generic WhatsApp-style avatar */}
+            {/* Circular generic neutral avatar */}
             <div className="flex justify-center">
               <ChildAvatar size="xl" className="ring-4 ring-purple-200 shadow-md" />
             </div>

@@ -1,4 +1,4 @@
-# NutriKids — School Canteen Meal Ordering & Management System
+# SchoolBite — School Canteen Meal Ordering & Management System
 
 > A modern, responsive, full-stack web application designed for Indian schools to streamline canteen operations, enable advance healthy meal scheduling for parents, and simplify lunch prep for kitchen staff.
 
@@ -55,27 +55,25 @@
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Lucide React Icons, Canvas-Confetti
 - **Backend**: Next.js API Routes & Server Actions
-- **Database**: PostgreSQL with Prisma ORM 6 (hosted on Neon, Supabase, Vercel Postgres, or local)
+- **Database**: Google Firebase Cloud Firestore (via `firebase-admin` SDK)
 - **Authentication**: JWT session tokens via `jose` with HTTP-Only secure cookies and `bcryptjs` password hashing
 - **Currency & Localization**: Indian Rupee (₹ INR), Indian FSSAI Veg/Non-Veg badges, date formatting for Indian school terms
 
 ---
 
-## 🚀 Running Locally
+## 🚀 Running Locally with Firebase Firestore
 
 1. **Install dependencies**:
    ```bash
    npm install
    ```
 
-2. **Sync database and generate Prisma Client**:
-   ```bash
-   npx prisma db push
-   ```
+2. **Configure Firebase**:
+   Download your Firebase Service Account Private Key from **Firebase Console** -> **Project Settings** -> **Service accounts** and save it as `firebase-service-account.json` in the project root (or set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` in `.env`).
 
-3. **Seed demo Indian school meals and sample orders**:
+3. **Seed demo Indian school meals and sample orders into Firestore**:
    ```bash
-   npx tsx prisma/seed.ts
+   npm run db:seed-firestore
    ```
 
 4. **Start the development server**:
