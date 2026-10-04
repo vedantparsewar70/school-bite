@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nutribox-web
+    container_name: schoolbite-web
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -12,7 +12,7 @@ services:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET:-super-secure-school-mealbox-jwt-secret-key-2026}
-      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Vidyalaya NutriBox}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-SchoolBite}
       - SEED_ON_INIT=${SEED_ON_INIT:-false}
     volumes:
       # Mount host prisma folder so SQLite database persists across container restarts
@@ -24,7 +24,7 @@ services:
   # 2. Run: docker compose --profile https up -d
   caddy:
     image: caddy:2-alpine
-    container_name: nutribox-caddy
+    container_name: schoolbite-caddy
     restart: unless-stopped
     profiles:
       - https

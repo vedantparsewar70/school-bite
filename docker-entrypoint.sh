@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "🚀 Starting Vidyalaya NutriBox container..."
+echo "🚀 Starting SchoolBite container..."
 
 # Ensure database directory exists
 mkdir -p /app/prisma

@@ -23,7 +23,7 @@ const CartContext = createContext<CartContextType>({
   subtotal: 0,
 });
 
-const CART_STORAGE_KEY = 'nutribox_school_cart';
+const CART_STORAGE_KEY = 'schoolbite_cart';
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -31,7 +31,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      const saved = localStorage.getItem(CART_STORAGE_KEY) || localStorage.getItem('nutribox_school_cart');
       if (saved) {
         setCartItems(JSON.parse(saved));
       }

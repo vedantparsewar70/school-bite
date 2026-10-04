@@ -1,4 +1,4 @@
-# NutriKids — School Canteen Meal Ordering & Management System
+# SchoolBite — School Canteen Meal Ordering & Management System
 
 > A modern, responsive, full-stack web application designed for Indian schools to streamline canteen operations, enable advance healthy meal scheduling for parents, and simplify lunch prep for kitchen staff.
 

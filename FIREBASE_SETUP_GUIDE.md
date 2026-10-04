@@ -8,7 +8,7 @@ This project is fully equipped to use **Google Cloud Firestore** as its database
 
 1. Go to the [Firebase Console](https://console.firebase.google.com/).
 2. Click **"Add project"** (or **"Create a project"**).
-3. Enter a project name (e.g. `school-bite` or `vidyalaya-nutribox`).
+3. Enter a project name (e.g. `school-bite`).
 4. (Optional) Disable or Enable Google Analytics according to your preference, then click **Create project**.
 
 ---
