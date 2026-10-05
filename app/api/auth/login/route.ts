@@ -124,10 +124,11 @@ export async function POST(req: Request) {
 
     step = '7_SESSION_COOKIE';
     console.log('[AUTH_LOGIN_TRACE] Step 7: Setting session cookie');
-    const cookieStore = await cookies();
-    cookieStore.set(TOKEN_COOKIE_NAME, token, {
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
+    const isHttps = proto === 'https';
+    (cookieStore as any).set(TOKEN_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days

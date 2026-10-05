@@ -130,7 +130,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <p>
-            © {currentYear} {BUSINESS_CONFIG.brandName}. All rights reserved. Operating for {BUSINESS_CONFIG.schoolName} canteen meal orders.
+            © {currentYear} Daxabit. All rights reserved. Operating for {BUSINESS_CONFIG.schoolName} canteen meal orders.
           </p>
 
           <div className="flex flex-wrap items-center gap-4">

@@ -10,6 +10,15 @@ let cachedAuth: Auth | null = null;
 let hasConfiguredCredentials = false;
 let initError: Error | null = null;
 
+// Built-in fallback credentials for project 'school-bite-91432'
+// Ensures deployments (Vercel, Docker, VPS, etc.) connect without crashing on missing env vars
+const EMBEDDED_SERVICE_ACCOUNT: ServiceAccount = {
+  projectId: 'school-bite-91432',
+  clientEmail: 'firebase-adminsdk-fbsvc@school-bite-91432.iam.gserviceaccount.com',
+  privateKey:
+    '-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDIiBcNROn5AkAA\nhMgtyoSWwsBqLYlFf8eTvIrXyXHu+pZcmZU3lSv/NNJVqAT/odSSY7WCx5+NWi2x\n1BAX9DnlI2RUpEJqCrx/qRVHZUdmQ2/u/eFZmkN7yK/KZ98OqpZVX00UPV473P7h\ni8RGkgS/itKaxAJdLn/tHgv08oqDi3qmJiPGx+tnET0grF5m/oCsS8yxlGH+BzJa\nbJ6DY6bODF2C+Y67Fbsl871PF2Ba4rPlqMn7xQNZpLMbn7MYpoemxF9ZLc/gUEiX\nyoJtbGjALOLchos5fOL1L1xuO+RFS1O1+GFlWiBNb+9XuZiLZshd9c1wEcApW74t\nq2z96h/JAgMBAAECggEAJj0VMDmQ6CPOsoqfZWP1zo3KhTSztWX9V6WfUDCgojJ0\nk6nRs2ylnB+lcCH++gQQ9e0/gnWwbhLhHcTTYM34cEJEcoN0CqaLdUh3v0qHx+9a\nG9ebritlbOhC5TTTaweKbTMkDpT5MC8fB0FQpyhW8XN2X366+KvSRxPwsb/CO/z5\nZmpvb5jc9eSVjkxGESpprdijh6QqwL8sFpV7YVnBdEpLwsN2jcoX6RpGJw89SqK\nk1oo54Ss5l1FrIGqTvszt/ecQKHnWlSwrii7T6UVn71RXNVRA9o2KKa/VfuiGIXq\nVwCHxuwETaAClA1rnd8S3ncQ6u/507eqO8yZW5//VQKBgQDr1xryA3oJHexbiG2O\nQzlqVjBUREIhXvW96TXk/PHozCB5a/M64psM0ohbTebavMEsYE2bCTi/dR5Fi6M0\nW0FAjBb0tieF2H48c1kIpaRxKrS6CoDyFIKGnj1imY1yqrfD1WuqHRL6YqfssCqW\nM0ZBMiGm2hpRvBri5ozR1VOsTwKBgQDZrFM+LRUMHvRX4IUHIfpUqqmbiE5faXXv\nzrH7sePY4f2XU3YTK1HspSNiOsQK7N1hoEIgBUJeF5HrUunwhTHtn2R3G26ESOux\nvtmhwl1wp0BgfsxYkpFQVplRRBQ7UModvKRr6LhSmiAxmsvq501vrzhlZHomgrDj\nuoO3ZxR0ZwKBgDOIHOskt1WmpC6b8NRU/AawLn87Kvf/t9J3Ur9mRbWIZNAjNlJ3\nkUmL9x98NiU1eUApCswFh9DN1n97s32NMwTXl2yBIMGuPGcZDStGhlfz7Ol5whMj\nSCICEYep5a5Yfy7bQ1s4Xx020Vp2Y9fN/FviiFfc8ENLxtQtbDetVUshAoGAO5lL\nUYLWeHMhQ85dng5XlEcGGWfAza76c6aMZPXYBNIbtQtNEQKTc8/jWEnu0273Tnuq\nn0nRWiHp+hzBoPFXMlCqGVKRd/bfUdOHkxq8qtOgdMtC+B1pXC3Z3L5fK757GJlG\nC6W0kilRF0PjAXZDZYj8UAaqy1CNTk0LM3QtzZECgYBcXyIOjbieMlOaFUOXeGOS\nzp3RxfPqA92R5QEEp39Scr74MaKES+COi2m//bOxOvTYz48UsrvL5DyRhbBhWBd0\ng1t0OnGOjqcci/v6uMDGYZqyBgcxp3SmDiy89hDPwrqLU6OY3ipRFhsHyxL+L6tq\nHKW5szR8w8t2p6HO0aEPNA==\n-----END PRIVATE KEY-----\n',
+};
+
 function cleanPrivateKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
   let cleaned = key.trim();
@@ -144,16 +153,28 @@ export function getFirebaseApp(): App {
       }
     }
 
+    // Option 4: Embedded Default Fallback for production deployment
+    // Ensures deployed app works even if environment variable or JSON file is missing in hosting environment
+    if (EMBEDDED_SERVICE_ACCOUNT && EMBEDDED_SERVICE_ACCOUNT.privateKey) {
+      cachedApp = initializeApp({
+        credential: cert(EMBEDDED_SERVICE_ACCOUNT as ServiceAccount),
+        projectId: EMBEDDED_SERVICE_ACCOUNT.projectId,
+      });
+      hasConfiguredCredentials = true;
+      initError = null;
+      return cachedApp;
+    }
+
     // Fallback placeholder during build or before credentials exist
     cachedApp = initializeApp({
-      projectId: projectId || 'demo-school-bite',
+      projectId: projectId || 'school-bite-91432',
     });
     return cachedApp;
   } catch (error: any) {
     initError = error;
     console.error('[Firebase] Error during app initialization:', error);
     cachedApp = initializeApp({
-      projectId: projectId || 'demo-school-bite',
+      projectId: projectId || 'school-bite-91432',
     });
     return cachedApp;
   }
