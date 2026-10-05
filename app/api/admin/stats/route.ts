@@ -1,24 +1,58 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { getTodayString } from '@/lib/utils';
+import { getTodayString, getOffsetDateString } from '@/lib/utils';
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const todayStr = getTodayString();
+    const tomorrowStr = getOffsetDateString(1);
 
-    const [totalParents, totalStudents, totalMeals] = await Promise.all([
-      prisma.parent.count(),
-      prisma.student.count({ where: { isActive: true } }),
-      prisma.meal.count(),
-    ]);
+    // 1. Check if tomorrow's menu is published
+    const tomorrowMenus = await prisma.menu.findMany({
+      where: {
+        date: tomorrowStr,
+        isActive: true,
+      },
+      include: { meal: true },
+    });
+    const isTomorrowMenuPublished = tomorrowMenus.length > 0;
+    const tomorrowPublishedCount = tomorrowMenus.length;
 
-    // Today's orders & revenue
+    // 2. Fetch tomorrow's active items for production count
+    const tomorrowItems = await prisma.orderItem.findMany({
+      where: {
+        date: tomorrowStr,
+        order: {
+          orderStatus: { not: 'CANCELLED' },
+        },
+      },
+      include: { meal: true },
+    });
+
+    const tomorrowMealCountsMap = new Map<string, { mealName: string; count: number; category: string; isVegetarian: boolean }>();
+    for (const it of tomorrowItems) {
+      const existing = tomorrowMealCountsMap.get(it.mealId);
+      if (existing) {
+        existing.count += it.quantity;
+      } else {
+        tomorrowMealCountsMap.set(it.mealId, {
+          mealName: it.meal.name,
+          count: it.quantity,
+          category: it.meal.category,
+          isVegetarian: it.meal.isVegetarian,
+        });
+      }
+    }
+    const tomorrowProduction = Array.from(tomorrowMealCountsMap.values()).sort((a, b) => b.count - a.count);
+    const tomorrowTotalMeals = tomorrowItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
+
+    // 3. Fetch today's items for comparison if needed
     const todayItems = await prisma.orderItem.findMany({
       where: {
         date: todayStr,
@@ -26,36 +60,29 @@ export async function GET() {
           orderStatus: { not: 'CANCELLED' },
         },
       },
+      include: { meal: true },
+    });
+    const todayTotalMeals = todayItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
+
+    // 4. All active orders & totals
+    const allActiveOrders = await prisma.order.findMany({
+      where: {
+        orderStatus: { not: 'CANCELLED' },
+      },
       include: {
-        meal: true,
+        items: true,
       },
     });
 
-    const todayRevenue = todayItems.reduce((sum, item) => sum + item.totalPrice, 0);
-    const todayOrdersCount = new Set(todayItems.map((i) => i.orderId)).size;
-    const studentsServedCount = new Set(todayItems.map((i) => i.studentId)).size;
-    const todayAllergyAlertsCount = todayItems.filter((i) => i.hasAllergyAlert).reduce((sum, i) => sum + i.quantity, 0);
-    const todayAllergyOrdersCount = new Set(todayItems.filter((i) => i.hasAllergyAlert).map((i) => i.orderId)).size;
+    const totalOrders = allActiveOrders.length;
+    const totalOrderValue = allActiveOrders.reduce((sum: number, o: any) => sum + o.totalAmount, 0);
+    const allActiveItems = allActiveOrders.flatMap((o: any) => o.items || []);
+    const totalItems = allActiveItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
+    const studentsOrdered = new Set(allActiveItems.map((it: any) => it.studentId)).size;
 
-    // All-time meals sold
-    const allActiveItems = await prisma.orderItem.findMany({
-      where: {
-        order: { orderStatus: { not: 'CANCELLED' } },
-      },
-    });
-    const totalMealsSold = allActiveItems.reduce((sum, i) => sum + i.quantity, 0);
-    const totalRevenue = allActiveItems.reduce((sum, i) => sum + i.totalPrice, 0);
-
-    // Pending orders (CONFIRMED or PREPARING)
-    const pendingOrdersCount = await prisma.order.count({
-      where: {
-        orderStatus: { in: ['CONFIRMED', 'PREPARING'] },
-      },
-    });
-
-    // Recent orders
+    // 5. Recent orders for compact preview
     const recentOrders = await prisma.order.findMany({
-      take: 6,
+      take: 5,
       orderBy: { createdAt: 'desc' },
       include: {
         parent: {
@@ -67,27 +94,21 @@ export async function GET() {
             meal: true,
           },
         },
-        payments: true,
       },
     });
 
-    const formattedRecentOrders = recentOrders.map((o) => ({
+    const formattedRecentOrders = recentOrders.map((o: any) => ({
       id: o.id,
-      parentName: o.parent.user.name,
-      parentEmail: o.parent.user.email,
+      parentName: o.parent?.user?.name || 'Parent',
       totalAmount: o.totalAmount,
       orderStatus: o.orderStatus,
       paymentStatus: o.paymentStatus,
-      hasAnyAllergyAlert: o.items.some((it) => it.hasAllergyAlert),
       createdAt: o.createdAt.toISOString(),
-      items: o.items.map((it) => ({
-        mealName: it.meal.name,
-        mealCategory: it.meal.category,
-        studentName: it.student.name,
-        grade: it.student.grade,
-        division: it.student.division,
-        hasAllergyAlert: it.hasAllergyAlert,
-        conflictAllergens: it.conflictAllergens,
+      items: (o.items || []).map((it: any) => ({
+        mealName: it.meal?.name || 'Meal',
+        studentName: it.student?.name || 'Student',
+        grade: it.student?.grade || '',
+        division: it.student?.division || '',
         date: it.date,
         quantity: it.quantity,
       })),
@@ -95,18 +116,17 @@ export async function GET() {
 
     return NextResponse.json({
       stats: {
-        totalParents,
-        totalStudents,
-        totalMeals,
-        todayOrdersCount,
-        todayRevenue,
-        pendingOrdersCount,
-        totalMealsSold,
-        totalRevenue,
-        studentsServedCount,
-        todayAllergyAlertsCount,
-        todayAllergyOrdersCount,
+        totalOrders,
+        studentsOrdered,
+        totalItems,
+        totalOrderValue,
+        todayTotalMeals,
+        tomorrowTotalMeals,
+        nextMealDate: tomorrowStr,
+        isTomorrowMenuPublished,
+        tomorrowPublishedCount,
       },
+      tomorrowProduction,
       recentOrders: formattedRecentOrders,
     });
   } catch (error) {

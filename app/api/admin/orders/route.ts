@@ -5,8 +5,8 @@ import { getCurrentUser } from '@/lib/auth';
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -21,20 +21,6 @@ export async function GET(req: Request) {
 
     // Query orders with items
     const orders = await prisma.order.findMany({
-      where: {
-        ...(orderStatus ? { orderStatus } : {}),
-        ...(paymentStatus ? { paymentStatus } : {}),
-        items: {
-          some: {
-            ...(date ? { date } : {}),
-            ...(mealId ? { mealId } : {}),
-            student: {
-              ...(grade ? { grade } : {}),
-              ...(division ? { division } : {}),
-            },
-          },
-        },
-      },
       include: {
         parent: {
           include: { user: true },
@@ -51,6 +37,36 @@ export async function GET(req: Request) {
     });
 
     let filtered = orders;
+
+    // Filter by orderStatus
+    if (orderStatus && orderStatus !== 'ALL') {
+      filtered = filtered.filter((o) => o.orderStatus === orderStatus);
+    }
+
+    // Filter by paymentStatus
+    if (paymentStatus && paymentStatus !== 'ALL') {
+      filtered = filtered.filter((o) => o.paymentStatus === paymentStatus);
+    }
+
+    // Filter by date (meal date on order items)
+    if (date) {
+      filtered = filtered.filter((o) => o.items && o.items.some((it) => it.date === date));
+    }
+
+    // Filter by meal
+    if (mealId) {
+      filtered = filtered.filter((o) => o.items && o.items.some((it) => it.mealId === mealId));
+    }
+
+    // Filter by class/grade
+    if (grade) {
+      filtered = filtered.filter((o) => o.items && o.items.some((it) => it.student?.grade === grade));
+    }
+
+    // Filter by division
+    if (division) {
+      filtered = filtered.filter((o) => o.items && o.items.some((it) => it.student?.division === division));
+    }
 
     // Filter by allergy alert presence
     if (allergyFilter === 'WITH_ALERTS') {
@@ -129,8 +145,8 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();

@@ -5,27 +5,31 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldCheck,
+  ChefHat,
   Mail,
   Lock,
   ArrowRight,
   AlertCircle,
   ArrowLeft,
   KeyRound,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
 
-function AdminLoginForm() {
+function StaffOrAdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isAdmin = searchParams.get('role') === 'admin';
+  const roleParam = searchParams.get('role');
+  const isStaff = roleParam === 'staff';
+  const isAdmin = roleParam === 'admin';
 
-  // If visited without role=admin, redirect immediately to root parent portal
+  // If visited without role=admin or role=staff, redirect to root parent portal
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdmin && !isStaff) {
       router.replace('/');
     }
-  }, [isAdmin, router]);
+  }, [isAdmin, isStaff, router]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +39,15 @@ function AdminLoginForm() {
   const { refreshUser } = useAuth();
   const { showToast } = useToast();
 
+  const handleQuickFill = () => {
+    if (isStaff) {
+      setEmail('staff@school.com');
+      setPassword('Staff123');
+    } else {
+      setEmail('admin@school.com');
+      setPassword('Admin123');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,21 +58,25 @@ function AdminLoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          requestedRole: isStaff ? 'staff' : 'admin',
+        }),
       });
 
       let data: any = null;
       try {
         data = await res.json();
       } catch {
-        // Non-JSON response (e.g. Vercel serverless gateway error)
+        // Non-JSON response
       }
 
       if (!res.ok) {
         setError(
           data?.error ||
           data?.diagnostic?.details ||
-          `Server error (${res.status}). Please verify your Firebase credentials in Vercel environment variables.`
+          `Server error (${res.status}). Please verify your database connection.`
         );
         setLoading(false);
         return;
@@ -67,45 +84,86 @@ function AdminLoginForm() {
 
       await refreshUser();
       showToast(`Welcome back, ${data.user.name}!`, 'success');
-      router.push('/admin/orders');
+
+      if (data.redirectUrl) {
+        router.push(data.redirectUrl);
+      } else if (data.user.role === 'STAFF') {
+        router.push('/staff/kitchen');
+      } else if (data.user.role === 'ADMIN') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/parent/children');
+      }
     } catch (err: any) {
       setError(err?.message || 'A network error occurred. Please try again.');
       setLoading(false);
     }
   };
 
-  if (!isAdmin) {
+  if (!isAdmin && !isStaff) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  const themeColors = isStaff
+    ? {
+        bgGradient: 'from-amber-50/50 via-white to-slate-50',
+        badgeBg: 'bg-amber-100 text-amber-800',
+        iconBg: 'from-amber-500 to-orange-600 shadow-amber-500/25',
+        buttonGradient: 'from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/20',
+        focusRing: 'focus:ring-amber-500',
+      }
+    : {
+        bgGradient: 'from-purple-50/50 via-white to-slate-50',
+        badgeBg: 'bg-purple-100 text-purple-700',
+        iconBg: 'from-purple-600 to-indigo-600 shadow-purple-600/25',
+        buttonGradient: 'from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/20',
+        focusRing: 'focus:ring-purple-500',
+      };
+
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-purple-50/50 via-white to-slate-50">
+    <div className={`min-h-[calc(100vh-4rem)] flex flex-col justify-center py-8 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b ${themeColors.bgGradient}`}>
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
         {/* Back to Parent Portal Button */}
-        <div className="flex justify-start max-w-md mx-auto mb-2">
+        <div className="flex items-center justify-between max-w-md mx-auto mb-2">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-amber-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:border-amber-300 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>← Back to Parent Portal</span>
+            <span>Parent Portal</span>
           </Link>
+
+          <button
+            type="button"
+            onClick={handleQuickFill}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+            <span>Auto-Fill Demo</span>
+          </button>
         </div>
 
-        <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 items-center justify-center text-white shadow-lg shadow-purple-600/25">
-          <ShieldCheck className="w-7 h-7" />
+        <div className={`inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr ${themeColors.iconBg} items-center justify-center text-white shadow-lg`}>
+          {isStaff ? <ChefHat className="w-7 h-7" /> : <ShieldCheck className="w-7 h-7" />}
         </div>
 
         <div>
+          <div className="inline-block mb-1.5">
+            <span className={`px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider rounded-md ${themeColors.badgeBg}`}>
+              {isStaff ? 'Canteen Staff Portal' : 'School Administration Portal'}
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Canteen & Admin Sign In
+            {isStaff ? 'Canteen Staff Sign In' : 'Canteen & Admin Sign In'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Access kitchen dashboard, order rosters, and daily menu publishing
+            {isStaff
+              ? 'Access kitchen production summary and daily student meal collection'
+              : 'Access overview dashboard, menu publishing, and student orders'}
           </p>
         </div>
       </div>
@@ -122,7 +180,7 @@ function AdminLoginForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Admin Email Address
+                {isStaff ? 'Staff Email Address' : 'Admin Email Address'}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
@@ -131,15 +189,15 @@ function AdminLoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter admin email"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-500 focus:bg-white text-slate-900 transition-all font-medium"
+                  placeholder={isStaff ? 'staff@school.com' : 'admin@school.com'}
+                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all font-medium`}
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Admin Password
+                Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
@@ -149,7 +207,7 @@ function AdminLoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-purple-500 focus:bg-white text-slate-900 transition-all"
+                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all`}
                 />
               </div>
             </div>
@@ -157,24 +215,49 @@ function AdminLoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-purple-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
+              className={`w-full py-3 px-4 bg-gradient-to-r ${themeColors.buttonGradient} text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2`}
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Sign In as Admin</span>
+                  <span>{isStaff ? 'Sign In as Canteen Staff' : 'Sign In as Admin'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
+
+          {/* Quick Switch Between Admin & Staff */}
+          <div className="pt-4 border-t border-slate-100 text-center">
+            {isStaff ? (
+              <p className="text-xs text-slate-500">
+                Need full admin privileges?{' '}
+                <Link
+                  href="/login?role=admin"
+                  className="text-purple-600 hover:text-purple-700 font-bold hover:underline"
+                >
+                  Switch to Admin Login →
+                </Link>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Kitchen or Canteen Staff?{' '}
+                <Link
+                  href="/login?role=staff"
+                  className="text-amber-600 hover:text-amber-700 font-bold hover:underline"
+                >
+                  Switch to Staff Login →
+                </Link>
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Clear Return to Parent Portal link */}
         <div className="mt-6 text-center space-y-2">
           <p className="text-xs text-slate-500">
-            Are you a parent looking to order food?{' '}
+            Are you a parent looking to pre-order food?{' '}
             <Link
               href="/"
               className="text-amber-600 hover:text-amber-700 font-bold hover:underline"
@@ -193,11 +276,12 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-[80vh] flex items-center justify-center">
-          <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >
-      <AdminLoginForm />
+      <StaffOrAdminLoginForm />
     </Suspense>
   );
 }
+

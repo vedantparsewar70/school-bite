@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
-import { comparePassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { comparePassword, hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
 import { UserRole } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     step = '2_PARSE_BODY';
     const body = await req.json().catch(() => null);
-    const { email, password } = body || {};
+    const { email, password, requestedRole } = body || {};
 
     if (!email || !password) {
       console.warn('[AUTH_LOGIN_TRACE] Step 2 Failed: Missing email or password in request body');
@@ -36,14 +36,43 @@ export async function POST(req: Request) {
     console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail})`);
 
     step = '3_DATABASE_CHECK';
-    console.log('[AUTH_LOGIN_TRACE] Step 3: PostgreSQL database connection check started');
+    console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection check started');
 
     step = '4_USER_LOOKUP';
     console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email: emailStr },
       include: { parent: true },
     });
+
+    // Auto-provision demo staff account if signing in
+    if (!user && emailStr === 'staff@school.com' && password === 'Staff123') {
+      const passwordHash = await hashPassword('Staff123');
+      user = await prisma.user.create({
+        data: {
+          id: 'usr_canteen_staff_01',
+          email: 'staff@school.com',
+          name: 'Canteen Staff',
+          role: 'STAFF',
+          passwordHash,
+        },
+      });
+    }
+
+    // Auto-provision demo admin account if not found
+    if (!user && emailStr === 'admin@school.com' && password === 'Admin123') {
+      const passwordHash = await hashPassword('Admin123');
+      user = await prisma.user.create({
+        data: {
+          id: 'usr_canteen_admin_01',
+          email: 'admin@school.com',
+          name: 'Canteen Admin',
+          role: 'ADMIN',
+          passwordHash,
+        },
+      });
+    }
+
     console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup completed. User found: ${Boolean(user)}`);
 
     if (!user) {
@@ -51,6 +80,21 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
+      );
+    }
+
+    // Role-specific enforcement if requestedRole is provided
+    if (requestedRole === 'admin' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Access denied: This login is reserved for Administrators. If you are Canteen Staff, please use Staff Login.' },
+        { status: 403 }
+      );
+    }
+
+    if (requestedRole === 'staff' && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Access denied: This login is reserved for Canteen Staff.' },
+        { status: 403 }
       );
     }
 
@@ -90,10 +134,18 @@ export async function POST(req: Request) {
     });
     console.log('[AUTH_LOGIN_TRACE] Step 7: Session cookie set successfully');
 
+    const redirectUrl =
+      user.role === 'ADMIN'
+        ? '/admin/dashboard'
+        : user.role === 'STAFF'
+        ? '/staff/kitchen'
+        : '/parent/children';
+
     console.log('[AUTH_LOGIN_TRACE] Final response status: 200 OK');
 
     return NextResponse.json({
       success: true,
+      redirectUrl,
       user: {
         id: user.id,
         email: user.email,

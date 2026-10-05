@@ -1,4 +1,4 @@
-export type UserRole = 'PARENT' | 'ADMIN';
+export type UserRole = 'PARENT' | 'ADMIN' | 'STAFF';
 
 export type PaymentMethod = 'UPI' | 'CARD' | 'NET_BANKING' | 'WALLET';
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';

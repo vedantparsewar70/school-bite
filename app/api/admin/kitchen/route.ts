@@ -6,8 +6,8 @@ import { getTodayString } from '@/lib/utils';
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -17,9 +17,6 @@ export async function GET(req: Request) {
     const items = await prisma.orderItem.findMany({
       where: {
         date,
-        order: {
-          orderStatus: { not: 'CANCELLED' },
-        },
       },
       include: {
         meal: true,
@@ -39,12 +36,21 @@ export async function GET(req: Request) {
       ],
     });
 
-    // Aggregate meal counts
+    // Strictly filter out CANCELLED orders or FAILED/REFUNDED payments
+    const validItems = items.filter((it) => {
+      const order = it.order;
+      if (!order) return true;
+      if (order.orderStatus === 'CANCELLED') return false;
+      if (order.paymentStatus === 'FAILED' || order.paymentStatus === 'REFUNDED') return false;
+      return true;
+    });
+
+    // Aggregate meal counts for kitchen production
     const mealCountsMap = new Map<string, { mealId: string; mealName: string; category: string; count: number; isVegetarian: boolean }>();
     let totalMeals = 0;
     let allergyAlertsCount = 0;
 
-    for (const it of items) {
+    for (const it of validItems) {
       totalMeals += it.quantity;
       if (it.hasAllergyAlert) {
         allergyAlertsCount += it.quantity;
@@ -66,15 +72,15 @@ export async function GET(req: Request) {
 
     // Breakdown by Class/Division
     const classBreakdownMap = new Map<string, number>();
-    for (const it of items) {
+    for (const it of validItems) {
       const key = `Class ${it.student.grade}-${it.student.division}`;
       classBreakdownMap.set(key, (classBreakdownMap.get(key) || 0) + it.quantity);
     }
 
-    const studentList = items.map((it) => {
-      const studentAllergies = it.student.studentAllergies.map((sa) => sa.allergy.name);
+    const studentList = validItems.map((it) => {
+      const studentAllergies = it.student.studentAllergies ? it.student.studentAllergies.map((sa: any) => sa.allergy?.name) : [];
       if (it.student.allergies && studentAllergies.length === 0) {
-        it.student.allergies.split(/[,;]/).forEach((p) => {
+        it.student.allergies.split(/[,;]/).forEach((p: string) => {
           const t = p.trim();
           if (t && !studentAllergies.includes(t)) studentAllergies.push(t);
         });
@@ -95,14 +101,16 @@ export async function GET(req: Request) {
         category: it.meal.category,
         isVegetarian: it.meal.isVegetarian,
         quantity: it.quantity,
-        orderStatus: it.order.orderStatus,
+        orderStatus: it.order?.orderStatus || 'CONFIRMED',
       };
     });
+
+    const uniqueOrderIds = new Set(validItems.map((i) => i.orderId));
 
     return NextResponse.json({
       date,
       totalMeals,
-      totalOrders: items.length,
+      totalOrders: uniqueOrderIds.size,
       allergyAlertsCount,
       mealCounts: Array.from(mealCountsMap.values()).sort((a, b) => b.count - a.count),
       classBreakdown: Array.from(classBreakdownMap.entries()).map(([cls, count]) => ({
@@ -120,8 +128,8 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();
