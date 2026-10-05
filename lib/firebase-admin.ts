@@ -97,64 +97,74 @@ export function getFirebaseApp(): App {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
   const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
-  try {
-    // Option 1: Parse from FIREBASE_SERVICE_ACCOUNT_KEY
-    const serviceAccount = parseServiceAccount(serviceAccountEnv);
-    if (serviceAccount && (serviceAccount.project_id || serviceAccount.projectId)) {
-      cachedApp = initializeApp({
-        credential: cert(serviceAccount),
-        projectId: serviceAccount.project_id || serviceAccount.projectId || projectId,
-      });
-      hasConfiguredCredentials = true;
-      initError = null;
-      return cachedApp;
+  // Strategy 1: Parse from FIREBASE_SERVICE_ACCOUNT_KEY
+  if (serviceAccountEnv) {
+    try {
+      const serviceAccount = parseServiceAccount(serviceAccountEnv);
+      if (serviceAccount && (serviceAccount.project_id || serviceAccount.projectId)) {
+        cachedApp = initializeApp({
+          credential: cert(serviceAccount),
+          projectId: serviceAccount.project_id || serviceAccount.projectId || projectId,
+        });
+        hasConfiguredCredentials = true;
+        initError = null;
+        return cachedApp;
+      }
+    } catch (err: any) {
+      console.warn('[Firebase] Strategy 1 (FIREBASE_SERVICE_ACCOUNT_KEY) failed:', err?.message);
     }
+  }
 
-    // Option 2: Individual environment variables
-    if (projectId && clientEmail && privateKey) {
+  // Strategy 2: Individual environment variables
+  if (clientEmail && privateKey) {
+    try {
       cachedApp = initializeApp({
         credential: cert({
-          projectId,
+          projectId: projectId || 'school-bite-91432',
           clientEmail,
           privateKey,
         }),
-        projectId,
+        projectId: projectId || 'school-bite-91432',
       });
       hasConfiguredCredentials = true;
       initError = null;
       return cachedApp;
+    } catch (err: any) {
+      console.warn('[Firebase] Strategy 2 (Individual Env Vars) failed:', err?.message);
     }
+  }
 
-    // Option 3: Default local file 'firebase-service-account.json'
+  // Strategy 3: Default local file 'firebase-service-account.json'
+  try {
     const defaultKeyPath = path.join(process.cwd(), 'firebase-service-account.json');
     if (fs.existsSync(defaultKeyPath)) {
-      try {
-        const fileContent = fs.readFileSync(defaultKeyPath, 'utf8');
-        const parsed = JSON.parse(fileContent);
-        if (parsed.private_key) {
-          parsed.private_key = cleanPrivateKey(parsed.private_key);
-        }
-        if (
-          parsed.project_id &&
-          !parsed.project_id.includes('PASTE_YOUR') &&
-          parsed.private_key &&
-          !parsed.private_key.includes('PASTE_YOUR')
-        ) {
-          cachedApp = initializeApp({
-            credential: cert(parsed),
-            projectId: parsed.project_id || projectId,
-          });
-          hasConfiguredCredentials = true;
-          initError = null;
-          return cachedApp;
-        }
-      } catch (fileErr: any) {
-        console.warn('[Firebase] Error reading default firebase-service-account.json:', fileErr?.message);
+      const fileContent = fs.readFileSync(defaultKeyPath, 'utf8');
+      const parsed = JSON.parse(fileContent);
+      if (parsed.private_key) {
+        parsed.private_key = cleanPrivateKey(parsed.private_key);
+      }
+      if (
+        parsed.project_id &&
+        !parsed.project_id.includes('PASTE_YOUR') &&
+        parsed.private_key &&
+        !parsed.private_key.includes('PASTE_YOUR')
+      ) {
+        cachedApp = initializeApp({
+          credential: cert(parsed),
+          projectId: parsed.project_id || projectId,
+        });
+        hasConfiguredCredentials = true;
+        initError = null;
+        return cachedApp;
       }
     }
+  } catch (fileErr: any) {
+    console.warn('[Firebase] Strategy 3 (Local JSON file) failed:', fileErr?.message);
+  }
 
-    // Option 4: Embedded Default Fallback for production deployment
-    // Ensures deployed app works even if environment variable or JSON file is missing in hosting environment
+  // Strategy 4: Embedded Default Fallback for production deployment
+  // Ensures deployed app works even if environment variable or JSON file is missing in hosting environment
+  try {
     if (EMBEDDED_SERVICE_ACCOUNT && EMBEDDED_SERVICE_ACCOUNT.privateKey) {
       cachedApp = initializeApp({
         credential: cert(EMBEDDED_SERVICE_ACCOUNT as ServiceAccount),
@@ -164,20 +174,16 @@ export function getFirebaseApp(): App {
       initError = null;
       return cachedApp;
     }
-
-    // Fallback placeholder during build or before credentials exist
-    cachedApp = initializeApp({
-      projectId: projectId || 'school-bite-91432',
-    });
-    return cachedApp;
-  } catch (error: any) {
-    initError = error;
-    console.error('[Firebase] Error during app initialization:', error);
-    cachedApp = initializeApp({
-      projectId: projectId || 'school-bite-91432',
-    });
-    return cachedApp;
+  } catch (fallbackErr: any) {
+    console.warn('[Firebase] Strategy 4 (Embedded Fallback) failed:', fallbackErr?.message);
   }
+
+  // Strategy 5: Fallback placeholder during build or before credentials exist
+  initError = new Error('No valid Firebase credentials could be configured');
+  cachedApp = initializeApp({
+    projectId: projectId || 'school-bite-91432',
+  });
+  return cachedApp;
 }
 
 function verifyCredentialsConfigured() {

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
@@ -71,16 +72,23 @@ export async function POST(req: Request) {
       parentId: user.parent?.id,
     });
 
-    const cookieStore = await cookies();
-    cookieStore.set(TOKEN_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
+    const isHttps = proto === 'https';
 
-    return NextResponse.json({
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set(TOKEN_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    } catch {
+      // ignore
+    }
+
+    const res = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -91,6 +99,18 @@ export async function POST(req: Request) {
         walletBalance: user.parent?.walletBalance ?? 500,
       },
     });
+
+    res.cookies.set({
+      name: TOKEN_COOKIE_NAME,
+      value: token,
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return res;
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
