@@ -6,9 +6,20 @@ import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth'
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 export async function POST(req: Request) {
   try {
-    const { name, email, phone, password, confirmPassword } = await req.json();
+    const body = await req.json().catch(() => null);
+    const { name, email, phone, password, confirmPassword } = body || {};
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -40,7 +51,7 @@ export async function POST(req: Request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'An account with this email already exists' },
+        { error: 'An account with this email already exists. Please sign in instead.' },
         { status: 409 }
       );
     }
@@ -88,17 +99,25 @@ export async function POST(req: Request) {
       // ignore
     }
 
-    const res = NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        parentId: user.parent?.id,
-        walletBalance: user.parent?.walletBalance ?? 500,
+    const res = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          parentId: user.parent?.id,
+          walletBalance: user.parent?.walletBalance ?? 500,
+        },
       },
-    });
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
 
     res.cookies.set({
       name: TOKEN_COOKIE_NAME,
@@ -111,11 +130,25 @@ export async function POST(req: Request) {
     });
 
     return res;
-  } catch (error) {
+  } catch (error: any) {
+    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    const sanitizedError = rawErrorMessage
+      .replace(/(password|secret|key|token)=[^& ]+/gi, '$1=***')
+      .replace(/:\/\/.*@/g, '://***@');
+
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred during registration' },
-      { status: 500 }
+      {
+        error: sanitizedError || 'An unexpected error occurred during registration',
+        details: sanitizedError,
+      },
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      }
     );
   }
 }

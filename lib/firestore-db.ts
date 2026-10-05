@@ -244,7 +244,9 @@ export class FirestoreDbAdapter {
               .where('parentId', '==', parentData.id)
               .where('isActive', '==', true)
               .get();
-            const students = studentsSnap.docs.map((d) => docData(d)).sort((a: any, b: any) => a.name.localeCompare(b.name));
+            const students = studentsSnap.docs
+              .map((d) => docData(d))
+              .sort((a: any, b: any) => String(a?.name || '').localeCompare(String(b?.name || '')));
             parentData.students = students;
           }
           doc.parent = parentData;
@@ -260,24 +262,24 @@ export class FirestoreDbAdapter {
       const userRef = db.collection('users').doc(userId);
 
       const { parent: parentCreate, ...userData } = data;
-      const userObj = {
+      const userObj = cleanDoc({
         id: userId,
         ...userData,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       await userRef.set(userObj);
 
       let createdParent = null;
       if (parentCreate?.create) {
         const parentId = generateId('par_');
-        const parentObj = {
+        const parentObj = cleanDoc({
           id: parentId,
           userId,
           walletBalance: parentCreate.create.walletBalance ?? 500,
           createdAt: now,
           updatedAt: now,
-        };
+        });
         await db.collection('parents').doc(parentId).set(parentObj);
         createdParent = parentObj;
       }

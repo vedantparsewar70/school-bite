@@ -5,6 +5,9 @@ import { isDeadlinePassed } from '@/lib/utils';
 import { CartItem, PaymentMethod } from '@/types';
 import { checkMealAllergy, getSystemSetting } from '@/lib/allergy';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const user = await getCurrentUser();

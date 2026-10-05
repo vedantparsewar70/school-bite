@@ -82,16 +82,9 @@ function parseServiceAccount(input: string | undefined): any | null {
   return null;
 }
 
-export function getFirebaseApp(): App {
-  if (cachedApp) return cachedApp;
-  if (getApps().length > 0) {
-    cachedApp = getApps()[0];
-    hasConfiguredCredentials = true;
-    return cachedApp;
-  }
-
+function resolveCredentials(): { credential: any; projectId: string } | null {
   const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim() || 'school-bite-91432';
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
   const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
@@ -100,13 +93,10 @@ export function getFirebaseApp(): App {
     try {
       const serviceAccount = parseServiceAccount(serviceAccountEnv);
       if (serviceAccount && (serviceAccount.project_id || serviceAccount.projectId)) {
-        cachedApp = initializeApp({
+        return {
           credential: cert(serviceAccount),
           projectId: serviceAccount.project_id || serviceAccount.projectId || projectId,
-        });
-        hasConfiguredCredentials = true;
-        initError = null;
-        return cachedApp;
+        };
       }
     } catch (err: any) {
       console.warn('[Firebase] Strategy 1 (FIREBASE_SERVICE_ACCOUNT_KEY) failed:', err?.message);
@@ -116,17 +106,14 @@ export function getFirebaseApp(): App {
   // Strategy 2: Individual environment variables
   if (clientEmail && privateKey) {
     try {
-      cachedApp = initializeApp({
+      return {
         credential: cert({
-          projectId: projectId || 'school-bite-91432',
+          projectId,
           clientEmail,
           privateKey,
         }),
-        projectId: projectId || 'school-bite-91432',
-      });
-      hasConfiguredCredentials = true;
-      initError = null;
-      return cachedApp;
+        projectId,
+      };
     } catch (err: any) {
       console.warn('[Firebase] Strategy 2 (Individual Env Vars) failed:', err?.message);
     }
@@ -147,13 +134,10 @@ export function getFirebaseApp(): App {
         parsed.private_key &&
         !parsed.private_key.includes('PASTE_YOUR')
       ) {
-        cachedApp = initializeApp({
+        return {
           credential: cert(parsed),
           projectId: parsed.project_id || projectId,
-        });
-        hasConfiguredCredentials = true;
-        initError = null;
-        return cachedApp;
+        };
       }
     }
   } catch (fileErr: any) {
@@ -161,26 +145,46 @@ export function getFirebaseApp(): App {
   }
 
   // Strategy 4: Embedded Default Fallback for production deployment
-  // Ensures deployed app works even if environment variable or JSON file is missing in hosting environment
-  try {
-    if (EMBEDDED_SERVICE_ACCOUNT && EMBEDDED_SERVICE_ACCOUNT.privateKey) {
-      cachedApp = initializeApp({
+  if (EMBEDDED_SERVICE_ACCOUNT && EMBEDDED_SERVICE_ACCOUNT.privateKey) {
+    try {
+      return {
         credential: cert(EMBEDDED_SERVICE_ACCOUNT as ServiceAccount),
-        projectId: EMBEDDED_SERVICE_ACCOUNT.projectId,
-      });
-      hasConfiguredCredentials = true;
-      initError = null;
-      return cachedApp;
+        projectId: EMBEDDED_SERVICE_ACCOUNT.projectId || projectId || 'school-bite-91432',
+      };
+    } catch (fallbackErr: any) {
+      console.warn('[Firebase] Strategy 4 (Embedded Fallback) failed:', fallbackErr?.message);
     }
-  } catch (fallbackErr: any) {
-    console.warn('[Firebase] Strategy 4 (Embedded Fallback) failed:', fallbackErr?.message);
   }
 
-  // Strategy 5: Fallback placeholder during build or before credentials exist
+  return null;
+}
+
+export function getFirebaseApp(): App {
+  if (cachedApp) return cachedApp;
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    cachedApp = existingApps[0];
+    hasConfiguredCredentials = true;
+    return cachedApp;
+  }
+
+  const resolved = resolveCredentials();
+  if (resolved) {
+    cachedApp = initializeApp({
+      credential: resolved.credential,
+      projectId: resolved.projectId,
+    });
+    hasConfiguredCredentials = true;
+    initError = null;
+    return cachedApp;
+  }
+
+  // Fallback placeholder during build or if credentials missing
   initError = new Error('No valid Firebase credentials could be configured');
   cachedApp = initializeApp({
-    projectId: projectId || 'school-bite-91432',
+    projectId: process.env.FIREBASE_PROJECT_ID?.trim() || 'school-bite-91432',
   });
+  hasConfiguredCredentials = false;
   return cachedApp;
 }
 
