@@ -205,4 +205,23 @@ export const auth: Auth = new Proxy({} as Auth, {
   },
 });
 
+export function getFirebaseConfigStatus() {
+  getFirebaseApp();
+  return {
+    configured: hasConfiguredCredentials,
+    initError: initError?.message || null,
+    envStatus: {
+      hasServiceAccountKey: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY),
+      serviceAccountKeyLength: process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.length || 0,
+      hasProjectId: Boolean(process.env.FIREBASE_PROJECT_ID),
+      projectId: process.env.FIREBASE_PROJECT_ID || null,
+      hasClientEmail: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
+      hasPrivateKey: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+      hasJwtSecret: Boolean(process.env.JWT_SECRET),
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV || null,
+    },
+  };
+}
+
 export default getFirebaseApp;
