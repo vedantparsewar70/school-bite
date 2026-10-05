@@ -8,6 +8,72 @@ let cachedApp: App | null = null;
 let cachedDb: Firestore | null = null;
 let cachedAuth: Auth | null = null;
 let hasConfiguredCredentials = false;
+let initError: Error | null = null;
+
+function cleanPrivateKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  let cleaned = key.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  return cleaned.replace(/\\n/g, '\n');
+}
+
+function parseServiceAccount(input: string | undefined): any | null {
+  if (!input) return null;
+  let raw = input.trim();
+
+  // Strip wrapping quotes
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    raw = raw.slice(1, -1).trim();
+  }
+
+  // 1. JSON string
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.private_key) {
+        parsed.private_key = cleanPrivateKey(parsed.private_key);
+      }
+      return parsed;
+    } catch (e: any) {
+      console.warn('[Firebase] JSON parse failed on FIREBASE_SERVICE_ACCOUNT_KEY:', e?.message);
+    }
+  }
+
+  // 2. Base64 encoded JSON
+  try {
+    const decoded = Buffer.from(raw, 'base64').toString('utf8');
+    if (decoded.trim().startsWith('{')) {
+      const parsed = JSON.parse(decoded);
+      if (parsed.private_key) {
+        parsed.private_key = cleanPrivateKey(parsed.private_key);
+      }
+      return parsed;
+    }
+  } catch {
+    // not base64
+  }
+
+  // 3. File path (only if short and does not look like JSON)
+  if (!raw.startsWith('{') && raw.length < 500) {
+    try {
+      const resolvedPath = path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+      if (fs.existsSync(resolvedPath)) {
+        const fileContent = fs.readFileSync(resolvedPath, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        if (parsed.private_key) {
+          parsed.private_key = cleanPrivateKey(parsed.private_key);
+        }
+        return parsed;
+      }
+    } catch {
+      // not a readable file
+    }
+  }
+
+  return null;
+}
 
 export function getFirebaseApp(): App {
   if (cachedApp) return cachedApp;
@@ -18,37 +84,24 @@ export function getFirebaseApp(): App {
   }
 
   const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
+  const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   try {
-    if (serviceAccountEnv) {
-      const resolvedPath = path.join(/*turbopackIgnore: true*/ process.cwd(), serviceAccountEnv);
-      if (fs.existsSync(resolvedPath)) {
-        const fileContent = fs.readFileSync(resolvedPath, 'utf8');
-        const serviceAccount: ServiceAccount = JSON.parse(fileContent);
-        cachedApp = initializeApp({
-          credential: cert(serviceAccount),
-          projectId: serviceAccount.projectId || projectId,
-        });
-        hasConfiguredCredentials = true;
-        return cachedApp;
-      }
-
-      try {
-        const serviceAccount: ServiceAccount = JSON.parse(serviceAccountEnv);
-        cachedApp = initializeApp({
-          credential: cert(serviceAccount),
-          projectId: serviceAccount.projectId || projectId,
-        });
-        hasConfiguredCredentials = true;
-        return cachedApp;
-      } catch {
-        // Fall through to other checks
-      }
+    // Option 1: Parse from FIREBASE_SERVICE_ACCOUNT_KEY
+    const serviceAccount = parseServiceAccount(serviceAccountEnv);
+    if (serviceAccount && (serviceAccount.project_id || serviceAccount.projectId)) {
+      cachedApp = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: serviceAccount.project_id || serviceAccount.projectId || projectId,
+      });
+      hasConfiguredCredentials = true;
+      initError = null;
+      return cachedApp;
     }
 
+    // Option 2: Individual environment variables
     if (projectId && clientEmail && privateKey) {
       cachedApp = initializeApp({
         credential: cert({
@@ -59,24 +112,35 @@ export function getFirebaseApp(): App {
         projectId,
       });
       hasConfiguredCredentials = true;
+      initError = null;
       return cachedApp;
     }
 
-    const defaultKeyPath = path.join(/*turbopackIgnore: true*/ process.cwd(), 'firebase-service-account.json');
+    // Option 3: Default local file 'firebase-service-account.json'
+    const defaultKeyPath = path.join(process.cwd(), 'firebase-service-account.json');
     if (fs.existsSync(defaultKeyPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(defaultKeyPath, 'utf8'));
-      if (
-        serviceAccount.project_id &&
-        !serviceAccount.project_id.includes('PASTE_YOUR') &&
-        serviceAccount.private_key &&
-        !serviceAccount.private_key.includes('PASTE_YOUR')
-      ) {
-        cachedApp = initializeApp({
-          credential: cert(serviceAccount),
-          projectId: serviceAccount.project_id || projectId,
-        });
-        hasConfiguredCredentials = true;
-        return cachedApp;
+      try {
+        const fileContent = fs.readFileSync(defaultKeyPath, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        if (parsed.private_key) {
+          parsed.private_key = cleanPrivateKey(parsed.private_key);
+        }
+        if (
+          parsed.project_id &&
+          !parsed.project_id.includes('PASTE_YOUR') &&
+          parsed.private_key &&
+          !parsed.private_key.includes('PASTE_YOUR')
+        ) {
+          cachedApp = initializeApp({
+            credential: cert(parsed),
+            projectId: parsed.project_id || projectId,
+          });
+          hasConfiguredCredentials = true;
+          initError = null;
+          return cachedApp;
+        }
+      } catch (fileErr: any) {
+        console.warn('[Firebase] Error reading default firebase-service-account.json:', fileErr?.message);
       }
     }
 
@@ -85,8 +149,9 @@ export function getFirebaseApp(): App {
       projectId: projectId || 'demo-school-bite',
     });
     return cachedApp;
-  } catch (error) {
-    console.warn('[Firebase] Warning during app initialization:', error);
+  } catch (error: any) {
+    initError = error;
+    console.error('[Firebase] Error during app initialization:', error);
     cachedApp = initializeApp({
       projectId: projectId || 'demo-school-bite',
     });
@@ -97,11 +162,15 @@ export function getFirebaseApp(): App {
 function verifyCredentialsConfigured() {
   getFirebaseApp();
   if (!hasConfiguredCredentials) {
+    const errorDetails = initError ? `\nInitialization error: ${initError.message}` : '';
     throw new Error(
-      `Firebase credentials not found!\n` +
-      `Please provide your Firebase credentials using one of these options:\n` +
-      `1. Save your Firebase Service Account JSON as 'firebase-service-account.json' in the project root folder.\n` +
-      `2. Or in '.env', provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.`
+      `Firebase credentials not found or invalid!${errorDetails}\n` +
+      `Environment check:\n` +
+      `- FIREBASE_SERVICE_ACCOUNT_KEY present: ${Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)}\n` +
+      `- FIREBASE_PROJECT_ID present: ${Boolean(process.env.FIREBASE_PROJECT_ID)}\n` +
+      `- FIREBASE_CLIENT_EMAIL present: ${Boolean(process.env.FIREBASE_CLIENT_EMAIL)}\n` +
+      `- FIREBASE_PRIVATE_KEY present: ${Boolean(process.env.FIREBASE_PRIVATE_KEY)}\n` +
+      `Please ensure your Firebase credentials are added to your Vercel Project Settings -> Environment Variables.`
     );
   }
 }

@@ -88,10 +88,19 @@ function HomePageContent() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. Vercel serverless gateway error)
+      }
 
       if (!res.ok) {
-        setError(data.error || 'Invalid email or password.');
+        setError(
+          data?.error ||
+          data?.diagnostic?.details ||
+          `Server error (${res.status}). Please check database connection.`
+        );
         setSubmitting(false);
         return;
       }
@@ -104,8 +113,8 @@ function HomePageContent() {
       } else {
         router.push('/parent/children');
       }
-    } catch {
-      setError('Network connection error. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'Network connection error. Please try again.');
       setSubmitting(false);
     }
   };

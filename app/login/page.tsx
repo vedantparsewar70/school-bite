@@ -48,10 +48,19 @@ function AdminLoginForm() {
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. Vercel serverless gateway error)
+      }
 
       if (!res.ok) {
-        setError(data.error || 'Invalid admin credentials.');
+        setError(
+          data?.error ||
+          data?.diagnostic?.details ||
+          `Server error (${res.status}). Please verify your Firebase credentials in Vercel environment variables.`
+        );
         setLoading(false);
         return;
       }
@@ -59,8 +68,8 @@ function AdminLoginForm() {
       await refreshUser();
       showToast(`Welcome back, ${data.user.name}!`, 'success');
       router.push('/admin/orders');
-    } catch {
-      setError('A network error occurred. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'A network error occurred. Please try again.');
       setLoading(false);
     }
   };
