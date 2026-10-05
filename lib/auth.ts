@@ -87,6 +87,21 @@ export async function getCurrentUser() {
         students: [],
       };
     }
+
+    // Staff fallback for environment credentials
+    const envStaffEmail = (process.env.STAFF_EMAIL || 'staff@school.com').toLowerCase().trim();
+    if (payload.role === 'STAFF' || payload.email.toLowerCase().trim() === envStaffEmail) {
+      return {
+        id: payload.userId || 'usr_canteen_staff_01',
+        email: payload.email || envStaffEmail,
+        name: payload.name || 'Canteen Staff',
+        phone: null,
+        role: 'STAFF' as UserRole,
+        parentId: undefined,
+        walletBalance: 0,
+        students: [],
+      };
+    }
     return null;
   }
 

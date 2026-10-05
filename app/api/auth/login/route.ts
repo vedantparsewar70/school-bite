@@ -48,7 +48,11 @@ export async function POST(req: Request) {
     const envAdminPass = process.env.ADMIN_PASS || 'Admin123';
     const isAdminEnvMatch = emailStr === envAdminEmail && password === envAdminPass;
 
-    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail}), IsEnvAdminMatch: ${isAdminEnvMatch}`);
+    const envStaffEmail = (process.env.STAFF_EMAIL || 'staff@school.com').trim().toLowerCase();
+    const envStaffPass = process.env.STAFF_PASS || 'Staff123';
+    const isStaffEnvMatch = emailStr === envStaffEmail && password === envStaffPass;
+
+    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail}), IsAdminMatch: ${isAdminEnvMatch}, IsStaffMatch: ${isStaffEnvMatch}`);
 
     step = '3_DATABASE_CHECK';
     console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection check started');
@@ -102,27 +106,40 @@ export async function POST(req: Request) {
       }
     }
 
-    // Auto-provision demo staff account if signing in
-    if (!user && emailStr === 'staff@school.com' && password === 'Staff123') {
-      try {
-        const passwordHash = await hashPassword('Staff123');
-        user = await prisma.user.create({
-          data: {
+    // Auto-provision or sync staff account if env matches
+    if (isStaffEnvMatch) {
+      if (!user) {
+        try {
+          const passwordHash = await hashPassword(envStaffPass);
+          user = await prisma.user.create({
+            data: {
+              id: 'usr_canteen_staff_01',
+              email: envStaffEmail,
+              name: 'Canteen Staff',
+              role: 'STAFF',
+              passwordHash,
+            },
+          });
+        } catch (createErr) {
+          console.warn('[AUTH_LOGIN_TRACE] Could not write staff to DB, using in-memory staff fallback:', createErr);
+          user = {
             id: 'usr_canteen_staff_01',
-            email: 'staff@school.com',
+            email: envStaffEmail,
             name: 'Canteen Staff',
             role: 'STAFF',
-            passwordHash,
-          },
-        });
-      } catch (err) {
-        user = {
-          id: 'usr_canteen_staff_01',
-          email: 'staff@school.com',
-          name: 'Canteen Staff',
-          role: 'STAFF',
-          passwordHash: '',
-        };
+            passwordHash: '',
+          };
+        }
+      } else if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+        try {
+          user = await prisma.user.upsert({
+            where: { id: user.id },
+            update: { role: 'STAFF' },
+            create: { ...user, role: 'STAFF' },
+          });
+        } catch {
+          user.role = 'STAFF';
+        }
       }
     }
 
@@ -154,7 +171,7 @@ export async function POST(req: Request) {
     step = '5_PASSWORD_VERIFY';
     console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification started for ${redactedEmail}`);
     let isValid = false;
-    if (isAdminEnvMatch) {
+    if (isAdminEnvMatch || isStaffEnvMatch) {
       isValid = true;
     } else if (user.passwordHash) {
       isValid = await comparePassword(password, user.passwordHash);
