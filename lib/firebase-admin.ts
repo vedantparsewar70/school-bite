@@ -1,12 +1,10 @@
 import { initializeApp, getApps, cert, App, ServiceAccount } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { getAuth, Auth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
 
 let cachedApp: App | null = null;
 let cachedDb: Firestore | null = null;
-let cachedAuth: Auth | null = null;
 let hasConfiguredCredentials = false;
 let initError: Error | null = null;
 
@@ -67,7 +65,7 @@ function parseServiceAccount(input: string | undefined): any | null {
   // 3. File path (only if short and does not look like JSON)
   if (!raw.startsWith('{') && raw.length < 500) {
     try {
-      const resolvedPath = path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+      const resolvedPath = path.isAbsolute(raw) ? raw : path.join(/*turbopackIgnore: true*/ process.cwd(), raw);
       if (fs.existsSync(resolvedPath)) {
         const fileContent = fs.readFileSync(resolvedPath, 'utf8');
         const parsed = JSON.parse(fileContent);
@@ -136,7 +134,7 @@ export function getFirebaseApp(): App {
 
   // Strategy 3: Default local file 'firebase-service-account.json'
   try {
-    const defaultKeyPath = path.join(process.cwd(), 'firebase-service-account.json');
+    const defaultKeyPath = path.join(/*turbopackIgnore: true*/ process.cwd(), 'firebase-service-account.json');
     if (fs.existsSync(defaultKeyPath)) {
       const fileContent = fs.readFileSync(defaultKeyPath, 'utf8');
       const parsed = JSON.parse(fileContent);
@@ -218,17 +216,6 @@ export const db: Firestore = new Proxy({} as Firestore, {
     }
     const val = (cachedDb as any)[prop];
     return typeof val === 'function' ? val.bind(cachedDb) : val;
-  },
-});
-
-// Proxy wrapper for Auth
-export const auth: Auth = new Proxy({} as Auth, {
-  get(_target, prop) {
-    if (!cachedAuth) {
-      cachedAuth = getAuth(getFirebaseApp());
-    }
-    const val = (cachedAuth as any)[prop];
-    return typeof val === 'function' ? val.bind(cachedAuth) : val;
   },
 });
 
