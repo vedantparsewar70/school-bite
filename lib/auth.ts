@@ -53,21 +53,42 @@ export async function getCurrentUser() {
   const payload = await verifySessionToken(token);
   if (!payload?.userId) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    include: {
-      parent: {
-        include: {
-          students: {
-            where: { isActive: true },
-            orderBy: { name: 'asc' },
+  let user: any = null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: {
+        parent: {
+          include: {
+            students: {
+              where: { isActive: true },
+              orderBy: { name: 'asc' },
+            },
           },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.warn('[AUTH_GET_CURRENT_USER] DB lookup error:', err);
+  }
 
-  if (!user) return null;
+  if (!user) {
+    // Admin fallback for environment credentials
+    const envAdminEmail = (process.env.ADMIN_EMAIL || 'admin@school.com').toLowerCase().trim();
+    if (payload.role === 'ADMIN' || payload.email.toLowerCase().trim() === envAdminEmail) {
+      return {
+        id: payload.userId || 'usr_canteen_admin_01',
+        email: payload.email || envAdminEmail,
+        name: payload.name || 'Canteen Admin',
+        phone: null,
+        role: 'ADMIN' as UserRole,
+        parentId: undefined,
+        walletBalance: 0,
+        students: [],
+      };
+    }
+    return null;
+  }
 
   return {
     id: user.id,

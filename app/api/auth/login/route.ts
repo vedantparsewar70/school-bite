@@ -44,44 +44,86 @@ export async function POST(req: Request) {
       redactedEmail = '***@' + (emailStr.split('@')[1] || 'domain');
     }
 
-    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail})`);
+    const envAdminEmail = (process.env.ADMIN_EMAIL || 'admin@school.com').trim().toLowerCase();
+    const envAdminPass = process.env.ADMIN_PASS || 'Admin123';
+    const isAdminEnvMatch = emailStr === envAdminEmail && password === envAdminPass;
+
+    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail}), IsEnvAdminMatch: ${isAdminEnvMatch}`);
 
     step = '3_DATABASE_CHECK';
     console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection check started');
 
     step = '4_USER_LOOKUP';
     console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);
-    let user = await prisma.user.findUnique({
-      where: { email: emailStr },
-      include: { parent: true },
-    });
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: emailStr },
+        include: { parent: true },
+      });
+    } catch (dbErr: any) {
+      console.warn('[AUTH_LOGIN_TRACE] Database lookup warning:', dbErr?.message);
+    }
+
+    // Auto-provision or sync admin account if env matches
+    if (isAdminEnvMatch) {
+      if (!user) {
+        try {
+          const passwordHash = await hashPassword(envAdminPass);
+          user = await prisma.user.create({
+            data: {
+              id: 'usr_canteen_admin_01',
+              email: envAdminEmail,
+              name: 'Canteen Admin',
+              role: 'ADMIN',
+              passwordHash,
+            },
+          });
+        } catch (createErr) {
+          console.warn('[AUTH_LOGIN_TRACE] Could not write admin to DB, using in-memory admin fallback:', createErr);
+          user = {
+            id: 'usr_canteen_admin_01',
+            email: envAdminEmail,
+            name: 'Canteen Admin',
+            role: 'ADMIN',
+            passwordHash: '',
+          };
+        }
+      } else if (user.role !== 'ADMIN') {
+        try {
+          user = await prisma.user.upsert({
+            where: { id: user.id },
+            update: { role: 'ADMIN' },
+            create: { ...user, role: 'ADMIN' },
+          });
+        } catch {
+          user.role = 'ADMIN';
+        }
+      }
+    }
 
     // Auto-provision demo staff account if signing in
     if (!user && emailStr === 'staff@school.com' && password === 'Staff123') {
-      const passwordHash = await hashPassword('Staff123');
-      user = await prisma.user.create({
-        data: {
+      try {
+        const passwordHash = await hashPassword('Staff123');
+        user = await prisma.user.create({
+          data: {
+            id: 'usr_canteen_staff_01',
+            email: 'staff@school.com',
+            name: 'Canteen Staff',
+            role: 'STAFF',
+            passwordHash,
+          },
+        });
+      } catch (err) {
+        user = {
           id: 'usr_canteen_staff_01',
           email: 'staff@school.com',
           name: 'Canteen Staff',
           role: 'STAFF',
-          passwordHash,
-        },
-      });
-    }
-
-    // Auto-provision demo admin account if not found
-    if (!user && emailStr === 'admin@school.com' && password === 'Admin123') {
-      const passwordHash = await hashPassword('Admin123');
-      user = await prisma.user.create({
-        data: {
-          id: 'usr_canteen_admin_01',
-          email: 'admin@school.com',
-          name: 'Canteen Admin',
-          role: 'ADMIN',
-          passwordHash,
-        },
-      });
+          passwordHash: '',
+        };
+      }
     }
 
     console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup completed. User found: ${Boolean(user)}`);
@@ -111,7 +153,12 @@ export async function POST(req: Request) {
 
     step = '5_PASSWORD_VERIFY';
     console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification started for ${redactedEmail}`);
-    const isValid = await comparePassword(password, user.passwordHash);
+    let isValid = false;
+    if (isAdminEnvMatch) {
+      isValid = true;
+    } else if (user.passwordHash) {
+      isValid = await comparePassword(password, user.passwordHash);
+    }
     console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification completed. Match: ${isValid}`);
 
     if (!isValid) {
