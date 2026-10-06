@@ -73,7 +73,10 @@ function AdminOrdersContent() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    const timer = setTimeout(() => {
+      fetchOrders();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [dateFilter, classFilter, statusFilter, paymentFilter, search]);
 
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {

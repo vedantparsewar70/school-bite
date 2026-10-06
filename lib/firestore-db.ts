@@ -547,10 +547,10 @@ export class FirestoreDbAdapter {
       if (include?.studentAllergies) {
         const saSnap = await db.collection('studentAllergies').where('studentId', '==', st.id).get();
         const saList = saSnap.docs.map((d) => docData(d));
-        if (include.studentAllergies.include?.allergy) {
+        if (include.studentAllergies.include?.allergy && saList.length > 0) {
+          const allergiesMap = await batchGetDocs('allergies', saList.map((sa) => sa.allergyId));
           for (const sa of saList) {
-            const aSnap = await db.collection('allergies').doc(sa.allergyId).get();
-            sa.allergy = docData(aSnap);
+            sa.allergy = allergiesMap.get(sa.allergyId) || null;
           }
         }
         st.studentAllergies = saList;
@@ -736,10 +736,10 @@ export class FirestoreDbAdapter {
       if (include?.mealAllergens) {
         const maSnap = await db.collection('mealAllergens').where('mealId', '==', m.id).get();
         const maList = maSnap.docs.map((d) => docData(d));
-        if (include.mealAllergens.include?.allergen) {
+        if (include.mealAllergens.include?.allergen && maList.length > 0) {
+          const allergensMap = await batchGetDocs('allergens', maList.map((ma) => ma.allergenId));
           for (const ma of maList) {
-            const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
-            ma.allergen = docData(aSnap);
+            ma.allergen = allergensMap.get(ma.allergenId) || null;
           }
         }
         m.mealAllergens = maList;
@@ -1138,14 +1138,18 @@ export class FirestoreDbAdapter {
       if (include?.items) {
         const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
         const items = itemsSnap.docs.map((d) => docData(d));
-        for (const item of items) {
-          if (include.items.include?.student) {
-            const sSnap = await db.collection('students').doc(item.studentId).get();
-            item.student = docData(sSnap);
-          }
-          if (include.items.include?.meal) {
-            const mSnap = await db.collection('meals').doc(item.mealId).get();
-            item.meal = docData(mSnap);
+        if (items.length > 0 && include.items.include) {
+          const [studentsMap, mealsMap] = await Promise.all([
+            include.items.include.student ? batchGetDocs('students', items.map((it) => it.studentId)) : Promise.resolve(new Map()),
+            include.items.include.meal ? batchGetDocs('meals', items.map((it) => it.mealId)) : Promise.resolve(new Map()),
+          ]);
+          for (const item of items) {
+            if (include.items.include?.student) {
+              item.student = studentsMap.get(item.studentId) || null;
+            }
+            if (include.items.include?.meal) {
+              item.meal = mealsMap.get(item.mealId) || null;
+            }
           }
         }
         ord.items = items;
@@ -1193,7 +1197,9 @@ export class FirestoreDbAdapter {
         createdAt: now,
         updatedAt: now,
       });
-      await db.collection('orders').doc(orderId).set(orderObj);
+
+      const batch = db.batch();
+      batch.set(db.collection('orders').doc(orderId), orderObj);
 
       const createdItems = [];
       if (itemsCreate?.create) {
@@ -1205,7 +1211,7 @@ export class FirestoreDbAdapter {
             ...item,
             createdAt: now,
           });
-          await db.collection('orderItems').doc(itemId).set(itemObj);
+          batch.set(db.collection('orderItems').doc(itemId), itemObj);
           createdItems.push(itemObj);
         }
       }
@@ -1221,10 +1227,12 @@ export class FirestoreDbAdapter {
             ...pay,
             createdAt: now,
           });
-          await db.collection('payments').doc(payId).set(payObj);
+          batch.set(db.collection('payments').doc(payId), payObj);
           createdPayments.push(payObj);
         }
       }
+
+      await batch.commit();
 
       const res: any = { ...orderObj };
       if (include?.items) res.items = createdItems;
@@ -1248,14 +1256,15 @@ export class FirestoreDbAdapter {
       return docData(await ref.get());
     },
     updateMany: async ({ where, data }: any): Promise<any> => {
-      if (where?.id?.in) {
+      if (where?.id?.in && Array.isArray(where.id.in) && where.id.in.length > 0) {
         const ids: string[] = where.id.in;
-        let count = 0;
+        const now = new Date().toISOString();
+        const batch = db.batch();
         for (const id of ids) {
-          await db.collection('orders').doc(id).set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
-          count++;
+          batch.set(db.collection('orders').doc(id), { ...data, updatedAt: now }, { merge: true });
         }
-        return { count };
+        await batch.commit();
+        return { count: ids.length };
       }
       return { count: 0 };
     },
@@ -1416,25 +1425,27 @@ export class FirestoreDbAdapter {
       const snap = await query.get();
       let list = snap.docs.map((d) => docData(d));
 
-      if (where?.order?.parentId) {
-        const targetParentId = where.order.parentId;
-        const filtered = [];
-        for (const p of list) {
-          const oSnap = await db.collection('orders').doc(p.orderId).get();
-          const ord = docData(oSnap);
-          if (ord && ord.parentId === targetParentId) {
-            p.order = ord;
-            filtered.push(p);
-          }
-        }
-        list = filtered;
-      }
+      if ((where?.order?.parentId || include?.order) && list.length > 0) {
+        const orderIds = list.map((p) => p.orderId);
+        const ordersMap = await batchGetDocs('orders', orderIds);
 
-      if (include?.order) {
-        for (const p of list) {
-          if (!p.order) {
-            const oSnap = await db.collection('orders').doc(p.orderId).get();
-            p.order = docData(oSnap);
+        if (where?.order?.parentId) {
+          const targetParentId = where.order.parentId;
+          list = list.filter((p) => {
+            const ord = ordersMap.get(p.orderId);
+            if (ord && ord.parentId === targetParentId) {
+              p.order = ord;
+              return true;
+            }
+            return false;
+          });
+        }
+
+        if (include?.order) {
+          for (const p of list) {
+            if (!p.order) {
+              p.order = ordersMap.get(p.orderId) || null;
+            }
           }
         }
       }

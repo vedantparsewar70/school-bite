@@ -36,7 +36,7 @@ function StaffOrAdminLoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { refreshUser } = useAuth();
+  const { setAuthUser, refreshUser } = useAuth();
   const { showToast } = useToast();
 
   const handleQuickFill = () => {
@@ -82,7 +82,8 @@ function StaffOrAdminLoginForm() {
         return;
       }
 
-      await refreshUser();
+      setAuthUser(data.user);
+      refreshUser().catch(() => {});
       showToast(`Welcome back, ${data.user.name}!`, 'success');
 
       if (data.redirectUrl) {

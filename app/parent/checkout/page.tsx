@@ -100,7 +100,7 @@ export default function CheckoutPage() {
       // Backend verified successful payment & created order
       clearCart();
       sessionStorage.removeItem('schoolbite_order_notes');
-      await refreshUser();
+      refreshUser().catch(() => {});
       showToast('Payment verified successfully! Order placed.', 'success');
       router.push(`/parent/confirmation/${data.orderId}`);
     } catch {

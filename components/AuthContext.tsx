@@ -29,6 +29,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   refreshUser: () => Promise<void>;
+  setAuthUser: (user: AuthUser | null) => void;
   logout: () => Promise<void>;
 }
 
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   refreshUser: async () => {},
+  setAuthUser: () => {},
   logout: async () => {},
 });
 
@@ -75,6 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, []);
 
+  const setAuthUser = (newUser: AuthUser | null) => {
+    setUser(newUser);
+    setIsLoading(false);
+  };
+
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -86,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, refreshUser, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, refreshUser, setAuthUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

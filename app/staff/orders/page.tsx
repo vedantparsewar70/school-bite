@@ -51,7 +51,10 @@ function StaffOrdersContent() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    const timer = setTimeout(() => {
+      fetchOrders();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [date, search]);
 
   const handleMarkCollected = async (orderId: string) => {

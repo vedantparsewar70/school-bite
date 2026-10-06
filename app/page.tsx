@@ -23,7 +23,7 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
 
-  const { user, isLoading: authLoading, refreshUser } = useAuth();
+  const { user, isLoading: authLoading, setAuthUser, refreshUser } = useAuth();
   const { showToast } = useToast();
 
   const [mode, setMode] = useState<'login' | 'register'>(
@@ -105,7 +105,8 @@ function HomePageContent() {
         return;
       }
 
-      await refreshUser();
+      setAuthUser(data.user);
+      refreshUser().catch(() => {});
       showToast(`Welcome, ${data.user.name}!`, 'success');
 
       if (data.user.role === 'ADMIN') {
@@ -165,7 +166,8 @@ function HomePageContent() {
         return;
       }
 
-      await refreshUser();
+      setAuthUser(data.user);
+      refreshUser().catch(() => {});
       showToast('Parent account registered successfully!', 'success');
       router.push('/parent/children');
     } catch (err: any) {
