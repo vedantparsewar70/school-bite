@@ -39,25 +39,36 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+let inFlightRefreshPromise: Promise<void> | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   const refreshUser = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user || null);
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+    if (inFlightRefreshPromise) {
+      return inFlightRefreshPromise;
     }
+
+    inFlightRefreshPromise = (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user || null);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+        inFlightRefreshPromise = null;
+      }
+    })();
+
+    return inFlightRefreshPromise;
   };
 
   useEffect(() => {

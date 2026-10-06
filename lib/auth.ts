@@ -53,6 +53,20 @@ export async function getCurrentUser() {
   const payload = await verifySessionToken(token);
   if (!payload?.userId) return null;
 
+  // Ultra-fast path for STAFF and ADMIN (no student/parent queries required)
+  if (payload.role === 'STAFF' || payload.role === 'ADMIN') {
+    return {
+      id: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      phone: null,
+      role: payload.role as UserRole,
+      parentId: undefined,
+      walletBalance: 0,
+      students: [],
+    };
+  }
+
   let user: any = null;
   try {
     user = await prisma.user.findUnique({
@@ -73,35 +87,6 @@ export async function getCurrentUser() {
   }
 
   if (!user) {
-    // Admin fallback for environment credentials
-    const envAdminEmail = (process.env.ADMIN_EMAIL || 'admin@school.com').toLowerCase().trim();
-    if (payload.role === 'ADMIN' || payload.email.toLowerCase().trim() === envAdminEmail) {
-      return {
-        id: payload.userId || 'usr_canteen_admin_01',
-        email: payload.email || envAdminEmail,
-        name: payload.name || 'Canteen Admin',
-        phone: null,
-        role: 'ADMIN' as UserRole,
-        parentId: undefined,
-        walletBalance: 0,
-        students: [],
-      };
-    }
-
-    // Staff fallback for environment credentials
-    const envStaffEmail = (process.env.STAFF_EMAIL || 'staff@school.com').toLowerCase().trim();
-    if (payload.role === 'STAFF' || payload.email.toLowerCase().trim() === envStaffEmail) {
-      return {
-        id: payload.userId || 'usr_canteen_staff_01',
-        email: payload.email || envStaffEmail,
-        name: payload.name || 'Canteen Staff',
-        phone: null,
-        role: 'STAFF' as UserRole,
-        parentId: undefined,
-        walletBalance: 0,
-        students: [],
-      };
-    }
     return null;
   }
 

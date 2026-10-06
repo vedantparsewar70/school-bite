@@ -30,29 +30,30 @@ export default function ParentDashboard() {
   const { showToast } = useToast();
 
   const [orders, setOrders] = useState<any[]>([]);
-  const [childrenList, setChildrenList] = useState<any[]>([]);
+  const [childrenList, setChildrenList] = useState<any[]>(user?.students || []);
   const [todayMenu, setTodayMenu] = useState<MenuDayItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   const todayStr = getTodayString();
 
   useEffect(() => {
+    if (user?.students && user.students.length > 0 && childrenList.length === 0) {
+      setChildrenList(user.students);
+    }
+  }, [user?.students]);
+
+  useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [ordersRes, childrenRes, menuRes] = await Promise.all([
-          fetch('/api/parent/orders'),
-          fetch('/api/parent/children'),
+        // Query recent 20 orders and today's menu in parallel (children already provided by auth context)
+        const [ordersRes, menuRes] = await Promise.all([
+          fetch('/api/parent/orders?limit=20'),
           fetch(`/api/menu?date=${todayStr}`),
         ]);
 
         if (ordersRes.ok) {
           const ordData = await ordersRes.json();
           setOrders(ordData.orders || []);
-        }
-
-        if (childrenRes.ok) {
-          const chData = await childrenRes.json();
-          setChildrenList(chData.students || []);
         }
 
         if (menuRes.ok) {

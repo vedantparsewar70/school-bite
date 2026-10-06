@@ -8,15 +8,20 @@ import { checkMealAllergy, getSystemSetting } from '@/lib/allergy';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== 'PARENT' || !user.parentId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const limitParam = searchParams.get('limit');
+    const take = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 100) : 50;
+
     const orders = await prisma.order.findMany({
       where: { parentId: user.parentId },
+      take,
       include: {
         items: {
           include: {
@@ -36,27 +41,27 @@ export async function GET() {
       paymentStatus: order.paymentStatus,
       orderStatus: order.orderStatus,
       notes: order.notes,
-      createdAt: order.createdAt.toISOString(),
-      items: order.items.map((item) => ({
+      createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : new Date(order.createdAt).toISOString(),
+      items: (order.items || []).map((item) => ({
         id: item.id,
         studentId: item.studentId,
-        studentName: item.student.name,
-        studentGrade: item.student.grade,
-        studentDivision: item.student.division,
-        studentRollNo: item.student.rollNo,
+        studentName: item.student?.name || 'Student',
+        studentGrade: item.student?.grade || '',
+        studentDivision: item.student?.division || '',
+        studentRollNo: item.student?.rollNo || '',
         mealId: item.mealId,
-        mealName: item.meal.name,
-        mealCategory: item.meal.category,
-        mealImage: item.meal.imageUrl,
-        isVegetarian: item.meal.isVegetarian,
+        mealName: item.meal?.name || 'Meal',
+        mealCategory: item.meal?.category || 'General',
+        mealImage: item.meal?.imageUrl || null,
+        isVegetarian: Boolean(item.meal?.isVegetarian),
         date: item.date,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
-        hasAllergyAlert: item.hasAllergyAlert,
-        conflictAllergens: item.conflictAllergens,
+        hasAllergyAlert: Boolean(item.hasAllergyAlert),
+        conflictAllergens: item.conflictAllergens || null,
       })),
-      payments: order.payments.map((p) => ({
+      payments: (order.payments || []).map((p) => ({
         id: p.id,
         orderId: p.orderId,
         amount: p.amount,
@@ -66,7 +71,7 @@ export async function GET() {
         upiId: p.upiId,
         cardLastFour: p.cardLastFour,
         bankName: p.bankName,
-        createdAt: p.createdAt.toISOString(),
+        createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : new Date(p.createdAt).toISOString(),
       })),
     }));
 

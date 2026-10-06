@@ -13,27 +13,66 @@ export async function GET() {
     const todayStr = getTodayString();
     const tomorrowStr = getOffsetDateString(1);
 
-    // 1. Check if tomorrow's menu is published
-    const tomorrowMenus = await prisma.menu.findMany({
-      where: {
-        date: tomorrowStr,
-        isActive: true,
-      },
-      include: { meal: true },
-    });
-    const isTomorrowMenuPublished = tomorrowMenus.length > 0;
-    const tomorrowPublishedCount = tomorrowMenus.length;
+    // Run all dashboard queries in parallel with Promise.all for sub-second responses
+    const [tomorrowMenus, tomorrowItems, todayItems, allActiveOrders, recentOrders] = await Promise.all([
+      // 1. Tomorrow's menu
+      prisma.menu.findMany({
+        where: {
+          date: tomorrowStr,
+          isActive: true,
+        },
+        include: { meal: true },
+      }),
 
-    // 2. Fetch tomorrow's active items for production count
-    const tomorrowItems = await prisma.orderItem.findMany({
-      where: {
-        date: tomorrowStr,
-        order: {
+      // 2. Tomorrow's active items
+      prisma.orderItem.findMany({
+        where: {
+          date: tomorrowStr,
+          order: {
+            orderStatus: { not: 'CANCELLED' },
+          },
+        },
+        include: { meal: true },
+      }),
+
+      // 3. Today's active items
+      prisma.orderItem.findMany({
+        where: {
+          date: todayStr,
+          order: {
+            orderStatus: { not: 'CANCELLED' },
+          },
+        },
+        include: { meal: true },
+      }),
+
+      // 4. All active orders for totals
+      prisma.order.findMany({
+        where: {
           orderStatus: { not: 'CANCELLED' },
         },
-      },
-      include: { meal: true },
-    });
+      }),
+
+      // 5. Recent 5 orders
+      prisma.order.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          parent: {
+            include: { user: true },
+          },
+          items: {
+            include: {
+              student: true,
+              meal: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const isTomorrowMenuPublished = tomorrowMenus.length > 0;
+    const tomorrowPublishedCount = tomorrowMenus.length;
 
     const tomorrowMealCountsMap = new Map<string, { mealName: string; count: number; category: string; isVegetarian: boolean }>();
     for (const it of tomorrowItems) {
@@ -42,60 +81,22 @@ export async function GET() {
         existing.count += it.quantity;
       } else {
         tomorrowMealCountsMap.set(it.mealId, {
-          mealName: it.meal.name,
+          mealName: it.meal?.name || 'Meal',
           count: it.quantity,
-          category: it.meal.category,
-          isVegetarian: it.meal.isVegetarian,
+          category: it.meal?.category || 'General',
+          isVegetarian: Boolean(it.meal?.isVegetarian),
         });
       }
     }
     const tomorrowProduction = Array.from(tomorrowMealCountsMap.values()).sort((a, b) => b.count - a.count);
     const tomorrowTotalMeals = tomorrowItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
 
-    // 3. Fetch today's items for comparison if needed
-    const todayItems = await prisma.orderItem.findMany({
-      where: {
-        date: todayStr,
-        order: {
-          orderStatus: { not: 'CANCELLED' },
-        },
-      },
-      include: { meal: true },
-    });
     const todayTotalMeals = todayItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
 
-    // 4. All active orders & totals
-    const allActiveOrders = await prisma.order.findMany({
-      where: {
-        orderStatus: { not: 'CANCELLED' },
-      },
-      include: {
-        items: true,
-      },
-    });
-
     const totalOrders = allActiveOrders.length;
-    const totalOrderValue = allActiveOrders.reduce((sum: number, o: any) => sum + o.totalAmount, 0);
-    const allActiveItems = allActiveOrders.flatMap((o: any) => o.items || []);
-    const totalItems = allActiveItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
-    const studentsOrdered = new Set(allActiveItems.map((it: any) => it.studentId)).size;
-
-    // 5. Recent orders for compact preview
-    const recentOrders = await prisma.order.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        parent: {
-          include: { user: true },
-        },
-        items: {
-          include: {
-            student: true,
-            meal: true,
-          },
-        },
-      },
-    });
+    const totalOrderValue = allActiveOrders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
+    const totalItems = tomorrowTotalMeals + todayTotalMeals;
+    const studentsOrdered = new Set([...tomorrowItems, ...todayItems].map((it: any) => it.studentId)).size;
 
     const formattedRecentOrders = recentOrders.map((o: any) => ({
       id: o.id,
