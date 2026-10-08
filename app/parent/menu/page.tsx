@@ -10,6 +10,7 @@ import {
   Plus,
   Minus,
   ArrowRight,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
@@ -139,19 +140,29 @@ function MenuPageContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Page Title */}
-      <div className="pb-4 border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
-            Next Day&apos;s Meal
-          </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
+              Next Day&apos;s Meal
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 mt-1.5">
+            <CalendarDays className="w-7 h-7 text-amber-500" />
+            <span>Tomorrow&apos;s Lunch Menu</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Menu for <strong className="text-slate-800 font-bold">{formatDatePretty(tomorrowDate)}</strong> • Freshly prepared and delivered directly to the classroom.
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 mt-1.5">
-          <CalendarDays className="w-7 h-7 text-amber-500" />
-          <span>Tomorrow&apos;s Lunch Menu</span>
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Menu for <strong className="text-slate-800 font-bold">{formatDatePretty(tomorrowDate)}</strong> • Freshly prepared and delivered directly to the classroom.
-        </p>
+
+        <Link
+          href="/parent/orders"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all self-start sm:self-auto cursor-pointer"
+        >
+          <FileText className="w-4 h-4 text-amber-500" />
+          <span>Order History</span>
+        </Link>
       </div>
 
       {/* Child Selector Strip */}

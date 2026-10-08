@@ -47,8 +47,8 @@ export const BUSINESS_CONFIG: BusinessConfig = {
   websiteUrl: 'https://schoolbite.in',
 
   // Customer support contact details
-  supportEmail: 'gayatriparsewar@gmail.com',
-  supportPhone: '+91 99220 28988',
+  supportEmail: 'vedantparsewar70@gmail.com',
+  supportPhone: '+91 90289 77988',
   whatsAppSupport: 'Available',
   supportAvailability: 'Monday to Sunday',
 

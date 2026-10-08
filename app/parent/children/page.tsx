@@ -10,6 +10,7 @@ import {
   UtensilsCrossed,
   Eye,
   X,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
@@ -172,13 +173,22 @@ export default function ChildrenPage() {
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Child</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Link
+            href="/parent/orders"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all"
+          >
+            <FileText className="w-4 h-4 text-amber-500" />
+            <span>Order History</span>
+          </Link>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Child</span>
+          </button>
+        </div>
       </div>
 
       {/* Children Cards Grid */}

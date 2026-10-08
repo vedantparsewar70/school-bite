@@ -5,8 +5,10 @@ import prisma from './prisma';
 import { UserRole } from '@/types';
 
 function getJwtSecret(): Uint8Array {
-  const secretKey =
-    process.env.JWT_SECRET || 'super-secure-school-mealbox-jwt-secret-key-2026';
+  const secretKey = process.env.JWT_SECRET;
+  if (!secretKey) {
+    throw new Error('JWT_SECRET environment variable is missing. Please define it in your .env file.');
+  }
   return new TextEncoder().encode(secretKey);
 }
 
@@ -62,7 +64,6 @@ export async function getCurrentUser() {
       phone: null,
       role: payload.role as UserRole,
       parentId: undefined,
-      walletBalance: 0,
       students: [],
     };
   }
@@ -82,8 +83,8 @@ export async function getCurrentUser() {
         },
       },
     });
-  } catch (err) {
-    console.warn('[AUTH_GET_CURRENT_USER] DB lookup error:', err);
+  } catch {
+    // Prisma fallback
   }
 
   if (!user) {
@@ -97,7 +98,6 @@ export async function getCurrentUser() {
     phone: user.phone,
     role: user.role as UserRole,
     parentId: user.parent?.id,
-    walletBalance: user.parent?.walletBalance ?? 0,
     students: user.parent?.students ?? [],
   };
 }

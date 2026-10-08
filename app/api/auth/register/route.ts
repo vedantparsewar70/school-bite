@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,15 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(`auth_reg_${clientIp}`, { windowMs: 60000, maxRequests: 10 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration requests. Please wait a moment and try again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
     const { name, email, phone, password, confirmPassword } = body || {};
 
@@ -58,7 +68,7 @@ export async function POST(req: Request) {
 
     const passwordHash = await hashPassword(password);
 
-    // Create user and parent record with initial wallet balance
+    // Create user and parent record
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -108,7 +118,6 @@ export async function POST(req: Request) {
           name: user.name,
           role: user.role,
           parentId: user.parent?.id,
-          walletBalance: user.parent?.walletBalance ?? 500,
         },
       },
       {

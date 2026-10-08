@@ -1,5 +1,5 @@
 import { db } from './firebase-admin';
-import type { DocumentSnapshot, Query, DocumentReference } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot, type Query, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
 
 export interface DbUser {
   id: string;
@@ -424,11 +424,9 @@ export class FirestoreDbAdapter {
 
       if (data.walletBalance !== undefined) {
         if (typeof data.walletBalance === 'object' && data.walletBalance.increment !== undefined) {
-          const current = (await ref.get()).data()?.walletBalance || 0;
-          updateData.walletBalance = current + data.walletBalance.increment;
+          updateData.walletBalance = FieldValue.increment(Number(data.walletBalance.increment));
         } else if (typeof data.walletBalance === 'object' && data.walletBalance.decrement !== undefined) {
-          const current = (await ref.get()).data()?.walletBalance || 0;
-          updateData.walletBalance = current - data.walletBalance.decrement;
+          updateData.walletBalance = FieldValue.increment(-Number(data.walletBalance.decrement));
         } else {
           updateData.walletBalance = Number(data.walletBalance);
         }
@@ -904,13 +902,19 @@ export class FirestoreDbAdapter {
         const snap = await db.collection('menus').doc(where.id).get();
         doc = docData(snap);
       } else if (where.mealId_date) {
-        const snap = await db
-          .collection('menus')
-          .where('mealId', '==', where.mealId_date.mealId)
-          .where('date', '==', where.mealId_date.date)
-          .limit(1)
-          .get();
-        if (!snap.empty) doc = docData(snap.docs[0]);
+        const directId = `${where.mealId_date.mealId}_${where.mealId_date.date}`;
+        const snap = await db.collection('menus').doc(directId).get();
+        if (snap.exists) {
+          doc = docData(snap);
+        } else {
+          const qSnap = await db
+            .collection('menus')
+            .where('mealId', '==', where.mealId_date.mealId)
+            .where('date', '==', where.mealId_date.date)
+            .limit(1)
+            .get();
+          if (!qSnap.empty) doc = docData(qSnap.docs[0]);
+        }
       }
       if (!doc) return null;
       if (include?.meal) {
@@ -987,11 +991,9 @@ export class FirestoreDbAdapter {
       const updateData: any = { updatedAt: new Date().toISOString() };
       if (data.availableQuantity !== undefined) {
         if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
-          const current = (await ref.get()).data()?.availableQuantity || 0;
-          updateData.availableQuantity = current - data.availableQuantity.decrement;
+          updateData.availableQuantity = FieldValue.increment(-Number(data.availableQuantity.decrement));
         } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
-          const current = (await ref.get()).data()?.availableQuantity || 0;
-          updateData.availableQuantity = current + data.availableQuantity.increment;
+          updateData.availableQuantity = FieldValue.increment(Number(data.availableQuantity.increment));
         } else {
           updateData.availableQuantity = Number(data.availableQuantity);
         }
@@ -1009,16 +1011,22 @@ export class FirestoreDbAdapter {
       if (where.date) query = query.where('date', '==', where.date);
       const snap = await query.get();
 
+      if (snap.empty) return { count: 0 };
+
+      const batch = db.batch();
       for (const d of snap.docs) {
-        const currentData = d.data();
-        let newQty = currentData.availableQuantity || 0;
+        const updateData: any = { updatedAt: new Date().toISOString() };
         if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
-          newQty += data.availableQuantity.increment;
+          updateData.availableQuantity = FieldValue.increment(Number(data.availableQuantity.increment));
         } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
-          newQty -= data.availableQuantity.decrement;
+          updateData.availableQuantity = FieldValue.increment(-Number(data.availableQuantity.decrement));
+        } else if (data.availableQuantity !== undefined) {
+          updateData.availableQuantity = Number(data.availableQuantity);
         }
-        await d.ref.set({ availableQuantity: newQty, updatedAt: new Date().toISOString() }, { merge: true });
+        if (data.isActive !== undefined) updateData.isActive = data.isActive;
+        batch.set(d.ref, updateData, { merge: true });
       }
+      await batch.commit();
       return { count: snap.docs.length };
     },
     delete: async ({ where }: any): Promise<any> => {
@@ -1173,17 +1181,37 @@ export class FirestoreDbAdapter {
       return ord;
     },
     findFirst: async ({ where, include }: any): Promise<DbOrder | null> => {
-      let query: Query = db.collection('orders');
-      if (where.id) query = query.where('__name__', '==', where.id);
-      if (where.parentId) query = query.where('parentId', '==', where.parentId);
-      const snap = await query.limit(1).get();
-      if (snap.empty) return null;
-      const ord = docData(snap.docs[0]);
+      let ord: any = null;
+      if (where.id) {
+        const snap = await db.collection('orders').doc(where.id).get();
+        if (snap.exists) {
+          const candidate = docData(snap);
+          if (!where.parentId || candidate.parentId === where.parentId) {
+            ord = candidate;
+          }
+        }
+      } else if (where.parentId) {
+        let query: Query = db.collection('orders').where('parentId', '==', where.parentId);
+        if (where.orderStatus) query = query.where('orderStatus', '==', where.orderStatus);
+        const snap = await query.limit(1).get();
+        if (!snap.empty) ord = docData(snap.docs[0]);
+      } else {
+        const snap = await db.collection('orders').limit(1).get();
+        if (!snap.empty) ord = docData(snap.docs[0]);
+      }
+
+      if (!ord) return null;
 
       if (include?.items) {
         const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
         ord.items = itemsSnap.docs.map((d) => docData(d));
       }
+
+      if (include?.payments) {
+        const paySnap = await db.collection('payments').where('orderId', '==', ord.id).get();
+        ord.payments = paySnap.docs.map((d) => docData(d));
+      }
+
       return ord;
     },
     create: async ({ data, include }: any): Promise<DbOrder> => {
@@ -1485,9 +1513,14 @@ export class FirestoreDbAdapter {
   // $disconnect for compatibility
   $disconnect = async (): Promise<void> => {};
 
-  // $transaction
+  // $transaction for Prisma compatibility
   $transaction = async (callback: (tx: this) => Promise<any>): Promise<any> => {
     return callback(this);
+  };
+
+  // Real atomic Firestore transaction
+  runTransaction = async <T>(updateFunction: (transaction: Transaction) => Promise<T>): Promise<T> => {
+    return db.runTransaction(updateFunction);
   };
 }
 

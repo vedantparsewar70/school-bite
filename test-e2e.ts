@@ -20,7 +20,7 @@ async function runTests() {
   const parentLoginData = await parentLoginRes.json();
   const parentCookie = parentLoginRes.headers.get('set-cookie');
   if (parentLoginRes.ok && parentLoginData.success) {
-    console.log(`✅ 2. Parent Login successful: ${parentLoginData.user.name} (${parentLoginData.user.role}), Wallet: ₹${parentLoginData.user.walletBalance}`);
+    console.log(`✅ 2. Parent Login successful: ${parentLoginData.user.name} (${parentLoginData.user.role})`);
   } else {
     throw new Error('Parent login failed');
   }

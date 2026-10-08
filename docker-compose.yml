@@ -10,13 +10,16 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-super-secure-school-mealbox-jwt-secret-key-2026}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-school-bite-91432}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
+      - FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY:-}
       - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-SchoolBite}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@school.com}
+      - STAFF_EMAIL=${STAFF_EMAIL:-staff@school.com}
       - SEED_ON_INIT=${SEED_ON_INIT:-false}
-    volumes:
-      # Mount host prisma folder so SQLite database persists across container restarts
-      - ./prisma:/app/prisma
 
   # Optional: Automatic SSL / Reverse Proxy using Caddy
   # To enable with your domain:

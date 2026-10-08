@@ -3,11 +3,20 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString, getOffsetDateString } from '@/lib/utils';
 
+let cachedStats: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 15000;
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
       return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
+    }
+
+    if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json(cachedStats.data, {
+        headers: { 'X-Cache': 'HIT' },
+      });
     }
 
     const todayStr = getTodayString();
@@ -115,7 +124,7 @@ export async function GET() {
       })),
     }));
 
-    return NextResponse.json({
+    const responsePayload = {
       stats: {
         totalOrders,
         studentsOrdered,
@@ -129,7 +138,14 @@ export async function GET() {
       },
       tomorrowProduction,
       recentOrders: formattedRecentOrders,
-    });
+    };
+
+    cachedStats = {
+      data: responsePayload,
+      timestamp: Date.now(),
+    };
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     return NextResponse.json({ error: 'Failed to fetch admin stats' }, { status: 500 });

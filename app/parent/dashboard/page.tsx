@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
@@ -121,6 +122,13 @@ export default function ParentDashboard() {
             >
               <UtensilsCrossed className="w-4 h-4" />
               <span>Order Lunch</span>
+            </Link>
+            <Link
+              href="/parent/orders"
+              className="px-4 py-2.5 bg-amber-700/60 hover:bg-amber-700/80 border border-white/20 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Order History</span>
             </Link>
             <Link
               href="/parent/children"

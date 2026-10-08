@@ -6,13 +6,13 @@ import {
   CreditCard,
   QrCode,
   Building2,
-  Wallet,
   Calendar,
   Filter,
   CheckCircle2,
   Clock,
   ArrowUpRight,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
 import { formatINR, formatDateTimePretty } from '@/lib/utils';
 import { PaymentData } from '@/types';
@@ -55,8 +55,6 @@ export default function PaymentsPage() {
     switch (method) {
       case 'UPI':
         return <QrCode className="w-4 h-4 text-purple-600" />;
-      case 'WALLET':
-        return <Wallet className="w-4 h-4 text-emerald-600" />;
       case 'CARD':
         return <CreditCard className="w-4 h-4 text-blue-600" />;
       case 'NET_BANKING':
@@ -80,11 +78,21 @@ export default function PaymentsPage() {
           </p>
         </div>
 
-        {/* Quick Total Spent Pill */}
-        <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-2xl flex items-center gap-3">
-          <div>
-            <p className="text-[10px] uppercase font-bold text-amber-800">Total Spent</p>
-            <p className="text-lg font-black text-amber-900">{formatINR(totalSpent)}</p>
+        {/* Right Header Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/parent/orders"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+          >
+            <FileText className="w-4 h-4 text-amber-500" />
+            <span>Order History</span>
+          </Link>
+
+          <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-2xl flex items-center gap-3">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-amber-800">Total Spent</p>
+              <p className="text-lg font-black text-amber-900">{formatINR(totalSpent)}</p>
+            </div>
           </div>
         </div>
       </div>

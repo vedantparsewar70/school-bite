@@ -11,7 +11,6 @@ export interface AuthUser {
   phone?: string | null;
   role: UserRole;
   parentId?: string;
-  walletBalance: number;
   students?: Array<{
     id: string;
     name: string;

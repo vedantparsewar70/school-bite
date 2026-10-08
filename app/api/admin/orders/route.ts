@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { db } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function GET(req: Request) {
   try {
@@ -194,14 +196,65 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
     }
 
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: { orderStatus },
+    // Atomic transaction for order state changes: prevents race conditions & double collection
+    const updated = await db.runTransaction(async (transaction) => {
+      const orderRef = db.collection('orders').doc(orderId);
+      const orderSnap = await transaction.get(orderRef);
+      if (!orderSnap.exists) {
+        throw new Error('Order not found');
+      }
+
+      const orderData = orderSnap.data() || {};
+      const currentStatus = orderData.orderStatus || 'CONFIRMED';
+
+      // 1. Guard terminal states
+      if (currentStatus === 'CANCELLED') {
+        throw new Error('This order has already been cancelled and cannot be modified.');
+      }
+
+      if (currentStatus === 'COLLECTED') {
+        if (orderStatus === 'COLLECTED') {
+          throw new Error('This order has already been collected.');
+        }
+        throw new Error('Collected orders have already been fulfilled and cannot be changed.');
+      }
+
+      const now = new Date().toISOString();
+
+      // 2. Cancellation by Admin / Staff: Restore menu stock
+      if (orderStatus === 'CANCELLED') {
+        const itemsSnap = await db.collection('orderItems').where('orderId', '==', orderId).get();
+        for (const doc of itemsSnap.docs) {
+          const item = doc.data();
+          const menuRef = db.collection('menus').doc(`${item.mealId}_${item.date}`);
+          transaction.update(menuRef, {
+            availableQuantity: FieldValue.increment(Number(item.quantity)),
+            updatedAt: now,
+          });
+        }
+
+        transaction.update(orderRef, {
+          orderStatus: 'CANCELLED',
+          paymentStatus: 'REFUNDED',
+          updatedAt: now,
+        });
+
+        return { ...orderData, orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED', updatedAt: now };
+      }
+
+      // 3. Status progression
+      transaction.update(orderRef, {
+        orderStatus,
+        updatedAt: now,
+      });
+
+      return { ...orderData, orderStatus, updatedAt: now };
     });
 
     return NextResponse.json({ success: true, order: updated });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating order status:', error);
-    return NextResponse.json({ error: 'Failed to update order status' }, { status: 500 });
+    const msg = error?.message || 'Failed to update order status';
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

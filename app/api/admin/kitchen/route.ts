@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
+import { db } from '@/lib/firebase-admin';
+
+const kitchenCache = new Map<string, { data: any; timestamp: number }>();
+const KITCHEN_CACHE_TTL = 10000;
 
 export async function GET(req: Request) {
   try {
@@ -12,6 +16,13 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date') || getTodayString();
+
+    const cached = kitchenCache.get(date);
+    if (cached && Date.now() - cached.timestamp < KITCHEN_CACHE_TTL) {
+      return NextResponse.json(cached.data, {
+        headers: { 'X-Cache': 'HIT' },
+      });
+    }
 
     // Fetch all active order items for this date
     const items = await prisma.orderItem.findMany({
@@ -107,7 +118,7 @@ export async function GET(req: Request) {
 
     const uniqueOrderIds = new Set(validItems.map((i) => i.orderId));
 
-    return NextResponse.json({
+    const payload = {
       date,
       totalMeals,
       totalOrders: uniqueOrderIds.size,
@@ -118,7 +129,11 @@ export async function GET(req: Request) {
         count,
       })),
       studentList,
-    });
+    };
+
+    kitchenCache.set(date, { data: payload, timestamp: Date.now() });
+
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('Error fetching kitchen data:', error);
     return NextResponse.json({ error: 'Failed to fetch kitchen data' }, { status: 500 });
@@ -127,6 +142,7 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    kitchenCache.clear();
     const user = await getCurrentUser();
     if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
       return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
@@ -139,14 +155,34 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
+    const validStatuses = ['PREPARING', 'READY', 'COLLECTED'];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid kitchen status' }, { status: 400 });
+    }
+
     let affectedCount = 0;
 
     if (orderIds && orderIds.length > 0) {
-      const res = await prisma.order.updateMany({
-        where: { id: { in: orderIds } },
-        data: { orderStatus: status },
-      });
-      affectedCount = res.count;
+      // Fetch these orders to filter out CANCELLED and already COLLECTED orders
+      const orderDocs = await Promise.all(orderIds.map((id) => db.collection('orders').doc(id).get()));
+      const validIds: string[] = [];
+
+      for (const d of orderDocs) {
+        if (!d.exists) continue;
+        const ord = d.data();
+        if (!ord) continue;
+        // Never override terminal orders
+        if (ord.orderStatus === 'CANCELLED' || ord.orderStatus === 'COLLECTED') continue;
+        validIds.push(d.id);
+      }
+
+      if (validIds.length > 0) {
+        const res = await prisma.order.updateMany({
+          where: { id: { in: validIds } },
+          data: { orderStatus: status },
+        });
+        affectedCount = res.count;
+      }
     } else if (date) {
       const items = await prisma.orderItem.findMany({
         where: {
@@ -157,11 +193,18 @@ export async function PATCH(req: Request) {
       });
 
       const uniqueOrderIds = Array.from(new Set(items.map((i) => i.orderId)));
-      const res = await prisma.order.updateMany({
-        where: { id: { in: uniqueOrderIds } },
-        data: { orderStatus: status },
-      });
-      affectedCount = res.count;
+      const orderDocs = await Promise.all(uniqueOrderIds.map((id) => db.collection('orders').doc(id).get()));
+      const validIds = orderDocs
+        .filter((d) => d.exists && d.data()?.orderStatus !== 'CANCELLED' && d.data()?.orderStatus !== 'COLLECTED')
+        .map((d) => d.id);
+
+      if (validIds.length > 0) {
+        const res = await prisma.order.updateMany({
+          where: { id: { in: validIds } },
+          data: { orderStatus: status },
+        });
+        affectedCount = res.count;
+      }
     }
 
     return NextResponse.json({

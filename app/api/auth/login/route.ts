@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { comparePassword, hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { UserRole } from '@/types';
 
 export const runtime = 'nodejs';
@@ -22,14 +23,20 @@ export async function POST(req: Request) {
   let redactedEmail = '';
 
   try {
-    console.log('[AUTH_LOGIN_TRACE] Step 1: Request reached /api/auth/login');
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(`auth_login_${clientIp}`, { windowMs: 60000, maxRequests: 25 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please wait a minute and try again.' },
+        { status: 429 }
+      );
+    }
 
     step = '2_PARSE_BODY';
     const body = await req.json().catch(() => null);
     const { email, password, requestedRole } = body || {};
 
     if (!email || !password) {
-      console.warn('[AUTH_LOGIN_TRACE] Step 2 Failed: Missing email or password in request body');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -44,33 +51,28 @@ export async function POST(req: Request) {
       redactedEmail = '***@' + (emailStr.split('@')[1] || 'domain');
     }
 
-    const envAdminEmail = (process.env.ADMIN_EMAIL || 'admin@school.com').trim().toLowerCase();
-    const envAdminPass = process.env.ADMIN_PASS || 'Admin123';
-    const isAdminEnvMatch = emailStr === envAdminEmail && password === envAdminPass;
+    const envAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const envAdminPass = process.env.ADMIN_PASS;
+    const isAdminEnvMatch = Boolean(envAdminEmail && envAdminPass && emailStr === envAdminEmail && password === envAdminPass);
 
-    const envStaffEmail = (process.env.STAFF_EMAIL || 'staff@school.com').trim().toLowerCase();
-    const envStaffPass = process.env.STAFF_PASS || 'Staff123';
-    const isStaffEnvMatch = emailStr === envStaffEmail && password === envStaffPass;
-
-    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail}), IsAdminMatch: ${isAdminEnvMatch}, IsStaffMatch: ${isStaffEnvMatch}`);
+    const envStaffEmail = process.env.STAFF_EMAIL?.trim().toLowerCase();
+    const envStaffPass = process.env.STAFF_PASS;
+    const isStaffEnvMatch = Boolean(envStaffEmail && envStaffPass && emailStr === envStaffEmail && password === envStaffPass);
 
     step = '3_DATABASE_CHECK';
-    console.log('[AUTH_LOGIN_TRACE] Step 3: Database connection check started');
-
     step = '4_USER_LOOKUP';
-    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);
     let user: any = null;
     try {
       user = await prisma.user.findUnique({
         where: { email: emailStr },
         include: { parent: true },
       });
-    } catch (dbErr: any) {
-      console.warn('[AUTH_LOGIN_TRACE] Database lookup warning:', dbErr?.message);
+    } catch {
+      // Prisma fallback handles missing connection
     }
 
     // Auto-provision or sync admin account if env matches
-    if (isAdminEnvMatch) {
+    if (isAdminEnvMatch && envAdminPass && envAdminEmail) {
       if (!user) {
         try {
           const passwordHash = await hashPassword(envAdminPass);
@@ -83,8 +85,7 @@ export async function POST(req: Request) {
               passwordHash,
             },
           });
-        } catch (createErr) {
-          console.warn('[AUTH_LOGIN_TRACE] Could not write admin to DB, using in-memory admin fallback:', createErr);
+        } catch {
           user = {
             id: 'usr_canteen_admin_01',
             email: envAdminEmail,
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
     }
 
     // Auto-provision or sync staff account if env matches
-    if (isStaffEnvMatch) {
+    if (isStaffEnvMatch && envStaffPass && envStaffEmail) {
       if (!user) {
         try {
           const passwordHash = await hashPassword(envStaffPass);
@@ -120,8 +121,7 @@ export async function POST(req: Request) {
               passwordHash,
             },
           });
-        } catch (createErr) {
-          console.warn('[AUTH_LOGIN_TRACE] Could not write staff to DB, using in-memory staff fallback:', createErr);
+        } catch {
           user = {
             id: 'usr_canteen_staff_01',
             email: envStaffEmail,
@@ -143,10 +143,7 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup completed. User found: ${Boolean(user)}`);
-
     if (!user) {
-      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: user not found in database (${redactedEmail})`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -169,17 +166,14 @@ export async function POST(req: Request) {
     }
 
     step = '5_PASSWORD_VERIFY';
-    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification started for ${redactedEmail}`);
     let isValid = false;
     if (isAdminEnvMatch || isStaffEnvMatch) {
       isValid = true;
     } else if (user.passwordHash) {
       isValid = await comparePassword(password, user.passwordHash);
     }
-    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification completed. Match: ${isValid}`);
 
     if (!isValid) {
-      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: invalid password for ${redactedEmail}`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -187,7 +181,6 @@ export async function POST(req: Request) {
     }
 
     step = '6_JWT_GENERATION';
-    console.log(`[AUTH_LOGIN_TRACE] Step 6: JWT generation started for userId: ${user.id}, role: ${user.role}`);
     const token = await createSessionToken({
       userId: user.id,
       email: user.email,
@@ -195,10 +188,8 @@ export async function POST(req: Request) {
       role: user.role as UserRole,
       parentId: user.parent?.id,
     });
-    console.log('[AUTH_LOGIN_TRACE] Step 6: JWT generation completed');
 
     step = '7_SESSION_COOKIE';
-    console.log('[AUTH_LOGIN_TRACE] Step 7: Setting session cookie');
     const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
     const isHttps = proto === 'https';
 
@@ -212,8 +203,8 @@ export async function POST(req: Request) {
         path: '/',
         maxAge: 60 * 60 * 24 * 7, // 7 days
       });
-    } catch (cookieErr) {
-      console.warn('[AUTH_LOGIN_TRACE] Note: cookieStore.set warning:', cookieErr);
+    } catch {
+      // Cookie header fallback applied below
     }
 
     const redirectUrl =
@@ -222,8 +213,6 @@ export async function POST(req: Request) {
         : user.role === 'STAFF'
         ? '/staff/kitchen'
         : '/parent/children';
-
-    console.log('[AUTH_LOGIN_TRACE] Final response status: 200 OK');
 
     const response = NextResponse.json(
       {
@@ -235,7 +224,6 @@ export async function POST(req: Request) {
           name: user.name,
           role: user.role,
           parentId: user.parent?.id,
-          walletBalance: user.parent?.walletBalance ?? 0,
         },
       },
       {

@@ -153,6 +153,41 @@ export default function Navbar() {
                 </Link>
               </>
             )}
+
+            {isParent && (
+              <>
+                <Link
+                  href="/parent/menu"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/menu')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  <UtensilsCrossed className="w-4 h-4" />
+                  Order Lunch
+                </Link>
+                <Link
+                  href="/parent/orders"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/orders')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  Order History
+                </Link>
+                <Link
+                  href="/parent/children"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/children')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  <Users className="w-4 h-4" />
+                  My Children
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Right Action Buttons */}
@@ -190,6 +225,19 @@ export default function Navbar() {
               <div className="flex items-center gap-3">
                 {isParent && (
                   <>
+                    <Link
+                      href="/parent/orders"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all border ${
+                        isActive('/parent/orders')
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300'
+                      }`}
+                      title="View Order History"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Order History</span>
+                    </Link>
+
                     {/* Shopping Cart Button */}
                     <Link
                       href="/parent/cart"
@@ -233,13 +281,36 @@ export default function Navbar() {
                       </div>
 
                       {isParent && (
-                        <Link
-                          href="/parent/profile"
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-                        >
-                          <UserIcon className="w-4 h-4 text-slate-400" />
-                          Parent Profile
-                        </Link>
+                        <>
+                          <Link
+                            href="/parent/orders"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <FileText className="w-4 h-4 text-amber-600" />
+                            Order History
+                          </Link>
+                          <Link
+                            href="/parent/menu"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <UtensilsCrossed className="w-4 h-4 text-slate-400" />
+                            Order Lunch
+                          </Link>
+                          <Link
+                            href="/parent/children"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <Users className="w-4 h-4 text-slate-400" />
+                            My Children
+                          </Link>
+                          <Link
+                            href="/parent/profile"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <UserIcon className="w-4 h-4 text-slate-400" />
+                            Parent Profile
+                          </Link>
+                        </>
                       )}
 
                       <button
@@ -360,13 +431,6 @@ export default function Navbar() {
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
                 Order History
-              </Link>
-              <Link
-                href="/parent/wallet"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-              >
-                Meal Wallet
               </Link>
               <button
                 onClick={() => {

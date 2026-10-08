@@ -13,6 +13,7 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
 import { useCart } from '@/components/CartContext';
 import { useAuth } from '@/components/AuthContext';
@@ -70,13 +71,22 @@ export default function CartPage() {
           <p className="text-xs text-slate-500">
             Browse today's or the weekly lunch menu, select a child, and add delicious nutritious meals.
           </p>
-          <Link
-            href="/parent/menu"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-xs font-bold shadow-md hover:from-amber-600 hover:to-orange-600 transition-all"
-          >
-            <UtensilsCrossed className="w-4 h-4" />
-            <span>Explore Menu</span>
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            <Link
+              href="/parent/menu"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-xs font-bold shadow-md hover:from-amber-600 hover:to-orange-600 transition-all"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              <span>Explore Menu</span>
+            </Link>
+            <Link
+              href="/parent/orders"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all"
+            >
+              <FileText className="w-4 h-4 text-amber-600" />
+              <span>Order History</span>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
