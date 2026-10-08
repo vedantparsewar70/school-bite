@@ -3,118 +3,69 @@
 import React, { useEffect, useState } from 'react';
 import {
   UtensilsCrossed,
-  Plus,
-  Edit2,
-  Trash2,
-  Calendar,
-  Clock,
-  X,
-  CheckCircle2,
-  AlertCircle,
-  Tag,
-  Search,
-  ShieldAlert,
-  ShieldCheck,
-  Flame,
-  Check,
   CheckSquare,
   Square,
   Save,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  Plus,
+  X,
   Loader2,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import VegBadge from '@/components/VegBadge';
 import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
-import { formatINR, formatDatePretty, getTodayString, getOffsetDateString } from '@/lib/utils';
+import { formatINR, formatDatePretty, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
-import { MealData, MenuDayItem } from '@/types';
-
-const COMMON_ALLERGEN_TAGS = [
-  'Milk',
-  'Peanuts',
-  'Egg',
-  'Soy',
-  'Wheat',
-  'Tree Nuts',
-  'Fish',
-  'Shellfish',
-  'Sesame',
-];
+import { MealData } from '@/types';
 
 export default function AdminMenuPage() {
   const { showToast } = useToast();
-
   const tomorrowDate = getOffsetDateString(1);
-  const [activeTab, setActiveTab] = useState<'tomorrow' | 'catalog'>('tomorrow');
-  const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
-  const [publishingTomorrow, setPublishingTomorrow] = useState(false);
-  const [tomorrowSearch, setTomorrowSearch] = useState('');
 
   const [meals, setMeals] = useState<MealData[]>([]);
-  const [scheduledMenus, setScheduledMenus] = useState<MenuDayItem[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  // Policy Setting (Requirement 5)
-  const [allowAllergyOrders, setAllowAllergyOrders] = useState(true);
-  const [policySaving, setPolicySaving] = useState(false);
-
-  // Meal Modal (Add / Edit Master Meal)
-  const [isMealModalOpen, setIsMealModalOpen] = useState(false);
-  const [editingMeal, setEditingMeal] = useState<MealData | null>(null);
-
-  // Meal Form fields
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('LUNCH');
-  const [isVegetarian, setIsVegetarian] = useState(true);
-  const [ingredients, setIngredients] = useState('');
-  const [calories, setCalories] = useState<number | string>(450);
-  const [price, setPrice] = useState<number | string>(100);
-
-  // Multi-select allergens
-  const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
-  const [customAllergenText, setCustomAllergenText] = useState('');
-
-  // Schedule Modal (Assign Meal to Date)
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [scheduleMealId, setScheduleMealId] = useState('');
-  const [scheduleDate, setScheduleDate] = useState(getTodayString());
-  const [scheduleQty, setScheduleQty] = useState(50);
-  const [scheduleDeadline, setScheduleDeadline] = useState('08:30');
+  // Add new food item modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newMealName, setNewMealName] = useState('');
+  const [newMealCategory, setNewMealCategory] = useState('LUNCH');
+  const [newMealPrice, setNewMealPrice] = useState('80');
+  const [newMealIsVeg, setNewMealIsVeg] = useState(true);
+  const [newMealDesc, setNewMealDesc] = useState('');
+  const [creatingMeal, setCreatingMeal] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [mealsRes, menusRes, tomorrowMenusRes, settingsRes] = await Promise.all([
+      const [mealsRes, menusRes] = await Promise.all([
         fetch('/api/admin/meals'),
-        fetch(`/api/admin/menus?date=${selectedDate}`),
         fetch(`/api/admin/menus?date=${tomorrowDate}`),
-        fetch('/api/admin/settings'),
       ]);
 
+      let allMeals: MealData[] = [];
       if (mealsRes.ok) {
         const m = await mealsRes.json();
-        setMeals(m.meals || []);
+        allMeals = m.meals || [];
+        setMeals(allMeals);
       }
+
       if (menusRes.ok) {
-        const s = await menusRes.json();
-        setScheduledMenus(s.menus || []);
-      }
-      if (tomorrowMenusRes.ok) {
-        const tm = await tomorrowMenusRes.json();
-        const activeTomorrowIds = (tm.menus || [])
-          .filter((item: any) => Boolean(item.isActive))
+        const menuData = await menusRes.json();
+        const activeIds = (menuData.menus || [])
+          .filter((item: any) => item.isActive)
           .map((item: any) => item.mealId);
-        setSelectedMealIds(activeTomorrowIds);
-      }
-      if (settingsRes.ok) {
-        const sett = await settingsRes.json();
-        if (sett.settings?.ALLOW_ALLERGY_ORDERS !== undefined) {
-          setAllowAllergyOrders(sett.settings.ALLOW_ALLERGY_ORDERS);
-        }
+        setSelectedMealIds(activeIds);
       }
     } catch (err) {
       console.error('Failed to load menu data:', err);
+      showToast('Error loading menu items', 'error');
     } finally {
       setLoading(false);
     }
@@ -122,24 +73,29 @@ export default function AdminMenuPage() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedDate]);
+  }, []);
 
-  const handleSelectAllTomorrow = () => {
-    setSelectedMealIds(meals.map((m) => m.id));
-  };
-
-  const handleUnselectAllTomorrow = () => {
-    setSelectedMealIds([]);
-  };
-
-  const handleToggleTomorrowMeal = (mealId: string) => {
+  const handleToggleMeal = (mealId: string) => {
     setSelectedMealIds((prev) =>
       prev.includes(mealId) ? prev.filter((id) => id !== mealId) : [...prev, mealId]
     );
   };
 
-  const handlePublishTomorrowMenu = async () => {
-    setPublishingTomorrow(true);
+  const handleSelectAll = () => {
+    const visibleIds = filteredMeals.map((m) => m.id);
+    const combined = Array.from(new Set([...selectedMealIds, ...visibleIds]));
+    setSelectedMealIds(combined);
+    showToast(`Selected all ${visibleIds.length} visible items`, 'info');
+  };
+
+  const handleUnselectAll = () => {
+    const visibleIds = new Set(filteredMeals.map((m) => m.id));
+    setSelectedMealIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+    showToast('Unselected visible items', 'info');
+  };
+
+  const handlePublishMenu = async () => {
+    setSaving(true);
     try {
       const res = await fetch('/api/admin/menus/publish', {
         method: 'POST',
@@ -150,987 +106,397 @@ export default function AdminMenuPage() {
         }),
       });
 
-      const data = await res.json();
       if (res.ok) {
         showToast(
-          `Published ${selectedMealIds.length} food items for Tomorrow (${formatDatePretty(tomorrowDate)})!`,
-          'success'
-        );
-        await fetchData();
-      } else {
-        showToast(data.error || 'Failed to publish menu', 'error');
-      }
-    } catch {
-      showToast('Network error while publishing menu', 'error');
-    } finally {
-      setPublishingTomorrow(false);
-    }
-  };
-
-  // Toggle Policy Setting
-  const handleTogglePolicy = async () => {
-    setPolicySaving(true);
-    const newValue = !allowAllergyOrders;
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'ALLOW_ALLERGY_ORDERS',
-          value: String(newValue),
-        }),
-      });
-
-      if (res.ok) {
-        setAllowAllergyOrders(newValue);
-        showToast(
-          newValue
-            ? 'Policy updated: Parents CAN order meals with warning acknowledgment.'
-            : 'Policy updated: Ordering meals with allergy conflicts is now STRICTLY BLOCKED.',
+          `Tomorrow's menu successfully published with ${selectedMealIds.length} items!`,
           'success'
         );
       } else {
-        showToast('Failed to save policy setting', 'error');
+        const err = await res.json();
+        showToast(err.error || 'Failed to publish menu', 'error');
       }
     } catch {
-      showToast('Network error saving policy setting', 'error');
+      showToast('Network error publishing menu', 'error');
     } finally {
-      setPolicySaving(false);
+      setSaving(false);
     }
   };
 
-  const openAddMealModal = () => {
-    setEditingMeal(null);
-    setName('');
-    setDescription('');
-    setCategory('LUNCH');
-    setIsVegetarian(true);
-    setIngredients('Basmati Rice, Dal, Vegetables, Mild Spices');
-    setSelectedAllergens(['Milk']);
-    setCustomAllergenText('');
-    setCalories(450);
-    setPrice(100);
-    setIsMealModalOpen(true);
-  };
-
-  const openEditMealModal = (m: MealData) => {
-    setEditingMeal(m);
-    setName(m.name);
-    setDescription(m.description);
-    setCategory(m.category);
-    setIsVegetarian(m.isVegetarian);
-    setIngredients(m.ingredients || '');
-    setCalories(m.calories || 400);
-    setPrice(m.price);
-
-    // Parse allergens
-    const existingList = m.allergensList || (m.allergens ? m.allergens.split(/[,;]/).map((s) => s.trim()) : []);
-    const known = existingList.filter((a) => COMMON_ALLERGEN_TAGS.includes(a));
-    const custom = existingList.filter((a) => !COMMON_ALLERGEN_TAGS.includes(a) && a.toLowerCase() !== 'none');
-
-    setSelectedAllergens(known);
-    setCustomAllergenText(custom.join(', '));
-    setIsMealModalOpen(true);
-  };
-
-  const toggleAllergenTag = (tag: string) => {
-    if (selectedAllergens.includes(tag)) {
-      setSelectedAllergens(selectedAllergens.filter((t) => t !== tag));
-    } else {
-      setSelectedAllergens([...selectedAllergens, tag]);
-    }
-  };
-
-  const handleSaveMeal = async (e: React.FormEvent) => {
+  const handleCreateNewMeal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newMealName.trim()) return;
+
+    setCreatingMeal(true);
     try {
-      const allTags = [...selectedAllergens];
-      if (customAllergenText.trim()) {
-        customAllergenText.split(/[,;]/).forEach((part) => {
-          const clean = part.trim();
-          if (clean && !allTags.includes(clean)) allTags.push(clean);
-        });
-      }
-
-      const body = {
-        id: editingMeal?.id,
-        name,
-        description,
-        category,
-        isVegetarian,
-        ingredients,
-        allergensList: allTags,
-        calories: Number(calories),
-        price: Number(price),
-      };
-
       const res = await fetch('/api/admin/meals', {
-        method: editingMeal ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        showToast(editingMeal ? 'Meal updated successfully!' : 'Meal created successfully!', 'success');
-        setIsMealModalOpen(false);
-        await fetchData();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to save meal', 'error');
-      }
-    } catch {
-      showToast('Network error saving meal', 'error');
-    }
-  };
-
-  const handleDeleteMeal = async (id: string, mealName: string) => {
-    if (!confirm(`Are you sure you want to delete ${mealName}?`)) return;
-    try {
-      const res = await fetch(`/api/admin/meals?id=${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        showToast(`Deleted ${mealName}`, 'info');
-        await fetchData();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to delete meal', 'error');
-      }
-    } catch {
-      showToast('Network error deleting meal', 'error');
-    }
-  };
-
-  const handleScheduleMeal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scheduleMealId) {
-      showToast('Please select a meal to schedule', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/admin/menus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mealId: scheduleMealId,
-          date: scheduleDate,
-          maxQuantity: Number(scheduleQty),
-          orderingDeadline: scheduleDeadline,
+          name: newMealName.trim(),
+          category: newMealCategory,
+          price: parseFloat(newMealPrice) || 80,
+          isVegetarian: newMealIsVeg,
+          description: newMealDesc.trim(),
         }),
       });
 
       if (res.ok) {
-        showToast('Meal successfully scheduled for date!', 'success');
-        setIsScheduleModalOpen(false);
-        await fetchData();
+        const data = await res.json();
+        showToast(`"${data.meal.name}" added to food catalog!`, 'success');
+        setIsAddModalOpen(false);
+        setNewMealName('');
+        setNewMealDesc('');
+        // Add to local state & select it automatically
+        setMeals((prev) => [data.meal, ...prev]);
+        setSelectedMealIds((prev) => [...prev, data.meal.id]);
       } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to schedule meal', 'error');
+        showToast('Failed to add food item', 'error');
       }
     } catch {
-      showToast('Network error scheduling meal', 'error');
+      showToast('Network error creating food item', 'error');
+    } finally {
+      setCreatingMeal(false);
     }
   };
 
-  const handleRemoveFromSchedule = async (menuId: string) => {
-    if (!confirm('Remove this meal from this date schedule?')) return;
-    try {
-      const res = await fetch(`/api/admin/menus?id=${menuId}`, { method: 'DELETE' });
-      if (res.ok) {
-        showToast('Meal removed from date schedule', 'info');
-        await fetchData();
-      } else {
-        showToast('Failed to remove scheduled meal', 'error');
-      }
-    } catch {
-      showToast('Network error removing meal', 'error');
-    }
-  };
+  const filteredMeals = meals.filter((meal) => {
+    const matchesSearch =
+      meal.name.toLowerCase().includes(search.toLowerCase()) ||
+      meal.category.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === 'ALL' || meal.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
+              Daily Menu Availability
+            </span>
+            <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-purple-600" />
+              <span>Tomorrow: {formatDatePretty(tomorrowDate)}</span>
+            </span>
+          </div>
+
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <UtensilsCrossed className="w-7 h-7 text-amber-500" />
-            <span>Menu & Allergen Management</span>
+            <span>Tomorrow&apos;s Menu</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Configure master meals, assign allergens, publish daily meal schedules, and manage school allergy safety policy.
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Select which dishes will be prepared and available for parents to pre-order tomorrow.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        {/* Action Controls */}
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={openAddMealModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create Master Meal</span>
+            <Plus className="w-4 h-4 text-purple-600" />
+            <span>Add New Dish</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePublishMenu}
+            disabled={saving}
+            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md shadow-purple-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Publishing...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Save & Publish Menu ({selectedMealIds.length})</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* View Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab('tomorrow')}
-          className={`px-5 py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === 'tomorrow'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Tomorrow&apos;s Menu ({formatDatePretty(tomorrowDate).split(',')[0]})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('catalog')}
-          className={`px-5 py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === 'catalog'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          <UtensilsCrossed className="w-4 h-4" />
-          <span>Master Recipes & Calendar</span>
-        </button>
-      </div>
-
-      {/* TAB 1: TOMORROW'S MENU MANAGEMENT */}
-      {activeTab === 'tomorrow' && (
-        <div className="space-y-6">
-          {/* Controls Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-600 text-white uppercase tracking-wider">
-                    TOMORROW&apos;S MENU
-                  </span>
-                  <h2 className="text-lg sm:text-xl font-black text-slate-900">
-                    {formatDatePretty(tomorrowDate)}
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Select which food items from the catalog will be available for parents to order for tomorrow.
-                </p>
-              </div>
-
-              {/* Action Buttons: Select All, Unselect All, Publish Menu */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleSelectAllTomorrow}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Select All</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUnselectAllTomorrow}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <Square className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Unselect All</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePublishTomorrowMenu}
-                  disabled={publishingTomorrow}
-                  className={`px-5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md transition-all flex items-center gap-2 cursor-pointer ${
-                    publishingTomorrow
-                      ? 'bg-purple-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/20'
-                  }`}
-                >
-                  {publishingTomorrow ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Publishing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      <span>Publish Menu</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Filter and Selection Status Counter */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={tomorrowSearch}
-                  onChange={(e) => setTomorrowSearch(e.target.value)}
-                  placeholder="Search meals by name or category..."
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-700">
-                  {selectedMealIds.length} of {meals.length} items enabled
-                </span>
-                {selectedMealIds.length === 0 && (
-                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                    No items selected
-                  </span>
-                )}
-              </div>
-            </div>
+      {/* Published Status Pill Banner */}
+      <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
           </div>
-
-          {/* Meals Selection Grid */}
-          {loading ? (
-            <div className="min-h-[30vh] flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : meals.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3 max-w-md mx-auto">
-              <UtensilsCrossed className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="text-base font-bold text-slate-800">No Meals In Catalog</h3>
-              <p className="text-xs text-slate-500">Create dishes in the Master Recipes tab first.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {meals
-                .filter((meal) => {
-                  if (!tomorrowSearch) return true;
-                  const q = tomorrowSearch.toLowerCase();
-                  return (
-                    meal.name.toLowerCase().includes(q) ||
-                    meal.category.toLowerCase().includes(q) ||
-                    (meal.ingredients && meal.ingredients.toLowerCase().includes(q))
-                  );
-                })
-                .map((meal) => {
-                  const isSelected = selectedMealIds.includes(meal.id);
-
-                  return (
-                    <div
-                      key={meal.id}
-                      onClick={() => handleToggleTomorrowMeal(meal.id)}
-                      className={`bg-white rounded-3xl p-5 border transition-all cursor-pointer flex flex-col justify-between space-y-4 ${
-                        isSelected
-                          ? 'border-purple-600 shadow-md ring-2 ring-purple-600/20'
-                          : 'border-slate-200/80 hover:border-slate-300 opacity-75 hover:opacity-100 shadow-2xs'
-                      }`}
-                    >
-                      <div>
-                        {/* Top: Meal Graphic + Name + Checkbox */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3">
-                            <MealIcon name={meal.name} category={meal.category} size="md" />
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <MealCategoryBadge category={meal.category} />
-                                <VegBadge isVegetarian={meal.isVegetarian} size="sm" />
-                              </div>
-                              <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
-                                {meal.name}
-                              </h4>
-                              <p className="text-sm font-black text-amber-700">
-                                {formatINR(meal.price)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Checkbox button */}
-                          <div
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
-                              isSelected
-                                ? 'bg-purple-600 text-white shadow-xs'
-                                : 'bg-slate-100 border border-slate-300 text-transparent hover:border-purple-400'
-                            }`}
-                          >
-                            <Check className="w-4 h-4 stroke-[3]" />
-                          </div>
-                        </div>
-
-                        {/* Description & Ingredients */}
-                        <p className="text-xs text-slate-600 line-clamp-2 mt-3 leading-relaxed">
-                          {meal.description}
-                        </p>
-                        {meal.ingredients && (
-                          <p className="text-[11px] text-slate-400 truncate mt-1">
-                            <strong className="text-slate-600">Ingredients:</strong> {meal.ingredients}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Status footer on card */}
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span
-                          className={`font-extrabold text-[11px] px-2.5 py-0.5 rounded-full ${
-                            isSelected
-                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {isSelected ? '✓ Available Tomorrow' : 'Not Scheduled'}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {meal.calories ? `${meal.calories} kcal` : ''}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: MASTER CATALOG & CALENDAR */}
-      {activeTab === 'catalog' && (
-        <div className="space-y-8">
-      {/* SECTION: School Allergy Policy Switch (Requirement 5) */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-500" />
-              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                School Policy: Allow Ordering Meals with Allergy Warning
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
-              When <strong>ON</strong>, parents may add a meal containing an allergen associated with their child&apos;s profile after explicitly confirming the warning modal. When <strong>OFF</strong>, conflicting meals are strictly blocked from being ordered.
+          <div>
+            <p className="font-extrabold text-purple-950">
+              {selectedMealIds.length} Food Items Selected for Tomorrow
+            </p>
+            <p className="text-[11px] text-purple-800">
+              Only checked items will be visible on the parent pre-ordering screen for {formatDatePretty(tomorrowDate)}.
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <span
-              className={`text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                allowAllergyOrders
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-rose-100 text-rose-800'
-              }`}
-            >
-              {allowAllergyOrders ? 'ALLOWED (WITH CONFIRMATION)' : 'STRICTLY BLOCKED'}
-            </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            className="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-800 font-bold rounded-lg border border-purple-200 transition-colors shadow-2xs text-xs cursor-pointer flex items-center gap-1"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span>Select All</span>
+          </button>
 
-            <button
-              onClick={handleTogglePolicy}
-              disabled={policySaving}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                allowAllergyOrders ? 'bg-emerald-600' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  allowAllergyOrders ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleUnselectAll}
+            className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-lg border border-slate-200 transition-colors shadow-2xs text-xs cursor-pointer flex items-center gap-1"
+          >
+            <Square className="w-3.5 h-3.5" />
+            <span>Unselect All</span>
+          </button>
         </div>
       </div>
 
-      {/* SECTION 1: Daily Published Menu */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-amber-500" />
-              <span>Published Daily Menu for {formatDatePretty(selectedDate)}</span>
-            </h2>
-            <p className="text-xs text-slate-500">Meals currently available for parents to order on this date</p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-            />
-            <button
-              onClick={() => {
-                if (meals.length > 0) setScheduleMealId(meals[0].id);
-                setScheduleDate(selectedDate);
-                setIsScheduleModalOpen(true);
-              }}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-            >
-              + Schedule Meal
-            </button>
-          </div>
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search food item by name..."
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500 shadow-2xs text-slate-900"
+          />
         </div>
 
-        {scheduledMenus.length === 0 ? (
-          <div className="text-center py-10 border border-dashed border-slate-200 rounded-3xl space-y-2">
-            <p className="text-xs text-slate-500 font-medium">No meals scheduled yet for this date.</p>
+        {/* Category Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          {['ALL', 'BREAKFAST', 'LUNCH', 'SNACK'].map((cat) => (
             <button
-              onClick={() => {
-                if (meals.length > 0) setScheduleMealId(meals[0].id);
-                setScheduleDate(selectedDate);
-                setIsScheduleModalOpen(true);
-              }}
-              className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+              key={cat}
+              type="button"
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                categoryFilter === cat
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
             >
-              Schedule a Meal Now
+              {cat === 'ALL' ? 'All Dishes' : cat.charAt(0) + cat.slice(1).toLowerCase()}
             </button>
-          </div>
-        ) : (
-          /* Cards matching Requirement 13 Design Reference */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {scheduledMenus.map((sm) => (
-              <div
-                key={sm.id}
-                className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
-              >
-                <div>
-                  {/* Top: Meal Graphic on Left + Category + Name + Edit/Actions */}
-                  <div className="flex items-start gap-3.5">
-                    <MealIcon name={sm.meal.name} category={sm.meal.category} size="md" />
-
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <MealCategoryBadge category={sm.meal.category} />
-                        <button
-                          onClick={() => openEditMealModal(sm.meal)}
-                          className="p-1 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer"
-                          title="Edit Master Recipe"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
-                        {sm.meal.name}
-                      </h4>
-
-                      <p className="text-sm font-black text-amber-700">{formatINR(sm.meal.price)}</p>
-                    </div>
-                  </div>
-
-                  {/* Allergens tags if present */}
-                  {sm.meal.allergens && (
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1 text-[10px]">
-                      <span className="text-slate-400 font-bold uppercase">Allergens:</span>
-                      {sm.meal.allergens.split(/[,;]/).map((a, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold rounded-md border border-rose-200"
-                        >
-                          {a.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom Row matching Reference: ☑ AVAILABLE TODAY TICKED ✓ & Remove Option */}
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                    <span className="flex items-center gap-1.5 text-emerald-700">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>AVAILABLE TODAY</span>
-                    </span>
-                    <span className="text-emerald-800 text-[10px]">TICKED ✓</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-slate-400 font-semibold">
-                      Stock: {sm.availableQuantity}/{sm.maxQuantity} • Cutoff: {sm.orderingDeadline}
-                    </span>
-
-                    <button
-                      onClick={() => handleRemoveFromSchedule(sm.id)}
-                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Remove from date</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* SECTION 2: Master Meals Catalog (Requirement 13) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-900">
-              Master Meals Recipe Book ({meals.length})
-            </h2>
-            <p className="text-xs text-slate-500">All configured dishes available in the canteen recipe book.</p>
-          </div>
-        </div>
-
-        {/* Master Meal Cards Grid (Requirement 13) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {meals.map((meal) => (
-            <div
-              key={meal.id}
-              className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start gap-3.5">
-                  <MealIcon name={meal.name} category={meal.category} size="lg" />
-
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <MealCategoryBadge category={meal.category} />
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => openEditMealModal(meal)}
-                          className="p-1 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer"
-                          title="Edit Recipe"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMeal(meal.id, meal.name)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete Meal"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
-                      {meal.name}
-                    </h4>
-
-                    <p className="text-sm font-black text-amber-700">{formatINR(meal.price)}</p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-500 line-clamp-2 mt-3 leading-relaxed">
-                  {meal.description}
-                </p>
-
-                {/* Allergen Tags */}
-                <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    Allergen Tags:
-                  </span>
-                  {meal.allergens && meal.allergens !== 'None' ? (
-                    <div className="flex flex-wrap gap-1">
-                      {meal.allergens.split(/[,;]/).map((alg, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold text-[10px] rounded-md border border-rose-200"
-                        >
-                          {alg.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[11px] text-slate-400 italic">No allergens tagged</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Add to day button */}
-              <div className="pt-3 border-t border-slate-100">
-                <button
-                  onClick={() => {
-                    setScheduleMealId(meal.id);
-                    setScheduleDate(selectedDate);
-                    setIsScheduleModalOpen(true);
-                  }}
-                  className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Schedule For {formatDatePretty(selectedDate).split(',')[0]}</span>
-                </button>
-              </div>
-            </div>
           ))}
         </div>
       </div>
+
+      {/* Food Items Selection Grid */}
+      {filteredMeals.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3">
+          <UtensilsCrossed className="w-10 h-10 text-slate-300 mx-auto" />
+          <p className="text-sm font-bold text-slate-800">No Food Items Found</p>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            {search ? `No dishes match "${search}". Try clearing search.` : 'Click "Add New Dish" above to create dishes in your canteen catalog.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          {filteredMeals.map((meal) => {
+            const isSelected = selectedMealIds.includes(meal.id);
+
+            return (
+              <div
+                key={meal.id}
+                onClick={() => handleToggleMeal(meal.id)}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none ${
+                  isSelected
+                    ? 'bg-purple-50/70 border-purple-400 shadow-sm ring-1 ring-purple-300'
+                    : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/60 shadow-2xs'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="shrink-0">
+                    <MealIcon name={meal.name} category={meal.category} size="md" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <VegBadge isVegetarian={meal.isVegetarian} size="sm" />
+                      <h3 className="font-extrabold text-sm text-slate-900 truncate">
+                        {meal.name}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-black text-slate-800">
+                        {formatINR(meal.price || 0)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        • {meal.category}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Big Touch-Friendly Toggle Checkbox */}
+                <div className="shrink-0 pl-2">
+                  <div
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                      isSelected
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'border-2 border-slate-300 bg-white'
+                    }`}
+                  >
+                    {isSelected && <CheckSquare className="w-4 h-4 stroke-[3]" />}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* CREATE / EDIT MEAL MODAL (Requirement 4: Multi-allergen tag selector) */}
-      {isMealModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-100">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-900">
-                  {editingMeal ? `Edit Recipe: ${editingMeal.name}` : 'Create Master Meal'}
-                </h3>
-                <p className="text-xs text-slate-500">Configure dish details and allergen tags for warning engine</p>
+      {/* Floating Save Bar on Mobile to guarantee easy single-tap publish */}
+      <div className="sm:hidden fixed bottom-16 left-0 right-0 z-30 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
+        <button
+          type="button"
+          onClick={handlePublishMenu}
+          disabled={saving}
+          className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Save & Publish Tomorrow&apos;s Menu ({selectedMealIds.length})</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Add New Dish Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="w-5 h-5 text-purple-600" />
+                <h3 className="font-extrabold text-base text-slate-900">Add New Dish to Catalog</h3>
               </div>
               <button
-                onClick={() => setIsMealModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMeal} className="p-6 space-y-4">
+            <form onSubmit={handleCreateNewMeal} className="space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Meal Name *
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Dish Name *</label>
                 <input
                   type="text"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Paneer Rice Bowl"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Description *
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Wholesome ingredients, cooking style, accompaniments..."
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                  value={newMealName}
+                  onChange={(e) => setNewMealName(e.target.value)}
+                  placeholder="e.g. Masala Dosa, Poha, Pav Bhaji"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 text-slate-900"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Category *
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Category</label>
                   <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-semibold"
+                    value={newMealCategory}
+                    onChange={(e) => setNewMealCategory(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
                   >
-                    <option value="BREAKFAST">● BREAKFAST</option>
-                    <option value="LUNCH">● LUNCH</option>
-                    <option value="SNACK">● SNACK</option>
-                    <option value="BEVERAGE">● BEVERAGE</option>
+                    <option value="BREAKFAST">Breakfast</option>
+                    <option value="LUNCH">Lunch</option>
+                    <option value="SNACK">Snack</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Price (₹) *
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Price (₹ INR) *</label>
                   <input
                     type="number"
                     required
-                    min={1}
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Dietary Classification
-                  </label>
-                  <div className="flex items-center gap-3 pt-1">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold">
-                      <input
-                        type="radio"
-                        checked={isVegetarian === true}
-                        onChange={() => setIsVegetarian(true)}
-                        className="accent-emerald-600"
-                      />
-                      <VegBadge isVegetarian={true} showLabel={true} />
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold">
-                      <input
-                        type="radio"
-                        checked={isVegetarian === false}
-                        onChange={() => setIsVegetarian(false)}
-                        className="accent-rose-600"
-                      />
-                      <VegBadge isVegetarian={false} showLabel={true} />
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Calories (kcal)
-                  </label>
-                  <input
-                    type="number"
-                    value={calories}
-                    onChange={(e) => setCalories(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                    min="1"
+                    value={newMealPrice}
+                    onChange={(e) => setNewMealPrice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Ingredients
-                </label>
-                <input
-                  type="text"
-                  value={ingredients}
-                  onChange={(e) => setIngredients(e.target.value)}
-                  placeholder="e.g. Basmati Rice, Paneer, Tomatoes, Cashew Paste"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
+                <label className="block font-bold text-slate-700 mb-1.5">Dietary Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold">
+                    <input
+                      type="radio"
+                      name="isVeg"
+                      checked={newMealIsVeg}
+                      onChange={() => setNewMealIsVeg(true)}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-emerald-700">Pure Veg</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-bold">
+                    <input
+                      type="radio"
+                      name="isVeg"
+                      checked={!newMealIsVeg}
+                      onChange={() => setNewMealIsVeg(false)}
+                      className="text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-rose-700">Non-Veg</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Short Description (Optional)</label>
+                <textarea
+                  rows={2}
+                  value={newMealDesc}
+                  onChange={(e) => setNewMealDesc(e.target.value)}
+                  placeholder="e.g. Served hot with fresh coconut chutney and sambar"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900"
                 />
               </div>
 
-              {/* Requirement 4: Allergen Tag Selector */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Allergen Tags (Multi-Select)</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400">Trigger warnings for children</span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {COMMON_ALLERGEN_TAGS.map((tag) => {
-                    const isSelected = selectedAllergens.includes(tag);
-                    return (
-                      <button
-                        type="button"
-                        key={tag}
-                        onClick={() => toggleAllergenTag(tag)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-rose-600 text-white shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {isSelected ? `✓ ${tag}` : tag}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Other / Custom Allergen:
-                  </label>
-                  <input
-                    type="text"
-                    value={customAllergenText}
-                    onChange={(e) => setCustomAllergenText(e.target.value)}
-                    placeholder="e.g. Mustard, Sulfites, Coconut"
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+              <div className="pt-2 flex justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsMealModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition-colors cursor-pointer"
+                  disabled={creatingMeal}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-70"
                 >
-                  {editingMeal ? 'Update Recipe' : 'Save Recipe'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* SCHEDULE MODAL */}
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-base font-extrabold text-slate-900">Schedule Meal for Date</h3>
-              <button
-                onClick={() => setIsScheduleModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleScheduleMeal} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Meal</label>
-                <select
-                  value={scheduleMealId}
-                  onChange={(e) => setScheduleMealId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                >
-                  {meals.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({formatINR(m.price)}) - {m.category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Date</label>
-                <input
-                  type="date"
-                  required
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Max Portions</label>
-                  <input
-                    type="number"
-                    min={5}
-                    value={scheduleQty}
-                    onChange={(e) => setScheduleQty(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Order Cutoff Time</label>
-                  <input
-                    type="time"
-                    value={scheduleDeadline}
-                    onChange={(e) => setScheduleDeadline(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 font-bold hover:bg-slate-100 rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
-                >
-                  Publish to Menu
+                  {creatingMeal ? 'Saving...' : 'Add Dish'}
                 </button>
               </div>
             </form>

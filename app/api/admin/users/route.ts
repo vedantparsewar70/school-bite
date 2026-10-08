@@ -99,7 +99,6 @@ export async function GET() {
       name: p.user.name,
       email: p.user.email,
       phone: p.user.phone,
-      walletBalance: p.walletBalance,
       childrenCount: p.students.length,
       ordersCount: p.orders.length,
       totalSpent: p.orders.reduce((sum, o) => sum + o.totalAmount, 0),

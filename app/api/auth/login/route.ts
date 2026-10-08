@@ -1,24 +1,42 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
-import { comparePassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { comparePassword, hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { UserRole } from '@/types';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
 
 export async function POST(req: Request) {
   let step = '1_REQUEST_RECEIVED';
   let redactedEmail = '';
 
   try {
-    console.log('[AUTH_LOGIN_TRACE] Step 1: Request reached /api/auth/login');
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(`auth_login_${clientIp}`, { windowMs: 60000, maxRequests: 25 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please wait a minute and try again.' },
+        { status: 429 }
+      );
+    }
 
     step = '2_PARSE_BODY';
     const body = await req.json().catch(() => null);
-    const { email, password } = body || {};
+    const { email, password, requestedRole } = body || {};
 
     if (!email || !password) {
-      console.warn('[AUTH_LOGIN_TRACE] Step 2 Failed: Missing email or password in request body');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -33,34 +51,129 @@ export async function POST(req: Request) {
       redactedEmail = '***@' + (emailStr.split('@')[1] || 'domain');
     }
 
-    console.log(`[AUTH_LOGIN_TRACE] Step 2: Email received (${redactedEmail})`);
+    const envAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const envAdminPass = process.env.ADMIN_PASS;
+    const isAdminEnvMatch = Boolean(envAdminEmail && envAdminPass && emailStr === envAdminEmail && password === envAdminPass);
+
+    const envStaffEmail = process.env.STAFF_EMAIL?.trim().toLowerCase();
+    const envStaffPass = process.env.STAFF_PASS;
+    const isStaffEnvMatch = Boolean(envStaffEmail && envStaffPass && emailStr === envStaffEmail && password === envStaffPass);
 
     step = '3_DATABASE_CHECK';
-    console.log('[AUTH_LOGIN_TRACE] Step 3: PostgreSQL database connection check started');
-
     step = '4_USER_LOOKUP';
-    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup started for ${redactedEmail}`);
-    const user = await prisma.user.findUnique({
-      where: { email: emailStr },
-      include: { parent: true },
-    });
-    console.log(`[AUTH_LOGIN_TRACE] Step 4: User lookup completed. User found: ${Boolean(user)}`);
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: emailStr },
+        include: { parent: true },
+      });
+    } catch {
+      // Prisma fallback handles missing connection
+    }
+
+    // Auto-provision or sync admin account if env matches
+    if (isAdminEnvMatch && envAdminPass && envAdminEmail) {
+      if (!user) {
+        try {
+          const passwordHash = await hashPassword(envAdminPass);
+          user = await prisma.user.create({
+            data: {
+              id: 'usr_canteen_admin_01',
+              email: envAdminEmail,
+              name: 'Canteen Admin',
+              role: 'ADMIN',
+              passwordHash,
+            },
+          });
+        } catch {
+          user = {
+            id: 'usr_canteen_admin_01',
+            email: envAdminEmail,
+            name: 'Canteen Admin',
+            role: 'ADMIN',
+            passwordHash: '',
+          };
+        }
+      } else if (user.role !== 'ADMIN') {
+        try {
+          user = await prisma.user.upsert({
+            where: { id: user.id },
+            update: { role: 'ADMIN' },
+            create: { ...user, role: 'ADMIN' },
+          });
+        } catch {
+          user.role = 'ADMIN';
+        }
+      }
+    }
+
+    // Auto-provision or sync staff account if env matches
+    if (isStaffEnvMatch && envStaffPass && envStaffEmail) {
+      if (!user) {
+        try {
+          const passwordHash = await hashPassword(envStaffPass);
+          user = await prisma.user.create({
+            data: {
+              id: 'usr_canteen_staff_01',
+              email: envStaffEmail,
+              name: 'Canteen Staff',
+              role: 'STAFF',
+              passwordHash,
+            },
+          });
+        } catch {
+          user = {
+            id: 'usr_canteen_staff_01',
+            email: envStaffEmail,
+            name: 'Canteen Staff',
+            role: 'STAFF',
+            passwordHash: '',
+          };
+        }
+      } else if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+        try {
+          user = await prisma.user.upsert({
+            where: { id: user.id },
+            update: { role: 'STAFF' },
+            create: { ...user, role: 'STAFF' },
+          });
+        } catch {
+          user.role = 'STAFF';
+        }
+      }
+    }
 
     if (!user) {
-      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: user not found in database (${redactedEmail})`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
+    // Role-specific enforcement if requestedRole is provided
+    if (requestedRole === 'admin' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Access denied: This login is reserved for Administrators. If you are Canteen Staff, please use Staff Login.' },
+        { status: 403 }
+      );
+    }
+
+    if (requestedRole === 'staff' && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Access denied: This login is reserved for Canteen Staff.' },
+        { status: 403 }
+      );
+    }
+
     step = '5_PASSWORD_VERIFY';
-    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification started for ${redactedEmail}`);
-    const isValid = await comparePassword(password, user.passwordHash);
-    console.log(`[AUTH_LOGIN_TRACE] Step 5: Password verification completed. Match: ${isValid}`);
+    let isValid = false;
+    if (isAdminEnvMatch || isStaffEnvMatch) {
+      isValid = true;
+    } else if (user.passwordHash) {
+      isValid = await comparePassword(password, user.passwordHash);
+    }
 
     if (!isValid) {
-      console.warn(`[AUTH_LOGIN_TRACE] Authentication failed: invalid password for ${redactedEmail}`);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -68,7 +181,6 @@ export async function POST(req: Request) {
     }
 
     step = '6_JWT_GENERATION';
-    console.log(`[AUTH_LOGIN_TRACE] Step 6: JWT generation started for userId: ${user.id}, role: ${user.role}`);
     const token = await createSessionToken({
       userId: user.id,
       email: user.email,
@@ -76,33 +188,64 @@ export async function POST(req: Request) {
       role: user.role as UserRole,
       parentId: user.parent?.id,
     });
-    console.log('[AUTH_LOGIN_TRACE] Step 6: JWT generation completed');
 
     step = '7_SESSION_COOKIE';
-    console.log('[AUTH_LOGIN_TRACE] Step 7: Setting session cookie');
-    const cookieStore = await cookies();
-    cookieStore.set(TOKEN_COOKIE_NAME, token, {
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
+    const isHttps = proto === 'https';
+
+    // Safely attempt next/headers cookie store
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set(TOKEN_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+    } catch {
+      // Cookie header fallback applied below
+    }
+
+    const redirectUrl =
+      user.role === 'ADMIN'
+        ? '/admin/dashboard'
+        : user.role === 'STAFF'
+        ? '/staff/kitchen'
+        : '/parent/children';
+
+    const response = NextResponse.json(
+      {
+        success: true,
+        redirectUrl,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          parentId: user.parent?.id,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+
+    // Also attach cookie directly to the response object for bulletproof header delivery across all environments
+    response.cookies.set({
+      name: TOKEN_COOKIE_NAME,
+      value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
     });
-    console.log('[AUTH_LOGIN_TRACE] Step 7: Session cookie set successfully');
 
-    console.log('[AUTH_LOGIN_TRACE] Final response status: 200 OK');
-
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        parentId: user.parent?.id,
-        walletBalance: user.parent?.walletBalance ?? 0,
-      },
-    });
+    return response;
   } catch (error: unknown) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     const rawErrorMessage = error instanceof Error ? error.message : String(error);
@@ -120,11 +263,9 @@ export async function POST(req: Request) {
       stack: error instanceof Error ? error.stack : undefined,
     });
 
-    console.log('[AUTH_LOGIN_TRACE] Final response status: 500 Internal Server Error');
-
     return NextResponse.json(
       {
-        error: 'An unexpected error occurred during login',
+        error: sanitizedError || 'An unexpected error occurred during login',
         diagnostic: {
           failedStep: step,
           errorName,
@@ -135,6 +276,8 @@ export async function POST(req: Request) {
       {
         status: 500,
         headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
           'x-auth-failed-step': step,
           'x-auth-error-name': errorName,
         },

@@ -3,33 +3,30 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Users,
   UtensilsCrossed,
+  ShoppingBag,
+  Users,
   ChefHat,
-  BarChart3,
   Calendar,
-  Clock,
   ArrowRight,
-  TrendingUp,
-  CheckCircle2,
-  AlertCircle,
-  FileSpreadsheet,
-  PlusCircle,
-  ShieldCheck,
-  ShieldAlert,
   RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  IndianRupee,
+  Layers,
 } from 'lucide-react';
-import ChildAvatar from '@/components/ChildAvatar';
-import MealIcon from '@/components/MealIcon';
 import VegBadge from '@/components/VegBadge';
-import { formatINR, formatDateTimePretty, getOrderStatusColor } from '@/lib/utils';
+import { formatINR, formatDatePretty, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
+  const [tomorrowProduction, setTomorrowProduction] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
+
+  const tomorrowStr = getOffsetDateString(1);
 
   const fetchStats = async () => {
     try {
@@ -37,6 +34,7 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);
+        setTomorrowProduction(data.tomorrowProduction || []);
         setRecentOrders(data.recentOrders || []);
       }
     } catch (err) {
@@ -50,25 +48,6 @@ export default function AdminDashboardPage() {
     fetchStats();
   }, []);
 
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
-    try {
-      const res = await fetch('/api/admin/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, orderStatus: newStatus }),
-      });
-
-      if (res.ok) {
-        showToast(`Order ${orderId} updated to ${newStatus}`, 'success');
-        await fetchStats();
-      } else {
-        showToast('Failed to update order status', 'error');
-      }
-    } catch {
-      showToast('Network error updating status', 'error');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
@@ -77,268 +56,303 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const isMenuPublished = stats?.isTomorrowMenuPublished;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
-              School Canteen Portal • S.B. Patil School
+              S.B. Patil School • Admin Portal
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
-            <ShieldCheck className="w-7 h-7 text-purple-600" />
-            <span>Canteen Operations & Overview</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <span>Canteen Operations Dashboard</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Monitor real-time student orders, kitchen preparation counts, daily sales, and meal availability.
+            Real-time meal pre-orders, student counts, and kitchen preparation requirements.
           </p>
         </div>
 
-        {/* Quick Kitchen Action Pill */}
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
-            onClick={fetchStats}
-            className="p-2.5 text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-            title="Refresh Statistics"
+            onClick={() => {
+              setLoading(true);
+              fetchStats();
+              showToast('Dashboard refreshed', 'success');
+            }}
+            className="p-2.5 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+            title="Refresh Data"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 text-purple-600" />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <Link
             href="/admin/kitchen"
-            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2"
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer"
           >
             <ChefHat className="w-4 h-4" />
-            <span>Open Kitchen Prep View</span>
+            <span>Kitchen Summary</span>
           </Link>
         </div>
       </div>
 
-      {/* KPI Cards Grid (Requirement 10: Includes Allergy Alerts Today) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
-        {/* Card 1: Today's Orders */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today&apos;s Orders</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <UtensilsCrossed className="w-4 h-4" />
-            </div>
+      {/* Operational Status Banner: Answers "What is next meal date?" & "Is tomorrow's menu published?" */}
+      <div
+        className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+          isMenuPublished
+            ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+        }`}
+      >
+        <div className="flex items-start sm:items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+              isMenuPublished ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
+            }`}
+          >
+            {isMenuPublished ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
           </div>
-          <p className="text-3xl font-black text-slate-900">{stats?.todayOrdersCount || 0}</p>
-          <p className="text-[11px] text-slate-400">Total active orders today</p>
-        </div>
-
-        {/* Card 2: Today's Revenue */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today&apos;s Revenue</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider opacity-80">
+                Next Meal Date
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-white/80 border border-slate-200/50">
+                {formatDatePretty(tomorrowStr)}
+              </span>
             </div>
-          </div>
-          <p className="text-3xl font-black text-emerald-700">{formatINR(stats?.todayRevenue || 0)}</p>
-          <p className="text-[11px] text-slate-400">All-time: {formatINR(stats?.totalRevenue || 0)}</p>
-        </div>
-
-        {/* Card 3: Allergy Alerts Today (Requirement 10) */}
-        <Link
-          href="/admin/orders?allergyFilter=WITH_ALERTS"
-          className={`p-5 rounded-3xl border shadow-2xs space-y-2 transition-all block hover:scale-102 cursor-pointer ${
-            (stats?.todayAllergyAlertsCount || 0) > 0
-              ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-200 shadow-rose-500/10'
-              : 'bg-white border-slate-100 hover:border-slate-200'
-          }`}
-          title="Click to view orders with allergy alerts"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-rose-800">
-              ⚠ Allergy Alerts
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-          </div>
-          <p className="text-3xl font-black text-rose-700">{stats?.todayAllergyAlertsCount || 0}</p>
-          <p className="text-[11px] text-rose-800 font-bold flex items-center gap-1">
-            <span>View affected orders</span>
-            <ArrowRight className="w-3 h-3" />
-          </p>
-        </Link>
-
-        {/* Card 4: Pending Kitchen Orders */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Prep</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-3xl font-black text-slate-800">{stats?.pendingOrdersCount || 0}</p>
-          <p className="text-[11px] text-slate-400">To be served</p>
-        </div>
-
-        {/* Card 5: Students Served */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-2 col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Students Served</span>
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-3xl font-black text-purple-700">{stats?.studentsServedCount || 0}</p>
-          <p className="text-[11px] text-slate-400">Registered: {stats?.totalStudents || 0}</p>
-        </div>
-      </div>
-
-      {/* Quick Action Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          href="/admin/kitchen"
-          className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg shadow-amber-500/15 flex flex-col justify-between space-y-4 hover:scale-101 transition-transform"
-        >
-          <div className="space-y-2">
-            <ChefHat className="w-8 h-8 text-amber-100" />
-            <h3 className="text-xl font-extrabold">Kitchen Prep Display</h3>
-            <p className="text-xs text-amber-100 leading-relaxed">
-              Simplified high-contrast tablet view showing exact meal counts to cook today and class distribution sheets.
+            <p className="text-sm sm:text-base font-extrabold mt-0.5">
+              {isMenuPublished
+                ? `Tomorrow's Menu is Published (${stats?.tomorrowPublishedCount || 0} items available to parents)`
+                : "Tomorrow's Menu is NOT published yet. Parents cannot order until published."}
             </p>
           </div>
-          <span className="text-xs font-bold flex items-center gap-1">
-            Open Kitchen Screen →
-          </span>
-        </Link>
+        </div>
 
         <Link
           href="/admin/menu"
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:border-purple-300 transition-colors"
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all text-center shrink-0 shadow-xs cursor-pointer ${
+            isMenuPublished
+              ? 'bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+              : 'bg-amber-600 text-white hover:bg-amber-700'
+          }`}
         >
-          <div className="space-y-2">
-            <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-extrabold text-slate-900">Manage Menu & Cutoffs</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Schedule meals for the week, adjust prices in ₹, update available portions, and set 08:30 AM deadlines.
-            </p>
-          </div>
-          <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
-            Configure Menus →
-          </span>
-        </Link>
-
-        <Link
-          href="/admin/reports"
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:border-purple-300 transition-colors"
-        >
-          <div className="space-y-2">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-extrabold text-slate-900">Sales & Audit Reports</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Download CSV audit logs, review most popular dishes, and examine revenue breakdown across classes.
-            </p>
-          </div>
-          <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-            Generate Reports →
-          </span>
+          {isMenuPublished ? "Edit Tomorrow's Menu →" : "Set & Publish Tomorrow's Menu →"}
         </Link>
       </div>
 
-      {/* Live Recent Orders Table */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-4 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-900">Live Orders & Status Controller</h2>
-            <p className="text-xs text-slate-500">
-              Update kitchen progress directly or view individual student orders
-            </p>
+      {/* 4 Core Summary Cards: Clean, High-Contrast, Mobile-First */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        {/* Card 1: Total Orders */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Orders</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+              <ShoppingBag className="w-4 h-4" />
+            </div>
           </div>
-          <Link
-            href="/admin/orders"
-            className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1 self-start sm:self-auto"
-          >
-            All Orders ({recentOrders.length}) →
-          </Link>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.totalOrders || 0}</p>
+          <p className="text-[11px] text-slate-400 font-medium">Active confirmed orders</p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-bold text-[10px]">
-              <tr>
-                <th className="py-3 px-4">Order ID</th>
-                <th className="py-3 px-4">Parent</th>
-                <th className="py-3 px-4">Meals & Students</th>
-                <th className="py-3 px-4 text-right">Amount</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Update Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {recentOrders.map((o) => {
-                const statusStyle = getOrderStatusColor(o.orderStatus);
-                return (
-                  <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{o.id}</td>
+        {/* Card 2: Students Ordered */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Students Ordered</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.studentsOrdered || 0}</p>
+          <p className="text-[11px] text-slate-400 font-medium">Unique children receiving lunch</p>
+        </div>
 
-                    <td className="py-3.5 px-4">
-                      <p className="font-bold text-slate-800">{o.parentName}</p>
-                      <p className="text-[10px] text-slate-400">{o.parentEmail}</p>
-                    </td>
+        {/* Card 3: Total Food Items Ordered */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Food Items</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <UtensilsCrossed className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.totalItems || 0}</p>
+          <p className="text-[11px] text-amber-700 font-medium">Tomorrow: {stats?.tomorrowTotalMeals || 0} portions</p>
+        </div>
 
-                    <td className="py-3.5 px-4">
-                      <div className="space-y-1.5">
-                        {o.items?.map((it: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-700">
-                            <MealIcon name={it.mealName} category={it.mealCategory} size="sm" />
-                            <div>
-                              <div>
-                                <strong className="text-slate-900">{it.mealName}</strong> for{' '}
-                                <span className="text-slate-800 font-semibold">{it.studentName}</span> (Class {it.grade}-{it.division})
-                              </div>
-                              {it.hasAllergyAlert && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 mt-0.5">
-                                  <ShieldAlert className="w-3 h-3 text-rose-600" />
-                                  <span>⚠ Allergy: {it.conflictAllergens}</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
+        {/* Card 4: Total Order Value */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Order Value</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <IndianRupee className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-emerald-700">{formatINR(stats?.totalOrderValue || 0)}</p>
+          <p className="text-[11px] text-slate-400 font-medium">Paid meal revenue</p>
+        </div>
+      </div>
 
-                    <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
-                      {formatINR(o.totalAmount)}
-                    </td>
+      {/* Main Content: Tomorrow's Production Preview + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Cols: Tomorrow's Production Preview */}
+        <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <ChefHat className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-extrabold text-slate-900">Tomorrow&apos;s Production Requirements</h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Exact kitchen portions to prepare for <strong>{formatDatePretty(tomorrowStr)}</strong>
+              </p>
+            </div>
 
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusStyle.bg}`}
-                      >
-                        {statusStyle.text}
+            <Link
+              href="/admin/kitchen"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
+            >
+              <span>View Kitchen Summary</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {tomorrowProduction.length === 0 ? (
+            <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+              <UtensilsCrossed className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">No Orders Placed for Tomorrow Yet</p>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                Once parents select meals and complete payment for tomorrow, total preparation counts will aggregate here automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
+                <span className="col-span-8">Food Item</span>
+                <span className="col-span-4 text-right">Qty to Prepare</span>
+              </div>
+
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                {tomorrowProduction.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 items-center px-4 py-3 bg-white hover:bg-slate-50/80 transition-colors"
+                  >
+                    <div className="col-span-8 flex items-center gap-2.5">
+                      <VegBadge isVegetarian={item.isVegetarian} size="sm" />
+                      <span className="text-sm font-bold text-slate-800">{item.mealName}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-semibold uppercase">
+                        {item.category}
                       </span>
-                    </td>
+                    </div>
 
-                    <td className="py-3.5 px-4 text-right">
-                      <select
-                        value={o.orderStatus}
-                        onChange={(e) => handleUpdateOrderStatus(o.id, e.target.value)}
-                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500"
-                      >
-                        <option value="CONFIRMED">Confirmed</option>
-                        <option value="PREPARING">Preparing</option>
-                        <option value="READY">Ready</option>
-                        <option value="COLLECTED">Collected</option>
-                        <option value="CANCELLED">Cancelled</option>
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <div className="col-span-4 text-right">
+                      <span className="text-lg font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-lg">
+                        {item.count}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 flex justify-between items-center text-xs px-2 text-slate-500">
+                <span>Total Items for Tomorrow:</span>
+                <strong className="text-slate-900 text-sm font-black">{stats?.tomorrowTotalMeals || 0} portions</strong>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Col: Quick Navigation & Recent Orders */}
+        <div className="space-y-6">
+          {/* Core Modules Quick Links */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-5 space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Actions</h3>
+
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/admin/menu"
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/50 transition-all text-slate-800 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Tomorrow&apos;s Menu</p>
+                    <p className="text-[10px] text-slate-500">Decide available dishes</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
+              </Link>
+
+              <Link
+                href="/admin/orders"
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/50 transition-all text-slate-800 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Manage Orders</p>
+                    <p className="text-[10px] text-slate-500">Who ordered what</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
+              </Link>
+
+              <Link
+                href="/admin/kitchen"
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/50 transition-all text-slate-800 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <ChefHat className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Kitchen Summary</p>
+                    <p className="text-[10px] text-slate-500">Total preparation totals</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Compact Recent Orders */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Latest Orders</h3>
+              <Link href="/admin/orders" className="text-[11px] font-bold text-purple-600 hover:underline">
+                View All →
+              </Link>
+            </div>
+
+            {recentOrders.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">No recent orders placed.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {recentOrders.slice(0, 4).map((ord) => (
+                  <div key={ord.id} className="p-3 bg-slate-50/70 rounded-xl border border-slate-100 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-slate-900">
+                        {ord.items?.[0]?.studentName || 'Student'}
+                      </span>
+                      <span className="font-mono font-bold text-[11px] text-emerald-700">
+                        {formatINR(ord.totalAmount)}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate">
+                      {ord.items?.map((it: any) => `${it.mealName} × ${it.quantity}`).join(', ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

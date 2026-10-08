@@ -9,6 +9,7 @@ import {
   Users,
   ShieldCheck,
   ArrowRight,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 
@@ -65,6 +66,19 @@ export default function ProfilePage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl border border-amber-200 transition-colors"
             >
               <span>Manage Children</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="flex items-center justify-between py-3">
+            <span className="text-slate-500 font-bold uppercase text-[10px] flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-400" /> Order History
+            </span>
+            <Link
+              href="/parent/orders"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl border border-amber-200 transition-colors"
+            >
+              <span>View Past Orders</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

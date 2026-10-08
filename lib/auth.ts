@@ -5,8 +5,10 @@ import prisma from './prisma';
 import { UserRole } from '@/types';
 
 function getJwtSecret(): Uint8Array {
-  const secretKey =
-    process.env.JWT_SECRET || 'super-secure-school-mealbox-jwt-secret-key-2026';
+  const secretKey = process.env.JWT_SECRET;
+  if (!secretKey) {
+    throw new Error('JWT_SECRET environment variable is missing. Please define it in your .env file.');
+  }
   return new TextEncoder().encode(secretKey);
 }
 
@@ -53,21 +55,41 @@ export async function getCurrentUser() {
   const payload = await verifySessionToken(token);
   if (!payload?.userId) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    include: {
-      parent: {
-        include: {
-          students: {
-            where: { isActive: true },
-            orderBy: { name: 'asc' },
+  // Ultra-fast path for STAFF and ADMIN (no student/parent queries required)
+  if (payload.role === 'STAFF' || payload.role === 'ADMIN') {
+    return {
+      id: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      phone: null,
+      role: payload.role as UserRole,
+      parentId: undefined,
+      students: [],
+    };
+  }
+
+  let user: any = null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: {
+        parent: {
+          include: {
+            students: {
+              where: { isActive: true },
+              orderBy: { name: 'asc' },
+            },
           },
         },
       },
-    },
-  });
+    });
+  } catch {
+    // Prisma fallback
+  }
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return {
     id: user.id,
@@ -76,7 +98,6 @@ export async function getCurrentUser() {
     phone: user.phone,
     role: user.role as UserRole,
     parentId: user.parent?.id,
-    walletBalance: user.parent?.walletBalance ?? 0,
     students: user.parent?.students ?? [],
   };
 }

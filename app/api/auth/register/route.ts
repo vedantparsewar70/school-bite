@@ -2,12 +2,34 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
 
 export async function POST(req: Request) {
   try {
-    const { name, email, phone, password, confirmPassword } = await req.json();
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(`auth_reg_${clientIp}`, { windowMs: 60000, maxRequests: 10 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration requests. Please wait a moment and try again.' },
+        { status: 429 }
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const { name, email, phone, password, confirmPassword } = body || {};
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -39,14 +61,14 @@ export async function POST(req: Request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'An account with this email already exists' },
+        { error: 'An account with this email already exists. Please sign in instead.' },
         { status: 409 }
       );
     }
 
     const passwordHash = await hashPassword(password);
 
-    // Create user and parent record with initial wallet balance
+    // Create user and parent record
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -71,31 +93,71 @@ export async function POST(req: Request) {
       parentId: user.parent?.id,
     });
 
-    const cookieStore = await cookies();
-    cookieStore.set(TOKEN_COOKIE_NAME, token, {
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
+    const isHttps = proto === 'https';
+
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set(TOKEN_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    } catch {
+      // ignore
+    }
+
+    const res = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          parentId: user.parent?.id,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+
+    res.cookies.set({
+      name: TOKEN_COOKIE_NAME,
+      value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        parentId: user.parent?.id,
-        walletBalance: user.parent?.walletBalance ?? 500,
-      },
-    });
-  } catch (error) {
+    return res;
+  } catch (error: any) {
+    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    const sanitizedError = rawErrorMessage
+      .replace(/(password|secret|key|token)=[^& ]+/gi, '$1=***')
+      .replace(/:\/\/.*@/g, '://***@');
+
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred during registration' },
-      { status: 500 }
+      {
+        error: sanitizedError || 'An unexpected error occurred during registration',
+        details: sanitizedError,
+      },
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      }
     );
   }
 }

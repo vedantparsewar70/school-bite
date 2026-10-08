@@ -32,6 +32,7 @@ export default function Navbar() {
 
   const isParent = user?.role === 'PARENT';
   const isAdmin = user?.role === 'ADMIN';
+  const isStaff = user?.role === 'STAFF';
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
@@ -40,7 +41,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo */}
-          <Link href={isAdmin ? '/admin/dashboard' : isParent ? '/parent/children' : '/'} className="flex items-center gap-2.5 group">
+          <Link href={isAdmin ? '/admin/dashboard' : isStaff ? '/staff/kitchen' : isParent ? '/parent/children' : '/'} className="flex items-center gap-2.5 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
               <UtensilsCrossed className="w-5 h-5" />
             </div>
@@ -50,6 +51,11 @@ export default function Navbar() {
                 {isAdmin && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider bg-purple-100 text-purple-700 rounded-md uppercase">
                     Admin
+                  </span>
+                )}
+                {isStaff && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider bg-amber-100 text-amber-800 rounded-md uppercase">
+                    Staff
                   </span>
                 )}
               </span>
@@ -82,22 +88,45 @@ export default function Navbar() {
               </>
             )}
 
+            {isStaff && (
+              <>
+                <Link
+                  href="/staff/kitchen"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/staff/kitchen')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-amber-900 bg-amber-50 hover:bg-amber-100 font-semibold'
+                    }`}
+                >
+                  <ChefHat className="w-4 h-4" />
+                  Kitchen Summary
+                </Link>
+                <Link
+                  href="/staff/orders"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/staff/orders')
+                    ? 'bg-amber-100 text-amber-900 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  Student Orders
+                </Link>
+              </>
+            )}
 
             {isAdmin && (
               <>
                 <Link
                   href="/admin/dashboard"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${pathname === '/admin/dashboard'
-                    ? 'bg-purple-50 text-purple-700 font-semibold'
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${pathname === '/admin/dashboard' || pathname === '/admin'
+                    ? 'bg-purple-50 text-purple-700 font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
-                  Overview
+                  Dashboard
                 </Link>
                 <Link
                   href="/admin/menu"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/menu')
-                    ? 'bg-purple-50 text-purple-700 font-semibold'
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/menu')
+                    ? 'bg-purple-50 text-purple-700 font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
@@ -105,8 +134,8 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/admin/orders"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/orders')
-                    ? 'bg-purple-50 text-purple-700 font-semibold'
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/orders')
+                    ? 'bg-purple-50 text-purple-700 font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
@@ -114,31 +143,48 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/admin/kitchen"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/admin/kitchen')
-                    ? 'bg-amber-500 text-white font-semibold shadow-xs'
-                    : 'text-amber-800 bg-amber-50 hover:bg-amber-100 font-medium'
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/admin/kitchen')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-amber-800 bg-amber-50 hover:bg-amber-100 font-semibold'
                     }`}
                 >
                   <ChefHat className="w-4 h-4" />
-                  Kitchen View
+                  Kitchen Summary
                 </Link>
+              </>
+            )}
+
+            {isParent && (
+              <>
                 <Link
-                  href="/admin/reports"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/reports')
-                    ? 'bg-purple-50 text-purple-700 font-semibold'
+                  href="/parent/menu"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/menu')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
-                  Reports
+                  <UtensilsCrossed className="w-4 h-4" />
+                  Order Lunch
                 </Link>
                 <Link
-                  href="/admin/users"
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/users')
-                    ? 'bg-purple-50 text-purple-700 font-semibold'
+                  href="/parent/orders"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/orders')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
-                  Accounts
+                  <FileText className="w-4 h-4" />
+                  Order History
+                </Link>
+                <Link
+                  href="/parent/children"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/children')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  <Users className="w-4 h-4" />
+                  My Children
                 </Link>
               </>
             )}
@@ -161,6 +207,13 @@ export default function Navbar() {
                   Register
                 </Link>
                 <Link
+                  href="/login?role=staff"
+                  className="px-3 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <ChefHat className="w-3.5 h-3.5 text-amber-600" />
+                  Staff
+                </Link>
+                <Link
                   href="/login?role=admin"
                   className="px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors flex items-center gap-1"
                 >
@@ -172,6 +225,19 @@ export default function Navbar() {
               <div className="flex items-center gap-3">
                 {isParent && (
                   <>
+                    <Link
+                      href="/parent/orders"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all border ${
+                        isActive('/parent/orders')
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300'
+                      }`}
+                      title="View Order History"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Order History</span>
+                    </Link>
+
                     {/* Shopping Cart Button */}
                     <Link
                       href="/parent/cart"
@@ -215,13 +281,36 @@ export default function Navbar() {
                       </div>
 
                       {isParent && (
-                        <Link
-                          href="/parent/profile"
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-                        >
-                          <UserIcon className="w-4 h-4 text-slate-400" />
-                          Parent Profile
-                        </Link>
+                        <>
+                          <Link
+                            href="/parent/orders"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <FileText className="w-4 h-4 text-amber-600" />
+                            Order History
+                          </Link>
+                          <Link
+                            href="/parent/menu"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <UtensilsCrossed className="w-4 h-4 text-slate-400" />
+                            Order Lunch
+                          </Link>
+                          <Link
+                            href="/parent/children"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <Users className="w-4 h-4 text-slate-400" />
+                            My Children
+                          </Link>
+                          <Link
+                            href="/parent/profile"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <UserIcon className="w-4 h-4 text-slate-400" />
+                            Parent Profile
+                          </Link>
+                        </>
                       )}
 
                       <button
@@ -297,13 +386,22 @@ export default function Navbar() {
                 >
                   Register as Parent
                 </Link>
-                <Link
-                  href="/login?role=admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-xs font-semibold text-purple-700 bg-purple-50 rounded-xl"
-                >
-                  Canteen Admin Login
-                </Link>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Link
+                    href="/login?role=staff"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2 text-xs font-semibold text-amber-800 bg-amber-50 rounded-xl"
+                  >
+                    Staff Login
+                  </Link>
+                  <Link
+                    href="/login?role=admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2 text-xs font-semibold text-purple-700 bg-purple-50 rounded-xl"
+                  >
+                    Admin Login
+                  </Link>
+                </div>
               </div>
             </div>
           ) : isParent ? (
@@ -314,19 +412,66 @@ export default function Navbar() {
               </div>
 
               <Link
-                href="/parent/profile"
+                href="/parent/children"
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
-                Profile & Settings
+                My Children
+              </Link>
+              <Link
+                href="/parent/menu"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Order Lunch
+              </Link>
+              <Link
+                href="/parent/orders"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Order History
               </Link>
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
                   logout();
                 }}
-                className="text-left px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg"
+                className="text-left px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-1.5"
               >
+                <LogOut className="w-4 h-4 text-rose-500" />
+                Sign Out
+              </button>
+            </div>
+          ) : isStaff ? (
+            <div className="flex flex-col gap-1 pt-2">
+              <div className="px-3 py-2 bg-amber-50 rounded-xl mb-2">
+                <p className="text-xs font-bold text-slate-800">{user.name}</p>
+                <p className="text-[11px] text-amber-800 font-semibold uppercase">Canteen Staff</p>
+              </div>
+              <Link
+                href="/staff/kitchen"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-bold text-amber-800 bg-amber-100 rounded-lg flex items-center gap-2"
+              >
+                <ChefHat className="w-4 h-4 text-amber-600" />
+                Kitchen Summary
+              </Link>
+              <Link
+                href="/staff/orders"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Student Orders
+              </Link>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                className="text-left px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-1.5"
+              >
+                <LogOut className="w-4 h-4 text-rose-500" />
                 Sign Out
               </button>
             </div>
@@ -341,7 +486,7 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
-                Admin Overview
+                Dashboard
               </Link>
               <Link
                 href="/admin/menu"
@@ -355,36 +500,24 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
-                Order Management
+                Orders
               </Link>
               <Link
                 href="/admin/kitchen"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-bold text-amber-700 bg-amber-50 rounded-lg"
+                className="px-3 py-2 text-sm font-bold text-amber-800 bg-amber-50 rounded-lg flex items-center gap-2"
               >
-                Kitchen Prep Display
-              </Link>
-              <Link
-                href="/admin/reports"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-              >
-                Reports & Sales
-              </Link>
-              <Link
-                href="/admin/users"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-              >
-                Parents & Students
+                <ChefHat className="w-4 h-4 text-amber-600" />
+                Kitchen Summary
               </Link>
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
                   logout();
                 }}
-                className="text-left px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg"
+                className="text-left px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-1.5"
               >
+                <LogOut className="w-4 h-4 text-rose-500" />
                 Sign Out
               </button>
             </div>

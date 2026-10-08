@@ -11,7 +11,6 @@ export interface AuthUser {
   phone?: string | null;
   role: UserRole;
   parentId?: string;
-  walletBalance: number;
   students?: Array<{
     id: string;
     name: string;
@@ -29,6 +28,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   refreshUser: () => Promise<void>;
+  setAuthUser: (user: AuthUser | null) => void;
   logout: () => Promise<void>;
 }
 
@@ -36,8 +36,11 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   refreshUser: async () => {},
+  setAuthUser: () => {},
   logout: async () => {},
 });
+
+let inFlightRefreshPromise: Promise<void> | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -45,24 +48,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const refreshUser = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user || null);
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+    if (inFlightRefreshPromise) {
+      return inFlightRefreshPromise;
     }
+
+    inFlightRefreshPromise = (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user || null);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+        inFlightRefreshPromise = null;
+      }
+    })();
+
+    return inFlightRefreshPromise;
   };
 
   useEffect(() => {
     refreshUser();
   }, []);
+
+  const setAuthUser = (newUser: AuthUser | null) => {
+    setUser(newUser);
+    setIsLoading(false);
+  };
 
   const logout = async () => {
     try {
@@ -75,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, refreshUser, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, refreshUser, setAuthUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,7 +12,6 @@ import {
   Eye,
   Mail,
   Phone,
-  Wallet,
   X,
   XCircle,
 } from 'lucide-react';
@@ -155,7 +154,7 @@ export default function AdminUsersPage() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Parent Wallets ({parents.length})
+            Registered Parents ({parents.length})
           </button>
         </div>
       </div>
@@ -440,8 +439,8 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Meal Wallet</span>
-                    <span className="font-black text-emerald-700 text-base">{formatINR(parent.walletBalance)}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Active</span>
                   </div>
                 </div>
 

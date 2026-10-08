@@ -23,7 +23,7 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
 
-  const { user, isLoading: authLoading, refreshUser } = useAuth();
+  const { user, isLoading: authLoading, setAuthUser, refreshUser } = useAuth();
   const { showToast } = useToast();
 
   const [mode, setMode] = useState<'login' | 'register'>(
@@ -71,8 +71,22 @@ function HomePageContent() {
     }
   }, [user, authLoading, router]);
 
-  // Handler for login submission
+  // Validation helper for Parent Login email field
+  const validateParentEmail = (input: HTMLInputElement) => {
+    const val = input.value.trim();
+    if (!val) {
+      input.setCustomValidity('');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (input.validity.typeMismatch || !emailRegex.test(val)) {
+      input.setCustomValidity('Please enter a valid email address.');
+    } else {
+      input.setCustomValidity('');
+    }
+  };
 
+  // Handler for login submission
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -88,15 +102,25 @@ function HomePageContent() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. Vercel serverless gateway error)
+      }
 
       if (!res.ok) {
-        setError(data.error || 'Invalid email or password.');
+        setError(
+          data?.error ||
+          data?.diagnostic?.details ||
+          `Server error (${res.status}). Please check database connection.`
+        );
         setSubmitting(false);
         return;
       }
 
-      await refreshUser();
+      setAuthUser(data.user);
+      refreshUser().catch(() => {});
       showToast(`Welcome, ${data.user.name}!`, 'success');
 
       if (data.user.role === 'ADMIN') {
@@ -104,8 +128,8 @@ function HomePageContent() {
       } else {
         router.push('/parent/children');
       }
-    } catch {
-      setError('Network connection error. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'Network connection error. Please try again.');
       setSubmitting(false);
     }
   };
@@ -139,19 +163,29 @@ function HomePageContent() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response
+      }
 
       if (!res.ok) {
-        setError(data.error || 'Failed to create parent account.');
+        setError(
+          data?.error ||
+          data?.details ||
+          `Server error (${res.status}). Please check database connection.`
+        );
         setSubmitting(false);
         return;
       }
 
-      await refreshUser();
+      setAuthUser(data.user);
+      refreshUser().catch(() => {});
       showToast('Parent account registered successfully!', 'success');
       router.push('/parent/children');
-    } catch {
-      setError('Network connection error. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'Network connection error. Please try again.');
       setSubmitting(false);
     }
   };
@@ -222,7 +256,16 @@ function HomePageContent() {
 
           {mode === 'login' ? (
             /* PARENT LOGIN FORM */
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form
+              onSubmit={handleLoginSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const emailInput = e.currentTarget.querySelector<HTMLInputElement>('input[type="email"]');
+                  if (emailInput) validateParentEmail(emailInput);
+                }
+              }}
+              className="space-y-4"
+            >
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Parent Email Address
@@ -233,7 +276,13 @@ function HomePageContent() {
                     type="email"
                     required
                     value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onChange={(e) => {
+                      setLoginEmail(e.target.value);
+                      validateParentEmail(e.currentTarget);
+                    }}
+                    onInput={(e) => validateParentEmail(e.currentTarget)}
+                    onBlur={(e) => validateParentEmail(e.currentTarget)}
+                    onInvalid={(e) => validateParentEmail(e.currentTarget)}
                     placeholder="Enter parent email address"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
@@ -260,6 +309,11 @@ function HomePageContent() {
               <button
                 type="submit"
                 disabled={submitting}
+                onClick={(e) => {
+                  const form = e.currentTarget.closest('form');
+                  const emailInput = form?.querySelector<HTMLInputElement>('input[type="email"]');
+                  if (emailInput) validateParentEmail(emailInput);
+                }}
                 className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
               >
                 {submitting ? (
@@ -316,6 +370,8 @@ function HomePageContent() {
                     required
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                     placeholder="Enter parent email address"
                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
@@ -404,7 +460,7 @@ function HomePageContent() {
           )}
         </div>
 
-        {/* Footer info & Admin login link */}
+        {/* Footer info & Staff/Admin login links */}
         <div className="mt-6 text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-full font-bold shadow-2xs">
@@ -413,8 +469,15 @@ function HomePageContent() {
             </span>
           </div>
 
-          <p className="text-xs text-slate-400">
-            Are you school canteen staff or an administrator?{' '}
+          <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
+            <span>Are you school canteen staff or an administrator?</span>
+            <Link
+              href="/login?role=staff"
+              className="text-amber-600 hover:text-amber-700 font-bold hover:underline"
+            >
+              Staff Login →
+            </Link>
+            <span className="text-slate-300">•</span>
             <Link
               href="/login?role=admin"
               className="text-purple-600 hover:text-purple-700 font-bold hover:underline"

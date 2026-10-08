@@ -10,6 +10,8 @@ import {
   Plus,
   Minus,
   ArrowRight,
+  FileText,
+  ShoppingCart,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
@@ -137,21 +139,31 @@ function MenuPageContent() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 ${totalItems > 0 ? 'pb-44 md:pb-28' : 'pb-16'}`}>
       {/* Page Title */}
-      <div className="pb-4 border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
-            Next Day&apos;s Meal
-          </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
+              Next Day&apos;s Meal
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 mt-1.5">
+            <CalendarDays className="w-7 h-7 text-amber-500" />
+            <span>Tomorrow&apos;s Lunch Menu</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Menu for <strong className="text-slate-800 font-bold">{formatDatePretty(tomorrowDate)}</strong> • Freshly prepared and delivered directly to the classroom.
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 mt-1.5">
-          <CalendarDays className="w-7 h-7 text-amber-500" />
-          <span>Tomorrow&apos;s Lunch Menu</span>
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Menu for <strong className="text-slate-800 font-bold">{formatDatePretty(tomorrowDate)}</strong> • Freshly prepared and delivered directly to the classroom.
-        </p>
+
+        <Link
+          href="/parent/orders"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all self-start sm:self-auto cursor-pointer"
+        >
+          <FileText className="w-4 h-4 text-amber-500" />
+          <span>Order History</span>
+        </Link>
       </div>
 
       {/* Child Selector Strip */}
@@ -348,21 +360,27 @@ function MenuPageContent() {
 
       {/* Sticky Mobile Floating Order Summary Bar */}
       {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-amber-200 p-3 sm:p-4 shadow-2xl">
+        <div className="fixed bottom-[58px] md:bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-amber-200 px-4 py-3 sm:px-6 sm:py-3.5 shadow-[0_-8px_25px_rgba(0,0,0,0.12)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div>
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                {totalItems} {totalItems === 1 ? 'Meal' : 'Meals'} Selected
-              </span>
-              <p className="text-base sm:text-xl font-black text-slate-900">
-                {formatINR(subtotal)}
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  {totalItems} {totalItems === 1 ? 'Meal' : 'Meals'} Selected
+                </span>
+                <p className="text-base sm:text-xl font-black text-slate-900 leading-tight">
+                  {formatINR(subtotal)}
+                </p>
+              </div>
             </div>
+
             <Link
-              href="/parent/checkout"
-              className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer"
+              href="/parent/cart"
+              className="px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/25 transition-all flex items-center gap-2 cursor-pointer shrink-0"
             >
-              <span>Order Summary & Pay</span>
+              <span>View Cart & Pay</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

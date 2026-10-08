@@ -1,6 +1,6 @@
-export type UserRole = 'PARENT' | 'ADMIN';
+export type UserRole = 'PARENT' | 'ADMIN' | 'STAFF';
 
-export type PaymentMethod = 'UPI' | 'CARD' | 'NET_BANKING' | 'WALLET';
+export type PaymentMethod = 'UPI' | 'CARD' | 'NET_BANKING';
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
 export type OrderStatus = 'CONFIRMED' | 'PREPARING' | 'READY' | 'COLLECTED' | 'CANCELLED';
 
@@ -11,7 +11,6 @@ export interface UserSession {
   phone?: string | null;
   role: UserRole;
   parentId?: string;
-  walletBalance?: number;
 }
 
 export interface StudentData {

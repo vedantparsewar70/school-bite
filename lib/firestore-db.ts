@@ -1,5 +1,5 @@
 import { db } from './firebase-admin';
-import type { DocumentSnapshot, Query, DocumentReference } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot, type Query, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
 
 export interface DbUser {
   id: string;
@@ -185,6 +185,53 @@ function docData(doc: DocumentSnapshot): any {
   };
 }
 
+// Ultra-fast batch fetch of documents by ID using Firestore db.getAll in chunks
+async function batchGetDocs(collectionName: string, ids: (string | undefined | null)[]): Promise<Map<string, any>> {
+  const map = new Map<string, any>();
+  const uniqueIds = Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+  if (uniqueIds.length === 0) return map;
+
+  const chunkSize = 200;
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    const refs = chunk.map((id) => db.collection(collectionName).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (snap.exists) {
+        map.set(snap.id, docData(snap));
+      }
+    }
+  }
+  return map;
+}
+
+// Ultra-fast chunked 'in' query for querying related child collections in parallel
+async function queryInChunks<T = any>(
+  collectionName: string,
+  field: string,
+  values: (string | undefined | null)[]
+): Promise<T[]> {
+  const unique = Array.from(new Set(values.filter((v): v is string => Boolean(v))));
+  if (unique.length === 0) return [];
+
+  const results: T[] = [];
+  const chunkSize = 30; // Firestore limit for 'in' queries
+  const promises: Promise<any>[] = [];
+
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    promises.push(db.collection(collectionName).where(field, 'in', chunk).get());
+  }
+
+  const snapshots = await Promise.all(promises);
+  for (const snap of snapshots) {
+    for (const doc of snap.docs) {
+      results.push(docData(doc));
+    }
+  }
+  return results;
+}
+
 export class FirestoreDbAdapter {
   // SystemSetting
   systemSetting = {
@@ -234,7 +281,7 @@ export class FirestoreDbAdapter {
 
       if (!doc) return null;
 
-      if (include?.parent) {
+      if (include?.parent && doc.role === 'PARENT') {
         const parentSnap = await db.collection('parents').where('userId', '==', doc.id).limit(1).get();
         if (!parentSnap.empty) {
           const parentData = docData(parentSnap.docs[0]);
@@ -244,7 +291,9 @@ export class FirestoreDbAdapter {
               .where('parentId', '==', parentData.id)
               .where('isActive', '==', true)
               .get();
-            const students = studentsSnap.docs.map((d) => docData(d)).sort((a: any, b: any) => a.name.localeCompare(b.name));
+            const students = studentsSnap.docs
+              .map((d) => docData(d))
+              .sort((a: any, b: any) => String(a?.name || '').localeCompare(String(b?.name || '')));
             parentData.students = students;
           }
           doc.parent = parentData;
@@ -260,24 +309,24 @@ export class FirestoreDbAdapter {
       const userRef = db.collection('users').doc(userId);
 
       const { parent: parentCreate, ...userData } = data;
-      const userObj = {
+      const userObj = cleanDoc({
         id: userId,
         ...userData,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       await userRef.set(userObj);
 
       let createdParent = null;
       if (parentCreate?.create) {
         const parentId = generateId('par_');
-        const parentObj = {
+        const parentObj = cleanDoc({
           id: parentId,
           userId,
           walletBalance: parentCreate.create.walletBalance ?? 500,
           createdAt: now,
           updatedAt: now,
-        };
+        });
         await db.collection('parents').doc(parentId).set(parentObj);
         createdParent = parentObj;
       }
@@ -333,20 +382,34 @@ export class FirestoreDbAdapter {
       const snap = await db.collection('parents').get();
       let parents = snap.docs.map((d) => docData(d));
 
-      if (include) {
+      if (include && parents.length > 0) {
+        const parentIds = parents.map((p) => p.id);
+        const userIds = parents.map((p) => p.userId);
+
+        const [usersMap, allStudents, allOrders] = await Promise.all([
+          include.user ? batchGetDocs('users', userIds) : Promise.resolve(new Map()),
+          include.students ? queryInChunks<any>('students', 'parentId', parentIds) : Promise.resolve([]),
+          include.orders ? queryInChunks<any>('orders', 'parentId', parentIds) : Promise.resolve([]),
+        ]);
+
+        const studentsByParent = new Map<string, any[]>();
+        for (const s of allStudents) {
+          const l = studentsByParent.get(s.parentId) || [];
+          l.push(s);
+          studentsByParent.set(s.parentId, l);
+        }
+
+        const ordersByParent = new Map<string, any[]>();
+        for (const o of allOrders) {
+          const l = ordersByParent.get(o.parentId) || [];
+          l.push(o);
+          ordersByParent.set(o.parentId, l);
+        }
+
         for (const p of parents) {
-          if (include.user) {
-            const uSnap = await db.collection('users').doc(p.userId).get();
-            p.user = docData(uSnap);
-          }
-          if (include.students) {
-            const sSnap = await db.collection('students').where('parentId', '==', p.id).get();
-            p.students = sSnap.docs.map((d) => docData(d));
-          }
-          if (include.orders) {
-            const oSnap = await db.collection('orders').where('parentId', '==', p.id).get();
-            p.orders = oSnap.docs.map((d) => docData(d));
-          }
+          if (include.user) p.user = usersMap.get(p.userId) || null;
+          if (include.students) p.students = studentsByParent.get(p.id) || [];
+          if (include.orders) p.orders = ordersByParent.get(p.id) || [];
         }
       }
       if (orderBy?.createdAt === 'desc') {
@@ -361,11 +424,9 @@ export class FirestoreDbAdapter {
 
       if (data.walletBalance !== undefined) {
         if (typeof data.walletBalance === 'object' && data.walletBalance.increment !== undefined) {
-          const current = (await ref.get()).data()?.walletBalance || 0;
-          updateData.walletBalance = current + data.walletBalance.increment;
+          updateData.walletBalance = FieldValue.increment(Number(data.walletBalance.increment));
         } else if (typeof data.walletBalance === 'object' && data.walletBalance.decrement !== undefined) {
-          const current = (await ref.get()).data()?.walletBalance || 0;
-          updateData.walletBalance = current - data.walletBalance.decrement;
+          updateData.walletBalance = FieldValue.increment(-Number(data.walletBalance.decrement));
         } else {
           updateData.walletBalance = Number(data.walletBalance);
         }
@@ -415,41 +476,56 @@ export class FirestoreDbAdapter {
         if (!st.orderItems) st.orderItems = [];
       }
 
-      if (include?.studentAllergies) {
-        for (const st of list) {
-          const saSnap = await db.collection('studentAllergies').where('studentId', '==', st.id).get();
-          const saList = saSnap.docs.map((d) => docData(d));
-          if (include.studentAllergies.include?.allergy) {
-            for (const sa of saList) {
-              const aSnap = await db.collection('allergies').doc(sa.allergyId).get();
-              sa.allergy = docData(aSnap);
-            }
-          }
-          st.studentAllergies = saList;
-        }
+      const studentIds = list.map((s) => s.id);
+
+      const [allStudentAllergies, allOrderItems, parentsMap] = await Promise.all([
+        include?.studentAllergies ? queryInChunks<any>('studentAllergies', 'studentId', studentIds) : Promise.resolve([]),
+        include?.orderItems ? queryInChunks<any>('orderItems', 'studentId', studentIds) : Promise.resolve([]),
+        include?.parent ? batchGetDocs('parents', list.map((s) => s.parentId)) : Promise.resolve(new Map()),
+      ]);
+
+      let allergiesMap = new Map<string, any>();
+      if (include?.studentAllergies?.include?.allergy && allStudentAllergies.length > 0) {
+        allergiesMap = await batchGetDocs('allergies', allStudentAllergies.map((sa) => sa.allergyId));
       }
 
-      if (include?.orderItems) {
-        for (const st of list) {
-          const oiSnap = await db.collection('orderItems').where('studentId', '==', st.id).get();
-          st.orderItems = oiSnap.docs.map((d) => docData(d));
-        }
+      let usersMap = new Map<string, any>();
+      if (include?.parent?.include?.user && parentsMap.size > 0) {
+        const userIds = Array.from(parentsMap.values()).map((p: any) => p?.userId).filter(Boolean);
+        usersMap = await batchGetDocs('users', userIds);
       }
 
-      if (include?.parent) {
-        for (const st of list) {
-          const pSnap = await db.collection('parents').doc(st.parentId).get();
-          const pData = docData(pSnap);
-          if (pData && include.parent.include?.user) {
-            const uSnap = await db.collection('users').doc(pData.userId).get();
-            pData.user = docData(uSnap);
+      const saByStudent = new Map<string, any[]>();
+      for (const sa of allStudentAllergies) {
+        if (include?.studentAllergies?.include?.allergy) {
+          sa.allergy = allergiesMap.get(sa.allergyId) || null;
+        }
+        const l = saByStudent.get(sa.studentId) || [];
+        l.push(sa);
+        saByStudent.set(sa.studentId, l);
+      }
+
+      const oiByStudent = new Map<string, any[]>();
+      for (const oi of allOrderItems) {
+        const l = oiByStudent.get(oi.studentId) || [];
+        l.push(oi);
+        oiByStudent.set(oi.studentId, l);
+      }
+
+      for (const st of list) {
+        st.studentAllergies = saByStudent.get(st.id) || [];
+        st.orderItems = oiByStudent.get(st.id) || [];
+        if (include?.parent) {
+          const p = parentsMap.get(st.parentId) || null;
+          if (p && include.parent.include?.user) {
+            p.user = usersMap.get(p.userId) || null;
           }
-          st.parent = pData;
+          st.parent = p;
         }
       }
 
       if (orderBy?.name === 'asc') {
-        list.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        list.sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
       }
       return list;
     },
@@ -469,10 +545,10 @@ export class FirestoreDbAdapter {
       if (include?.studentAllergies) {
         const saSnap = await db.collection('studentAllergies').where('studentId', '==', st.id).get();
         const saList = saSnap.docs.map((d) => docData(d));
-        if (include.studentAllergies.include?.allergy) {
+        if (include.studentAllergies.include?.allergy && saList.length > 0) {
+          const allergiesMap = await batchGetDocs('allergies', saList.map((sa) => sa.allergyId));
           for (const sa of saList) {
-            const aSnap = await db.collection('allergies').doc(sa.allergyId).get();
-            sa.allergy = docData(aSnap);
+            sa.allergy = allergiesMap.get(sa.allergyId) || null;
           }
         }
         st.studentAllergies = saList;
@@ -621,17 +697,27 @@ export class FirestoreDbAdapter {
       for (const m of list) {
         if (!m.mealAllergens) m.mealAllergens = [];
       }
-      if (include?.mealAllergens) {
-        for (const m of list) {
-          const maSnap = await db.collection('mealAllergens').where('mealId', '==', m.id).get();
-          const maList = maSnap.docs.map((d) => docData(d));
+      if (include?.mealAllergens && list.length > 0) {
+        const mealIds = list.map((m) => m.id);
+        const allMealAllergens = await queryInChunks<any>('mealAllergens', 'mealId', mealIds);
+
+        let allergensMap = new Map<string, any>();
+        if (include.mealAllergens.include?.allergen && allMealAllergens.length > 0) {
+          allergensMap = await batchGetDocs('allergens', allMealAllergens.map((ma) => ma.allergenId));
+        }
+
+        const maByMeal = new Map<string, any[]>();
+        for (const ma of allMealAllergens) {
           if (include.mealAllergens.include?.allergen) {
-            for (const ma of maList) {
-              const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
-              ma.allergen = docData(aSnap);
-            }
+            ma.allergen = allergensMap.get(ma.allergenId) || null;
           }
-          m.mealAllergens = maList;
+          const l = maByMeal.get(ma.mealId) || [];
+          l.push(ma);
+          maByMeal.set(ma.mealId, l);
+        }
+
+        for (const m of list) {
+          m.mealAllergens = maByMeal.get(m.id) || [];
         }
       }
       if (orderBy?.name === 'asc') {
@@ -648,10 +734,10 @@ export class FirestoreDbAdapter {
       if (include?.mealAllergens) {
         const maSnap = await db.collection('mealAllergens').where('mealId', '==', m.id).get();
         const maList = maSnap.docs.map((d) => docData(d));
-        if (include.mealAllergens.include?.allergen) {
+        if (include.mealAllergens.include?.allergen && maList.length > 0) {
+          const allergensMap = await batchGetDocs('allergens', maList.map((ma) => ma.allergenId));
           for (const ma of maList) {
-            const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
-            ma.allergen = docData(aSnap);
+            ma.allergen = allergensMap.get(ma.allergenId) || null;
           }
         }
         m.mealAllergens = maList;
@@ -778,22 +864,30 @@ export class FirestoreDbAdapter {
         list = list.filter((m: any) => Boolean(m.isActive) === Boolean(where.isActive));
       }
 
-      if (include?.meal) {
-        for (const mn of list) {
-          const mSnap = await db.collection('meals').doc(mn.mealId).get();
-          const mealObj = docData(mSnap);
-          if (mealObj && include.meal.include?.mealAllergens) {
-            const maSnap = await db.collection('mealAllergens').where('mealId', '==', mealObj.id).get();
-            const maList = maSnap.docs.map((d) => docData(d));
-            if (include.meal.include.mealAllergens.include?.allergen) {
-              for (const ma of maList) {
-                const aSnap = await db.collection('allergens').doc(ma.allergenId).get();
-                ma.allergen = docData(aSnap);
-              }
-            }
-            mealObj.mealAllergens = maList;
+      if (include?.meal && list.length > 0) {
+        const mealIds = list.map((mn) => mn.mealId);
+        const mealsMap = await batchGetDocs('meals', mealIds);
+
+        if (include.meal.include?.mealAllergens) {
+          const allMealAllergens = await queryInChunks<any>('mealAllergens', 'mealId', Array.from(mealsMap.keys()));
+          const allergenIds = allMealAllergens.map((ma) => ma.allergenId);
+          const allergensMap = await batchGetDocs('allergens', allergenIds);
+
+          const mealAllergensByMealId = new Map<string, any[]>();
+          for (const ma of allMealAllergens) {
+            ma.allergen = allergensMap.get(ma.allergenId) || null;
+            const l = mealAllergensByMealId.get(ma.mealId) || [];
+            l.push(ma);
+            mealAllergensByMealId.set(ma.mealId, l);
           }
-          mn.meal = mealObj;
+
+          for (const meal of mealsMap.values()) {
+            meal.mealAllergens = mealAllergensByMealId.get(meal.id) || [];
+          }
+        }
+
+        for (const mn of list) {
+          mn.meal = mealsMap.get(mn.mealId) || null;
         }
       }
 
@@ -808,13 +902,19 @@ export class FirestoreDbAdapter {
         const snap = await db.collection('menus').doc(where.id).get();
         doc = docData(snap);
       } else if (where.mealId_date) {
-        const snap = await db
-          .collection('menus')
-          .where('mealId', '==', where.mealId_date.mealId)
-          .where('date', '==', where.mealId_date.date)
-          .limit(1)
-          .get();
-        if (!snap.empty) doc = docData(snap.docs[0]);
+        const directId = `${where.mealId_date.mealId}_${where.mealId_date.date}`;
+        const snap = await db.collection('menus').doc(directId).get();
+        if (snap.exists) {
+          doc = docData(snap);
+        } else {
+          const qSnap = await db
+            .collection('menus')
+            .where('mealId', '==', where.mealId_date.mealId)
+            .where('date', '==', where.mealId_date.date)
+            .limit(1)
+            .get();
+          if (!qSnap.empty) doc = docData(qSnap.docs[0]);
+        }
       }
       if (!doc) return null;
       if (include?.meal) {
@@ -891,11 +991,9 @@ export class FirestoreDbAdapter {
       const updateData: any = { updatedAt: new Date().toISOString() };
       if (data.availableQuantity !== undefined) {
         if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
-          const current = (await ref.get()).data()?.availableQuantity || 0;
-          updateData.availableQuantity = current - data.availableQuantity.decrement;
+          updateData.availableQuantity = FieldValue.increment(-Number(data.availableQuantity.decrement));
         } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
-          const current = (await ref.get()).data()?.availableQuantity || 0;
-          updateData.availableQuantity = current + data.availableQuantity.increment;
+          updateData.availableQuantity = FieldValue.increment(Number(data.availableQuantity.increment));
         } else {
           updateData.availableQuantity = Number(data.availableQuantity);
         }
@@ -913,16 +1011,22 @@ export class FirestoreDbAdapter {
       if (where.date) query = query.where('date', '==', where.date);
       const snap = await query.get();
 
+      if (snap.empty) return { count: 0 };
+
+      const batch = db.batch();
       for (const d of snap.docs) {
-        const currentData = d.data();
-        let newQty = currentData.availableQuantity || 0;
+        const updateData: any = { updatedAt: new Date().toISOString() };
         if (typeof data.availableQuantity === 'object' && data.availableQuantity.increment !== undefined) {
-          newQty += data.availableQuantity.increment;
+          updateData.availableQuantity = FieldValue.increment(Number(data.availableQuantity.increment));
         } else if (typeof data.availableQuantity === 'object' && data.availableQuantity.decrement !== undefined) {
-          newQty -= data.availableQuantity.decrement;
+          updateData.availableQuantity = FieldValue.increment(-Number(data.availableQuantity.decrement));
+        } else if (data.availableQuantity !== undefined) {
+          updateData.availableQuantity = Number(data.availableQuantity);
         }
-        await d.ref.set({ availableQuantity: newQty, updatedAt: new Date().toISOString() }, { merge: true });
+        if (data.isActive !== undefined) updateData.isActive = data.isActive;
+        batch.set(d.ref, updateData, { merge: true });
       }
+      await batch.commit();
       return { count: snap.docs.length };
     },
     delete: async ({ where }: any): Promise<any> => {
@@ -941,54 +1045,21 @@ export class FirestoreDbAdapter {
   // Order
   order = {
     findMany: async ({ where, include, orderBy, take }: any = {}): Promise<DbOrder[]> => {
-      let query: Query = db.collection('orders');
-      if (where?.parentId) {
-        query = query.where('parentId', '==', where.parentId);
-      }
-      if (where?.orderStatus) {
-        query = query.where('orderStatus', '==', where.orderStatus);
-      }
+      let orders: any[] = [];
 
-      const snap = await query.get();
-      let orders = snap.docs.map((d) => docData(d));
-
-      if (include?.items) {
-        for (const ord of orders) {
-          const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
-          const items = itemsSnap.docs.map((d) => docData(d));
-          if (include.items.include) {
-            for (const item of items) {
-              if (include.items.include.student) {
-                const sSnap = await db.collection('students').doc(item.studentId).get();
-                item.student = docData(sSnap);
-              }
-              if (include.items.include.meal) {
-                const mSnap = await db.collection('meals').doc(item.mealId).get();
-                item.meal = docData(mSnap);
-              }
-            }
-          }
-          ord.items = items;
+      if (where?.id?.in && Array.isArray(where.id.in)) {
+        const map = await batchGetDocs('orders', where.id.in);
+        orders = Array.from(map.values());
+      } else {
+        let query: Query = db.collection('orders');
+        if (where?.parentId) {
+          query = query.where('parentId', '==', where.parentId);
         }
-      }
-
-      if (include?.payments) {
-        for (const ord of orders) {
-          const paySnap = await db.collection('payments').where('orderId', '==', ord.id).get();
-          ord.payments = paySnap.docs.map((d) => docData(d));
+        if (where?.orderStatus) {
+          query = query.where('orderStatus', '==', where.orderStatus);
         }
-      }
-
-      if (include?.parent) {
-        for (const ord of orders) {
-          const pSnap = await db.collection('parents').doc(ord.parentId).get();
-          const parentData = docData(pSnap);
-          if (parentData && include.parent.include?.user) {
-            const uSnap = await db.collection('users').doc(parentData.userId).get();
-            parentData.user = docData(uSnap);
-          }
-          ord.parent = parentData;
-        }
+        const snap = await query.get();
+        orders = snap.docs.map((d) => docData(d));
       }
 
       if (orderBy?.createdAt === 'desc') {
@@ -997,6 +1068,72 @@ export class FirestoreDbAdapter {
 
       if (take && typeof take === 'number') {
         orders = orders.slice(0, take);
+      }
+
+      const orderIds = orders.map((o) => o.id);
+
+      if (orderIds.length > 0) {
+        const [allItems, allPayments, parentsMap] = await Promise.all([
+          include?.items ? queryInChunks<any>('orderItems', 'orderId', orderIds) : Promise.resolve([]),
+          include?.payments ? queryInChunks<any>('payments', 'orderId', orderIds) : Promise.resolve([]),
+          include?.parent ? batchGetDocs('parents', orders.map((o) => o.parentId)) : Promise.resolve(new Map()),
+        ]);
+
+        let studentsMap = new Map<string, any>();
+        let mealsMap = new Map<string, any>();
+        if (include?.items?.include && allItems.length > 0) {
+          const [sMap, mMap] = await Promise.all([
+            include.items.include.student ? batchGetDocs('students', allItems.map((it) => it.studentId)) : Promise.resolve(new Map()),
+            include.items.include.meal ? batchGetDocs('meals', allItems.map((it) => it.mealId)) : Promise.resolve(new Map()),
+          ]);
+          studentsMap = sMap;
+          mealsMap = mMap;
+        }
+
+        let usersMap = new Map<string, any>();
+        if (include?.parent?.include?.user && parentsMap.size > 0) {
+          const userIds = Array.from(parentsMap.values()).map((p: any) => p?.userId).filter(Boolean);
+          usersMap = await batchGetDocs('users', userIds);
+          for (const p of parentsMap.values()) {
+            if (p && p.userId) p.user = usersMap.get(p.userId) || null;
+          }
+        }
+
+        if (include?.items) {
+          const itemsByOrderId = new Map<string, any[]>();
+          for (const item of allItems) {
+            if (include.items.include?.student) {
+              item.student = studentsMap.get(item.studentId) || null;
+            }
+            if (include.items.include?.meal) {
+              item.meal = mealsMap.get(item.mealId) || null;
+            }
+            const l = itemsByOrderId.get(item.orderId) || [];
+            l.push(item);
+            itemsByOrderId.set(item.orderId, l);
+          }
+          for (const ord of orders) {
+            ord.items = itemsByOrderId.get(ord.id) || [];
+          }
+        }
+
+        if (include?.payments) {
+          const paymentsByOrderId = new Map<string, any[]>();
+          for (const p of allPayments) {
+            const l = paymentsByOrderId.get(p.orderId) || [];
+            l.push(p);
+            paymentsByOrderId.set(p.orderId, l);
+          }
+          for (const ord of orders) {
+            ord.payments = paymentsByOrderId.get(ord.id) || [];
+          }
+        }
+
+        if (include?.parent) {
+          for (const ord of orders) {
+            ord.parent = parentsMap.get(ord.parentId) || null;
+          }
+        }
       }
 
       return orders;
@@ -1009,14 +1146,18 @@ export class FirestoreDbAdapter {
       if (include?.items) {
         const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
         const items = itemsSnap.docs.map((d) => docData(d));
-        for (const item of items) {
-          if (include.items.include?.student) {
-            const sSnap = await db.collection('students').doc(item.studentId).get();
-            item.student = docData(sSnap);
-          }
-          if (include.items.include?.meal) {
-            const mSnap = await db.collection('meals').doc(item.mealId).get();
-            item.meal = docData(mSnap);
+        if (items.length > 0 && include.items.include) {
+          const [studentsMap, mealsMap] = await Promise.all([
+            include.items.include.student ? batchGetDocs('students', items.map((it) => it.studentId)) : Promise.resolve(new Map()),
+            include.items.include.meal ? batchGetDocs('meals', items.map((it) => it.mealId)) : Promise.resolve(new Map()),
+          ]);
+          for (const item of items) {
+            if (include.items.include?.student) {
+              item.student = studentsMap.get(item.studentId) || null;
+            }
+            if (include.items.include?.meal) {
+              item.meal = mealsMap.get(item.mealId) || null;
+            }
           }
         }
         ord.items = items;
@@ -1040,17 +1181,37 @@ export class FirestoreDbAdapter {
       return ord;
     },
     findFirst: async ({ where, include }: any): Promise<DbOrder | null> => {
-      let query: Query = db.collection('orders');
-      if (where.id) query = query.where('__name__', '==', where.id);
-      if (where.parentId) query = query.where('parentId', '==', where.parentId);
-      const snap = await query.limit(1).get();
-      if (snap.empty) return null;
-      const ord = docData(snap.docs[0]);
+      let ord: any = null;
+      if (where.id) {
+        const snap = await db.collection('orders').doc(where.id).get();
+        if (snap.exists) {
+          const candidate = docData(snap);
+          if (!where.parentId || candidate.parentId === where.parentId) {
+            ord = candidate;
+          }
+        }
+      } else if (where.parentId) {
+        let query: Query = db.collection('orders').where('parentId', '==', where.parentId);
+        if (where.orderStatus) query = query.where('orderStatus', '==', where.orderStatus);
+        const snap = await query.limit(1).get();
+        if (!snap.empty) ord = docData(snap.docs[0]);
+      } else {
+        const snap = await db.collection('orders').limit(1).get();
+        if (!snap.empty) ord = docData(snap.docs[0]);
+      }
+
+      if (!ord) return null;
 
       if (include?.items) {
         const itemsSnap = await db.collection('orderItems').where('orderId', '==', ord.id).get();
         ord.items = itemsSnap.docs.map((d) => docData(d));
       }
+
+      if (include?.payments) {
+        const paySnap = await db.collection('payments').where('orderId', '==', ord.id).get();
+        ord.payments = paySnap.docs.map((d) => docData(d));
+      }
+
       return ord;
     },
     create: async ({ data, include }: any): Promise<DbOrder> => {
@@ -1064,7 +1225,9 @@ export class FirestoreDbAdapter {
         createdAt: now,
         updatedAt: now,
       });
-      await db.collection('orders').doc(orderId).set(orderObj);
+
+      const batch = db.batch();
+      batch.set(db.collection('orders').doc(orderId), orderObj);
 
       const createdItems = [];
       if (itemsCreate?.create) {
@@ -1076,7 +1239,7 @@ export class FirestoreDbAdapter {
             ...item,
             createdAt: now,
           });
-          await db.collection('orderItems').doc(itemId).set(itemObj);
+          batch.set(db.collection('orderItems').doc(itemId), itemObj);
           createdItems.push(itemObj);
         }
       }
@@ -1092,10 +1255,12 @@ export class FirestoreDbAdapter {
             ...pay,
             createdAt: now,
           });
-          await db.collection('payments').doc(payId).set(payObj);
+          batch.set(db.collection('payments').doc(payId), payObj);
           createdPayments.push(payObj);
         }
       }
+
+      await batch.commit();
 
       const res: any = { ...orderObj };
       if (include?.items) res.items = createdItems;
@@ -1119,14 +1284,15 @@ export class FirestoreDbAdapter {
       return docData(await ref.get());
     },
     updateMany: async ({ where, data }: any): Promise<any> => {
-      if (where?.id?.in) {
+      if (where?.id?.in && Array.isArray(where.id.in) && where.id.in.length > 0) {
         const ids: string[] = where.id.in;
-        let count = 0;
+        const now = new Date().toISOString();
+        const batch = db.batch();
         for (const id of ids) {
-          await db.collection('orders').doc(id).set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
-          count++;
+          batch.set(db.collection('orders').doc(id), { ...data, updatedAt: now }, { merge: true });
         }
-        return { count };
+        await batch.commit();
+        return { count: ids.length };
       }
       return { count: 0 };
     },
@@ -1149,7 +1315,7 @@ export class FirestoreDbAdapter {
 
   // OrderItem
   orderItem = {
-    findMany: async ({ where, include }: any = {}): Promise<DbOrderItem[]> => {
+    findMany: async ({ where, include, orderBy }: any = {}): Promise<DbOrderItem[]> => {
       let query: Query = db.collection('orderItems');
       if (where?.orderId) query = query.where('orderId', '==', where.orderId);
       if (where?.date) query = query.where('date', '==', where.date);
@@ -1157,45 +1323,94 @@ export class FirestoreDbAdapter {
       const snap = await query.get();
       let items = snap.docs.map((d) => docData(d));
 
-      if (where?.order?.orderStatus?.in) {
-        const allowedStatuses = where.order.orderStatus.in;
-        const validItems = [];
-        for (const item of items) {
-          const oSnap = await db.collection('orders').doc(item.orderId).get();
-          const ord = docData(oSnap);
-          if (ord && allowedStatuses.includes(ord.orderStatus)) {
-            item.order = ord;
-            validItems.push(item);
-          }
-        }
-        items = validItems;
+      if (where?.order?.orderStatus?.in || where?.order?.orderStatus?.not) {
+        const orderIds = items.map((it) => it.orderId);
+        const ordersMap = await batchGetDocs('orders', orderIds);
+        items = items.filter((item) => {
+          const ord = ordersMap.get(item.orderId);
+          if (!ord) return false;
+          item.order = ord;
+          if (where.order.orderStatus.in && !where.order.orderStatus.in.includes(ord.orderStatus)) return false;
+          if (where.order.orderStatus.not && ord.orderStatus === where.order.orderStatus.not) return false;
+          return true;
+        });
       }
 
-      if (include) {
-        for (const item of items) {
-          if (include.meal) {
-            const mSnap = await db.collection('meals').doc(item.mealId).get();
-            item.meal = docData(mSnap);
-          }
-          if (include.student) {
-            const sSnap = await db.collection('students').doc(item.studentId).get();
-            item.student = docData(sSnap);
-          }
-          if (include.order && !item.order) {
-            const oSnap = await db.collection('orders').doc(item.orderId).get();
-            const ordData = docData(oSnap);
-            if (ordData && include.order.include?.parent) {
-              const pSnap = await db.collection('parents').doc(ordData.parentId).get();
-              const pData = docData(pSnap);
-              if (pData && include.order.include.parent.include?.user) {
-                const uSnap = await db.collection('users').doc(pData.userId).get();
-                pData.user = docData(uSnap);
-              }
-              ordData.parent = pData;
-            }
-            item.order = ordData;
+      if (include && items.length > 0) {
+        const mealIds = items.map((it) => it.mealId);
+        const studentIds = items.map((it) => it.studentId);
+        const orderIds = items.map((it) => it.orderId);
+
+        const [mealsMap, studentsMap, ordersMap] = await Promise.all([
+          include.meal ? batchGetDocs('meals', mealIds) : Promise.resolve(new Map()),
+          include.student ? batchGetDocs('students', studentIds) : Promise.resolve(new Map()),
+          include.order ? batchGetDocs('orders', orderIds) : Promise.resolve(new Map()),
+        ]);
+
+        let studentAllergiesMap = new Map<string, any[]>();
+        if (include.student?.include?.studentAllergies && studentsMap.size > 0) {
+          const allStudentAllergies = await queryInChunks<any>('studentAllergies', 'studentId', Array.from(studentsMap.keys()));
+          const allergyIds = allStudentAllergies.map((sa) => sa.allergyId);
+          const allergiesMap = await batchGetDocs('allergies', allergyIds);
+
+          for (const sa of allStudentAllergies) {
+            sa.allergy = allergiesMap.get(sa.allergyId) || null;
+            const l = studentAllergiesMap.get(sa.studentId) || [];
+            l.push(sa);
+            studentAllergiesMap.set(sa.studentId, l);
           }
         }
+
+        let parentsMap = new Map<string, any>();
+        let usersMap = new Map<string, any>();
+        if (include.order?.include?.parent) {
+          const allOrderObjs = Array.from(ordersMap.values()).concat(items.map((it) => it.order).filter(Boolean));
+          const parentIds = allOrderObjs.map((o: any) => o?.parentId).filter(Boolean);
+          parentsMap = await batchGetDocs('parents', parentIds);
+          if (include.order.include.parent.include?.user) {
+            const userIds = Array.from(parentsMap.values()).map((p: any) => p?.userId).filter(Boolean);
+            usersMap = await batchGetDocs('users', userIds);
+            for (const p of parentsMap.values()) {
+              if (p && p.userId) p.user = usersMap.get(p.userId) || null;
+            }
+          }
+        }
+
+        for (const item of items) {
+          if (include.meal) {
+            item.meal = mealsMap.get(item.mealId) || null;
+          }
+          if (include.student) {
+            const st = studentsMap.get(item.studentId) || null;
+            if (st && include.student?.include?.studentAllergies) {
+              st.studentAllergies = studentAllergiesMap.get(st.id) || [];
+            }
+            item.student = st;
+          }
+          if (include.order) {
+            const ord = item.order || ordersMap.get(item.orderId) || null;
+            if (ord && include.order.include?.parent) {
+              ord.parent = parentsMap.get(ord.parentId) || null;
+            }
+            item.order = ord;
+          }
+        }
+      }
+
+      if (orderBy && Array.isArray(orderBy)) {
+        items.sort((a, b) => {
+          for (const rule of orderBy) {
+            if (rule.student) {
+              for (const [k, dir] of Object.entries(rule.student)) {
+                const valA = String(a.student?.[k] || '');
+                const valB = String(b.student?.[k] || '');
+                const cmp = valA.localeCompare(valB, undefined, { numeric: true });
+                if (cmp !== 0) return dir === 'desc' ? -cmp : cmp;
+              }
+            }
+          }
+          return 0;
+        });
       }
 
       return items;
@@ -1238,25 +1453,27 @@ export class FirestoreDbAdapter {
       const snap = await query.get();
       let list = snap.docs.map((d) => docData(d));
 
-      if (where?.order?.parentId) {
-        const targetParentId = where.order.parentId;
-        const filtered = [];
-        for (const p of list) {
-          const oSnap = await db.collection('orders').doc(p.orderId).get();
-          const ord = docData(oSnap);
-          if (ord && ord.parentId === targetParentId) {
-            p.order = ord;
-            filtered.push(p);
-          }
-        }
-        list = filtered;
-      }
+      if ((where?.order?.parentId || include?.order) && list.length > 0) {
+        const orderIds = list.map((p) => p.orderId);
+        const ordersMap = await batchGetDocs('orders', orderIds);
 
-      if (include?.order) {
-        for (const p of list) {
-          if (!p.order) {
-            const oSnap = await db.collection('orders').doc(p.orderId).get();
-            p.order = docData(oSnap);
+        if (where?.order?.parentId) {
+          const targetParentId = where.order.parentId;
+          list = list.filter((p) => {
+            const ord = ordersMap.get(p.orderId);
+            if (ord && ord.parentId === targetParentId) {
+              p.order = ord;
+              return true;
+            }
+            return false;
+          });
+        }
+
+        if (include?.order) {
+          for (const p of list) {
+            if (!p.order) {
+              p.order = ordersMap.get(p.orderId) || null;
+            }
           }
         }
       }
@@ -1296,9 +1513,14 @@ export class FirestoreDbAdapter {
   // $disconnect for compatibility
   $disconnect = async (): Promise<void> => {};
 
-  // $transaction
+  // $transaction for Prisma compatibility
   $transaction = async (callback: (tx: this) => Promise<any>): Promise<any> => {
     return callback(this);
+  };
+
+  // Real atomic Firestore transaction
+  runTransaction = async <T>(updateFunction: (transaction: Transaction) => Promise<T>): Promise<T> => {
+    return db.runTransaction(updateFunction);
   };
 }
 

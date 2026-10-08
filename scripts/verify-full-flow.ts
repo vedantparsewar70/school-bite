@@ -1,3 +1,5 @@
+export {};
+
 const BASE_URL = 'http://localhost:3000';
 
 function getOffsetDate(offset: number = 1): string {

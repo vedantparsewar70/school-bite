@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
@@ -30,29 +31,30 @@ export default function ParentDashboard() {
   const { showToast } = useToast();
 
   const [orders, setOrders] = useState<any[]>([]);
-  const [childrenList, setChildrenList] = useState<any[]>([]);
+  const [childrenList, setChildrenList] = useState<any[]>(user?.students || []);
   const [todayMenu, setTodayMenu] = useState<MenuDayItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   const todayStr = getTodayString();
 
   useEffect(() => {
+    if (user?.students && user.students.length > 0 && childrenList.length === 0) {
+      setChildrenList(user.students);
+    }
+  }, [user?.students]);
+
+  useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [ordersRes, childrenRes, menuRes] = await Promise.all([
-          fetch('/api/parent/orders'),
-          fetch('/api/parent/children'),
+        // Query recent 20 orders and today's menu in parallel (children already provided by auth context)
+        const [ordersRes, menuRes] = await Promise.all([
+          fetch('/api/parent/orders?limit=20'),
           fetch(`/api/menu?date=${todayStr}`),
         ]);
 
         if (ordersRes.ok) {
           const ordData = await ordersRes.json();
           setOrders(ordData.orders || []);
-        }
-
-        if (childrenRes.ok) {
-          const chData = await childrenRes.json();
-          setChildrenList(chData.students || []);
         }
 
         if (menuRes.ok) {
@@ -120,6 +122,13 @@ export default function ParentDashboard() {
             >
               <UtensilsCrossed className="w-4 h-4" />
               <span>Order Lunch</span>
+            </Link>
+            <Link
+              href="/parent/orders"
+              className="px-4 py-2.5 bg-amber-700/60 hover:bg-amber-700/80 border border-white/20 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Order History</span>
             </Link>
             <Link
               href="/parent/children"
