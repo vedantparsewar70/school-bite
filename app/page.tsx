@@ -460,7 +460,7 @@ function HomePageContent() {
           )}
         </div>
 
-        {/* Footer info & Admin login link */}
+        {/* Footer info & Staff/Admin login links */}
         <div className="mt-6 text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-full font-bold shadow-2xs">
@@ -469,8 +469,15 @@ function HomePageContent() {
             </span>
           </div>
 
-          <p className="text-xs text-slate-400">
-            Are you school canteen staff or an administrator?{' '}
+          <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
+            <span>Are you school canteen staff or an administrator?</span>
+            <Link
+              href="/login?role=staff"
+              className="text-amber-600 hover:text-amber-700 font-bold hover:underline"
+            >
+              Staff Login →
+            </Link>
+            <span className="text-slate-300">•</span>
             <Link
               href="/login?role=admin"
               className="text-purple-600 hover:text-purple-700 font-bold hover:underline"
