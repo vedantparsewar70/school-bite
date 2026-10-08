@@ -190,6 +190,8 @@ function StaffOrAdminLoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
+                  onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                   placeholder={isStaff ? 'staff@school.com' : 'admin@school.com'}
                   className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all font-medium`}
                 />

@@ -254,6 +254,8 @@ function HomePageContent() {
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                     placeholder="Enter parent email address"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
@@ -336,6 +338,8 @@ function HomePageContent() {
                     required
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                     placeholder="Enter parent email address"
                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
