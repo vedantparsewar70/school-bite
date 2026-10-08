@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { cleanDoc, generateId } from '@/lib/firestore-db';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
+import { createCashfreeOrder } from '@/lib/cashfree';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -288,6 +289,38 @@ export async function POST(req: Request) {
 
     const now = new Date().toISOString();
 
+    // Determine host for Cashfree return and webhook notifications
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
+    const host = req.headers.get('host') || 'localhost:3000';
+    const originUrl = `${proto}://${host}`;
+
+    let cfSession: any = null;
+    const isCashfreeEnabled = Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY);
+
+    if (isCashfreeEnabled) {
+      try {
+        cfSession = await createCashfreeOrder({
+          orderId,
+          orderAmount: totalAmount,
+          customer: {
+            customerId: parentRecord.id,
+            customerName: user.name || 'Parent',
+            customerEmail: user.email || 'parent@schoolbite.in',
+            customerPhone: user.phone || '9028977988',
+          },
+          returnUrl: `${originUrl}/parent/confirmation/${orderId}?order_id={order_id}`,
+          notifyUrl: `${originUrl}/api/webhooks/cashfree`,
+          orderNote: `SchoolBite Order - ${evaluatedCartItems.length} meals`,
+        });
+      } catch (cfErr: any) {
+        console.error('Failed to create Cashfree payment session:', cfErr);
+        return NextResponse.json(
+          { error: `Payment gateway error: ${cfErr.message || 'Failed to initialize payment session'}` },
+          { status: 500 }
+        );
+      }
+    }
+
     // ========================================================
     // ATOMIC FIRESTORE TRANSACTION: Guaranteed concurrency & quota safety
     // ========================================================
@@ -335,12 +368,15 @@ export async function POST(req: Request) {
       }
 
       // C. Create Order
+      const initialPaymentStatus = isCashfreeEnabled ? 'PENDING' : 'PAID';
       const orderObj = cleanDoc({
         id: orderId,
         parentId: parentRecord.id,
         totalAmount,
-        paymentStatus: 'PAID',
+        paymentStatus: initialPaymentStatus,
         orderStatus: 'CONFIRMED',
+        cashfreeOrderId: cfSession?.cfOrderId || null,
+        paymentSessionId: cfSession?.paymentSessionId || null,
         notes: notes || null,
         createdAt: now,
         updatedAt: now,
@@ -369,12 +405,13 @@ export async function POST(req: Request) {
       }
 
       // E. Create Payment
+      const initialPayStatus = isCashfreeEnabled ? 'PENDING' : 'SUCCESS';
       const payObj = cleanDoc({
         id: paymentId,
         orderId,
         amount: totalAmount,
         paymentMethod,
-        status: 'SUCCESS',
+        status: initialPayStatus,
         transactionRef: txnRef,
         upiId: upiId || null,
         cardLastFour: cardLastFour || (paymentMethod === 'CARD' ? '4242' : null),
@@ -393,6 +430,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       orderId: transactionResult.id,
+      paymentSessionId: cfSession?.paymentSessionId || null,
+      cfOrderId: cfSession?.cfOrderId || null,
+      isCashfree: isCashfreeEnabled,
       paymentId,
       transactionRef: txnRef,
       totalAmount,

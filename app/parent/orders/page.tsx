@@ -137,18 +137,20 @@ function OrdersPageContent() {
                 {/* Items in this order */}
                 <div className="py-3 divide-y divide-slate-100">
                   {order.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="py-3 flex items-center justify-between text-xs gap-3">
-                      <div className="flex items-center gap-3">
-                        <MealIcon name={item.mealName} category={item.mealCategory} size="sm" />
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
+                    <div key={idx} className="py-3 flex items-start sm:items-center justify-between text-xs gap-3">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                        <div className="shrink-0 mt-0.5 sm:mt-0">
+                          <MealIcon name={item.mealName} category={item.mealCategory} size="sm" />
+                        </div>
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <VegBadge isVegetarian={item.isVegetarian} size="sm" />
-                            <span className="font-bold text-slate-800 text-sm">{item.mealName}</span>
+                            <span className="font-bold text-slate-800 text-sm leading-snug break-words">{item.mealName}</span>
                             <span className="text-slate-400 font-semibold">× {item.quantity}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 flex-wrap">
                             <ChildAvatar size="xs" />
-                            <span>
+                            <span className="break-words">
                               For: <strong className="text-slate-700">{item.studentName}</strong> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
                             </span>
                           </div>
@@ -158,8 +160,8 @@ function OrdersPageContent() {
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <span className="font-extrabold text-slate-900 text-sm">{formatINR(item.totalPrice)}</span>
+                      <div className="text-right shrink-0 pt-0.5 sm:pt-0">
+                        <span className="font-extrabold text-slate-900 text-sm whitespace-nowrap">{formatINR(item.totalPrice)}</span>
                       </div>
                     </div>
                   ))}

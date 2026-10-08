@@ -90,7 +90,7 @@ async function runTests() {
 
   const orderData = await orderRes.json();
   if (orderRes.ok && orderData.success) {
-    console.log(`✅ 5. Multi-child order placed successfully: Order ID ${orderData.orderId}, Total ₹${orderData.totalAmount}, Txn: ${orderData.transactionRef}`);
+    console.log(`✅ 5. Multi-child order placed successfully: Order ID ${orderData.orderId}, Total ₹${orderData.totalAmount}, Cashfree Session: ${orderData.paymentSessionId ? 'Generated (' + orderData.paymentSessionId.slice(0, 18) + '...)' : 'None'}`);
   } else {
     throw new Error(`Order placement failed: ${orderData.error}`);
   }

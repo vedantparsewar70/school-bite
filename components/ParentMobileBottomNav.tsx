@@ -61,7 +61,7 @@ export default function ParentMobileBottomNav() {
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-1 tracking-tight">{link.label}</span>
+              <span className="text-[10px] sm:text-[11px] mt-0.5 sm:mt-1 tracking-tight truncate max-w-full text-center">{link.label}</span>
             </Link>
           );
         })}
