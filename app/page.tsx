@@ -71,8 +71,22 @@ function HomePageContent() {
     }
   }, [user, authLoading, router]);
 
-  // Handler for login submission
+  // Validation helper for Parent Login email field
+  const validateParentEmail = (input: HTMLInputElement) => {
+    const val = input.value.trim();
+    if (!val) {
+      input.setCustomValidity('');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (input.validity.typeMismatch || !emailRegex.test(val)) {
+      input.setCustomValidity('Please enter a valid email address.');
+    } else {
+      input.setCustomValidity('');
+    }
+  };
 
+  // Handler for login submission
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -242,7 +256,16 @@ function HomePageContent() {
 
           {mode === 'login' ? (
             /* PARENT LOGIN FORM */
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form
+              onSubmit={handleLoginSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const emailInput = e.currentTarget.querySelector<HTMLInputElement>('input[type="email"]');
+                  if (emailInput) validateParentEmail(emailInput);
+                }
+              }}
+              className="space-y-4"
+            >
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Parent Email Address
@@ -253,9 +276,13 @@ function HomePageContent() {
                     type="email"
                     required
                     value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
-                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+                    onChange={(e) => {
+                      setLoginEmail(e.target.value);
+                      validateParentEmail(e.currentTarget);
+                    }}
+                    onInput={(e) => validateParentEmail(e.currentTarget)}
+                    onBlur={(e) => validateParentEmail(e.currentTarget)}
+                    onInvalid={(e) => validateParentEmail(e.currentTarget)}
                     placeholder="Enter parent email address"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
@@ -282,6 +309,11 @@ function HomePageContent() {
               <button
                 type="submit"
                 disabled={submitting}
+                onClick={(e) => {
+                  const form = e.currentTarget.closest('form');
+                  const emailInput = form?.querySelector<HTMLInputElement>('input[type="email"]');
+                  if (emailInput) validateParentEmail(emailInput);
+                }}
                 className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-sm rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
               >
                 {submitting ? (
