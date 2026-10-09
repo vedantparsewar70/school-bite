@@ -10,6 +10,8 @@
 
 export interface BusinessConfig {
   brandName: string;
+  legalEntityName: string;
+  proprietorName: string;
   schoolName: string;
   tagline: string;
   shortDescription: string;
@@ -35,20 +37,29 @@ export const BUSINESS_CONFIG: BusinessConfig = {
   // Brand identity shown across the portal
   brandName: 'School-Bite',
 
+  // Registered legal business entity name matching Cashfree Payments KYC
+  // Options verified with Cashfree: 'BRIGHT CATERING' / 'BRIGHT DESIGNERS' / 'NEW BRIGHT XEROX'
+  legalEntityName: 'BRIGHT CATERING',
+
+  // Registered legal proprietor name matching Cashfree Payments KYC
+  proprietorName: 'GANESH GOPAL UDAS',
+
   // Operating school
   schoolName: 'S.B. Patil School',
 
   // Accurate service description
   tagline: 'School Meal Pre-Ordering Platform',
   shortDescription:
-    'School-Bite is a school meal pre-ordering platform that allows parents to select meals for their child and make online payments through the website. Meals are prepared and provided by the S.B. Patil School canteen.',
+    'School-Bite is a school meal pre-ordering platform operated by BRIGHT CATERING that allows parents to select meals for their child and make online payments through the website. Meals are prepared and provided by the S.B. Patil School canteen.',
 
   // Website URL
   websiteUrl: 'https://schoolbite.in',
 
-  // Customer support contact details
-  supportEmail: 'vedantparsewar70@gmail.com',
-  supportPhone: '+91 90289 77988',
+  // Customer support contact details matching Cashfree KYC
+  // Registered KYC email: 'gayatriparsewar@gmail.com' (Alternative: 'vedantparsewar70@gmail.com')
+  supportEmail: 'gayatriparsewar@gmail.com',
+  // Registered KYC phone: '+91 99220 28988' (Alternative: '+91 90289 77988')
+  supportPhone: '+91 99220 28988',
   whatsAppSupport: 'Available',
   supportAvailability: 'Monday to Sunday',
 
@@ -74,4 +85,14 @@ export const BUSINESS_CONFIG: BusinessConfig = {
 export function getFormattedAddress(): string {
   const { line1, line2, city, state, pincode, country } = BUSINESS_CONFIG.businessAddress;
   return `${line1}, ${line2 ? line2 + ', ' : ''}${city}, ${state} - ${pincode}, ${country}`;
+}
+
+/**
+ * Returns formatted legal entity string for compliance notices
+ */
+export function getLegalOperatorString(): string {
+  if (BUSINESS_CONFIG.proprietorName && BUSINESS_CONFIG.legalEntityName) {
+    return `${BUSINESS_CONFIG.legalEntityName} (Proprietor: ${BUSINESS_CONFIG.proprietorName})`;
+  }
+  return BUSINESS_CONFIG.legalEntityName || BUSINESS_CONFIG.brandName;
 }

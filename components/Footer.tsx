@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { UtensilsCrossed, ShieldCheck, Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
-import { BUSINESS_CONFIG, getFormattedAddress } from '@/lib/business-config';
+import { UtensilsCrossed, ShieldCheck, Mail, Phone, MapPin, MessageCircle, Building2 } from 'lucide-react';
+import { BUSINESS_CONFIG, getFormattedAddress, getLegalOperatorString } from '@/lib/business-config';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -28,8 +28,18 @@ export default function Footer() {
             </p>
 
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              School-Bite enables parents to pre-order fresh, hygienic meals for their children. Food is prepared and provided by the S.B. Patil School canteen.
+              School-Bite enables parents to pre-order fresh, hygienic meals for their children. Food is prepared and provided by the {BUSINESS_CONFIG.schoolName} canteen.
             </p>
+
+            <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1 text-xs">
+              <div className="flex items-center gap-2 text-slate-300 font-semibold">
+                <Building2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>Operating Business: {BUSINESS_CONFIG.legalEntityName}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 pl-5.5">
+                Proprietor: {BUSINESS_CONFIG.proprietorName}
+              </p>
+            </div>
 
             <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-semibold">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 rounded-full">
@@ -53,6 +63,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/about" className="hover:text-amber-400 transition-colors">
+                  About Us
+                </Link>
+              </li>
+              <li>
                 <Link href="/contact" className="hover:text-amber-400 transition-colors">
                   Contact Us
                 </Link>
@@ -70,6 +85,11 @@ export default function Footer() {
               <li>
                 <Link href="/refund-policy" className="hover:text-amber-400 transition-colors">
                   Refund & Cancellation Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/delivery-policy" className="hover:text-amber-400 transition-colors">
+                  Shipping & Delivery Policy
                 </Link>
               </li>
             </ul>
@@ -130,7 +150,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <p>
-            © {currentYear} Daxabit. All rights reserved. Operating for {BUSINESS_CONFIG.schoolName} canteen meal orders.
+            © {currentYear} {BUSINESS_CONFIG.legalEntityName}. All rights reserved. Operated by {BUSINESS_CONFIG.legalEntityName} (Proprietor: {BUSINESS_CONFIG.proprietorName}) for {BUSINESS_CONFIG.schoolName} canteen meal orders.
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -151,7 +171,11 @@ export default function Footer() {
             </Link>
             <span>•</span>
             <Link href="/refund-policy" className="hover:text-slate-400 transition-colors">
-              Refund & Cancellation Policy
+              Refund Policy
+            </Link>
+            <span>•</span>
+            <Link href="/delivery-policy" className="hover:text-slate-400 transition-colors">
+              Delivery Policy
             </Link>
           </div>
         </div>

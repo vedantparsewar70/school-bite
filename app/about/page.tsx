@@ -140,9 +140,13 @@ export default function AboutPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-900">{BUSINESS_CONFIG.schoolName} Canteen</h3>
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-            School-Bite works hand-in-hand with the on-premise canteen catering team of {BUSINESS_CONFIG.schoolName} in Ravet, Pune. Food is prepared and provided directly by the school canteen. Meal preparations are carried out strictly according to advance verified orders.
+            School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), working hand-in-hand with the on-premise canteen catering team of {BUSINESS_CONFIG.schoolName} in Ravet, Pune. Food is prepared and provided directly by the school canteen. Meal preparations are carried out strictly according to advance verified orders.
           </p>
           <div className="pt-2 flex flex-wrap gap-6 text-xs font-semibold text-slate-800">
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Operating Entity</span>
+              <span>{BUSINESS_CONFIG.legalEntityName}</span>
+            </div>
             <div>
               <span className="text-slate-500 block text-[10px] uppercase">Operating Location</span>
               <span>{formattedAddress}</span>

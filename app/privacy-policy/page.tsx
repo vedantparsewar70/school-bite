@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
               School-Bite is an online school meal pre-ordering platform that allows parents to select nutritious meals for their children attending <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune) and complete secure online payments.
             </p>
             <p>
-              The food is prepared and provided directly by the {BUSINESS_CONFIG.schoolName} canteen. School-Bite is operated by the website operator. We are committed to respecting and protecting the privacy of parents, students, and users of our school pre-ordering service.
+              The food is prepared and provided directly by the {BUSINESS_CONFIG.schoolName} canteen. School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). We are committed to respecting and protecting the privacy of parents, students, and users of our school pre-ordering service.
             </p>
             <p>
               This Privacy Policy explains what personal information we collect, why it is required, how it is stored and processed, and how you can contact us regarding your data.
@@ -213,6 +213,8 @@ export default function PrivacyPolicyPage() {
             </p>
 
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2">
+              <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
+              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
               <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
               <p><strong>Operating School:</strong> {BUSINESS_CONFIG.schoolName}</p>
               <p>
@@ -241,10 +243,13 @@ export default function PrivacyPolicyPage() {
           </Link>
           <div className="flex flex-wrap gap-4 font-semibold text-slate-600">
             <Link href="/terms-and-conditions" className="hover:underline">
-              Terms & Conditions
+              Terms &amp; Conditions
             </Link>
             <Link href="/refund-policy" className="hover:underline">
-              Refund & Cancellation Policy
+              Refund &amp; Cancellation Policy
+            </Link>
+            <Link href="/delivery-policy" className="hover:underline">
+              Shipping &amp; Delivery Policy
             </Link>
             <Link href="/contact" className="hover:underline">
               Contact Us
