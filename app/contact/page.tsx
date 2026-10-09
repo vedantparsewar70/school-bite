@@ -288,6 +288,14 @@ export default function ContactPage() {
 
               <div className="space-y-3 text-xs text-slate-600">
                 <div className="flex justify-between pb-2 border-b border-slate-100">
+                  <span className="font-medium text-slate-500">Operating Business</span>
+                  <span className="font-bold text-slate-800">{BUSINESS_CONFIG.legalEntityName}</span>
+                </div>
+                <div className="flex justify-between pb-2 border-b border-slate-100">
+                  <span className="font-medium text-slate-500">Proprietor</span>
+                  <span className="font-bold text-slate-800">{BUSINESS_CONFIG.proprietorName}</span>
+                </div>
+                <div className="flex justify-between pb-2 border-b border-slate-100">
                   <span className="font-medium text-slate-500">Service</span>
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.brandName}</span>
                 </div>
@@ -330,7 +338,7 @@ export default function ContactPage() {
                 <span>Customer Policies & Information</span>
               </p>
               <p className="text-slate-500 text-[11px] leading-relaxed">
-                Review our comprehensive policies regarding pre-ordering, payments, data protection, and order cancellations.
+                Review our comprehensive policies regarding pre-ordering, payments, data protection, fulfillment, and cancellations.
               </p>
               <div className="flex flex-col gap-2 pt-1 text-amber-700 font-semibold">
                 <Link href="/terms-and-conditions" className="hover:underline flex items-center justify-between py-1 border-b border-slate-100">
@@ -341,8 +349,12 @@ export default function ContactPage() {
                   <span>Privacy Policy</span>
                   <span>→</span>
                 </Link>
-                <Link href="/refund-policy" className="hover:underline flex items-center justify-between py-1">
+                <Link href="/refund-policy" className="hover:underline flex items-center justify-between py-1 border-b border-slate-100">
                   <span>Refund & Cancellation Policy</span>
+                  <span>→</span>
+                </Link>
+                <Link href="/delivery-policy" className="hover:underline flex items-center justify-between py-1">
+                  <span>Shipping & Delivery Policy</span>
                   <span>→</span>
                 </Link>
               </div>

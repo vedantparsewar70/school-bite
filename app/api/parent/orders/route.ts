@@ -9,6 +9,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { cleanDoc, generateId } from '@/lib/firestore-db';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { createCashfreeOrder } from '@/lib/cashfree';
+import { BUSINESS_CONFIG } from '@/lib/business-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -306,7 +307,7 @@ export async function POST(req: Request) {
             customerId: parentRecord.id,
             customerName: user.name || 'Parent',
             customerEmail: user.email || 'parent@schoolbite.in',
-            customerPhone: user.phone || '9028977988',
+            customerPhone: user.phone || BUSINESS_CONFIG.supportPhone.replace(/\D/g, ''),
           },
           returnUrl: `${originUrl}/parent/confirmation/${orderId}?order_id={order_id}`,
           notifyUrl: `${originUrl}/api/webhooks/cashfree`,

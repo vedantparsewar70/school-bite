@@ -45,10 +45,10 @@ export default function TermsAndConditionsPage() {
               <span>1. Introduction & Acceptance of Terms</span>
             </h2>
             <p>
-              These Terms and Conditions (&quot;Terms&quot;) constitute a legally binding agreement between you (&quot;User&quot; or &quot;Parent&quot;) and <strong>{BUSINESS_CONFIG.brandName}</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;).
+              These Terms and Conditions (&quot;Terms&quot;) constitute a legally binding agreement between you (&quot;User&quot; or &quot;Parent&quot;) and <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (operating the <strong>{BUSINESS_CONFIG.brandName}</strong> platform, Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;).
             </p>
             <p>
-              School-Bite is operated by the website operator. By creating an account, browsing menus, or placing meal orders on our website ({BUSINESS_CONFIG.websiteUrl}), you acknowledge that you have read, understood, and agreed to be bound by these Terms, together with our Privacy Policy and Refund &amp; Cancellation Policy.
+              School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). By creating an account, browsing menus, or placing meal orders on our website ({BUSINESS_CONFIG.websiteUrl}), you acknowledge that you have read, understood, and agreed to be bound by these Terms, together with our Privacy Policy, Refund &amp; Cancellation Policy, and Shipping &amp; Delivery Policy.
             </p>
           </section>
 
@@ -228,6 +228,8 @@ export default function TermsAndConditionsPage() {
               For any questions, order assistance, or clarification regarding these Terms, please contact our support team:
             </p>
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2">
+              <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
+              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
               <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
               <p><strong>Operating School:</strong> {BUSINESS_CONFIG.schoolName}</p>
               <p>
@@ -259,7 +261,10 @@ export default function TermsAndConditionsPage() {
               Privacy Policy
             </Link>
             <Link href="/refund-policy" className="hover:underline">
-              Refund & Cancellation Policy
+              Refund &amp; Cancellation Policy
+            </Link>
+            <Link href="/delivery-policy" className="hover:underline">
+              Shipping &amp; Delivery Policy
             </Link>
             <Link href="/contact" className="hover:underline">
               Contact Us

@@ -55,7 +55,7 @@ export default function RefundPolicyPage() {
               <span>1. Overview & Operational Model</span>
             </h2>
             <p>
-              At <strong>{BUSINESS_CONFIG.brandName}</strong>, we are committed to transparent and dependable service for parents and students of <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
+              At <strong>{BUSINESS_CONFIG.brandName}</strong> (operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong>, Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), we are committed to transparent and dependable service for parents and students of <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
             </p>
             <p>
               Because school canteen meals are prepared fresh daily based on advance pre-orders, our cancellation and refund guidelines are structured around real kitchen workflows and preparation cutoffs.
@@ -217,6 +217,9 @@ export default function RefundPolicyPage() {
             </ol>
 
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2 mt-3">
+              <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
+              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
+              <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
               <p><strong>Support Email:</strong>{' '}
                 <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="text-amber-600 font-bold hover:underline">
                   {BUSINESS_CONFIG.supportEmail}
@@ -241,10 +244,13 @@ export default function RefundPolicyPage() {
           </Link>
           <div className="flex flex-wrap gap-4 font-semibold text-slate-600">
             <Link href="/terms-and-conditions" className="hover:underline">
-              Terms & Conditions
+              Terms &amp; Conditions
             </Link>
             <Link href="/privacy-policy" className="hover:underline">
               Privacy Policy
+            </Link>
+            <Link href="/delivery-policy" className="hover:underline">
+              Shipping &amp; Delivery Policy
             </Link>
             <Link href="/contact" className="hover:underline">
               Contact Us
