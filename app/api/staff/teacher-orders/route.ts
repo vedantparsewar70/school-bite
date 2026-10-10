@@ -66,6 +66,11 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
+    const orderData = snap.data() || {};
+    if ((orderStatus === 'GIVEN' || orderStatus === 'COLLECTED') && orderData.paymentStatus !== 'PAID') {
+      return NextResponse.json({ error: 'Cannot mark an unpaid teacher order as given or collected.' }, { status: 400 });
+    }
+
     await ref.update({
       orderStatus,
       collectedAt: new Date().toISOString(),

@@ -44,6 +44,13 @@ export async function POST(req: Request) {
     }
 
     const emailStr = String(email).trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_REGEX.test(emailStr)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid email address' },
+        { status: 400 }
+      );
+    }
     const atIndex = emailStr.indexOf('@');
     if (atIndex > 1) {
       redactedEmail = `${emailStr[0]}***${emailStr[atIndex - 1]}${emailStr.slice(atIndex)}`;

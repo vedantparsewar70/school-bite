@@ -87,7 +87,7 @@ function StaffOrdersContent() {
       params.append('date', todayDateStr);
       if (search) params.append('search', search);
 
-      const res = await fetch(`/api/admin/orders?${params.toString()}`);
+      const res = await fetch(`/api/admin/orders?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const allOrders = data.orders || [];
@@ -114,7 +114,7 @@ function StaffOrdersContent() {
       params.append('date', todayDateStr);
       if (search) params.append('search', search);
 
-      const res = await fetch(`/api/staff/teacher-orders?${params.toString()}`);
+      const res = await fetch(`/api/staff/teacher-orders?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const allTeacherOrders = data.orders || [];

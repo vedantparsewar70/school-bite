@@ -227,6 +227,11 @@ export async function PATCH(req: Request) {
         }
       }
 
+      // Guard: Cannot mark an unpaid, pending, or refunded order as collected
+      if (orderStatus === 'COLLECTED' && orderData.paymentStatus !== 'PAID') {
+        throw new Error('Cannot mark an unpaid or pending order as collected.');
+      }
+
       const now = new Date().toISOString();
 
       // 2. Cancellation by Admin / Staff: Restore menu stock
