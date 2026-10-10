@@ -18,6 +18,7 @@ import {
 import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
 import { useToast } from '@/components/ToastContext';
+import { useChildren } from '@/components/ChildrenContext';
 import { formatINR, formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/utils';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
@@ -27,21 +28,15 @@ import { MenuDayItem } from '@/types';
 
 export default function ParentDashboard() {
   const { user, isLoading } = useAuth();
+  const { children: childrenList } = useChildren();
   const { addToCart } = useCart();
   const { showToast } = useToast();
 
   const [orders, setOrders] = useState<any[]>([]);
-  const [childrenList, setChildrenList] = useState<any[]>(user?.students || []);
   const [todayMenu, setTodayMenu] = useState<MenuDayItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   const todayStr = getTodayString();
-
-  useEffect(() => {
-    if (user?.students && user.students.length > 0 && childrenList.length === 0) {
-      setChildrenList(user.students);
-    }
-  }, [user?.students]);
 
   useEffect(() => {
     async function loadDashboardData() {

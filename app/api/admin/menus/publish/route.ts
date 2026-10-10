@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -25,20 +25,22 @@ export async function POST(req: Request) {
 
     const existingMealIdMap = new Map(existingMenus.map((m: any) => [m.mealId, m]));
 
-    // 2. Enable selected meals (upserting if not yet in database for that date)
-    for (const mealId of selectedMealIds) {
+    const now = new Date().toISOString();
+
+    // 2. Concurrently enable selected meals & disable unselected meals
+    const enablePromises = selectedMealIds.map((mealId: string) => {
       const existing = existingMealIdMap.get(mealId);
       if (existing) {
-        await prisma.menu.update({
+        return prisma.menu.update({
           where: { id: existing.id },
-          data: { isActive: true },
+          data: { isActive: true, updatedAt: now },
         });
       } else {
-        await prisma.menu.upsert({
+        return prisma.menu.upsert({
           where: {
             mealId_date: { mealId, date },
           },
-          update: { isActive: true },
+          update: { isActive: true, updatedAt: now },
           create: {
             mealId,
             date,
@@ -46,19 +48,37 @@ export async function POST(req: Request) {
             maxQuantity: 50,
             orderingDeadline: '08:30',
             isActive: true,
+            updatedAt: now,
           },
         });
       }
+    });
+
+    const disablePromises = existingMenus
+      .filter((existing: any) => !selectedMealIds.includes(existing.mealId))
+      .map((existing: any) =>
+        prisma.menu.update({
+          where: { id: existing.id },
+          data: { isActive: false, updatedAt: now },
+        })
+      );
+
+    await Promise.all([...enablePromises, ...disablePromises]);
+
+    // Record authoritative publication in menu_publishes collection
+    try {
+      const { recordMenuPublication } = await import('@/lib/menu-schedule');
+      await recordMenuPublication(date, selectedMealIds);
+    } catch (e) {
+      console.error('Failed to record menu publication:', e);
     }
 
-    // 3. Disable any menu items for this date that are NOT in selectedMealIds
-    for (const existing of existingMenus) {
-      if (!selectedMealIds.includes(existing.mealId)) {
-        await prisma.menu.update({
-          where: { id: existing.id },
-          data: { isActive: false },
-        });
-      }
+    // Invalidate menu cache so parents immediately see updated menu
+    try {
+      const { clearMenuCache } = await import('@/app/api/menu/route');
+      clearMenuCache();
+    } catch {
+      // ignore
     }
 
     const updatedMenus = await prisma.menu.findMany({

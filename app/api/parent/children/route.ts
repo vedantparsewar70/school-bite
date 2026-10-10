@@ -140,28 +140,34 @@ export async function POST(req: Request) {
       },
     });
 
-    // Create relational student allergies
-    for (const alg of finalAllergies) {
-      if (!alg || alg.toLowerCase() === 'none') continue;
-      const allergyRecord = await prisma.allergy.upsert({
-        where: { name: alg },
-        update: {},
-        create: { name: alg },
-      });
+    // Create relational student allergies concurrently
+    const validAllergies = finalAllergies.filter(
+      (alg) => Boolean(alg) && alg.toLowerCase() !== 'none'
+    );
+    if (validAllergies.length > 0) {
+      await Promise.all(
+        validAllergies.map(async (alg) => {
+          const allergyRecord = await prisma.allergy.upsert({
+            where: { name: alg },
+            update: {},
+            create: { name: alg },
+          });
 
-      await prisma.studentAllergy.upsert({
-        where: {
-          studentId_allergyId: {
-            studentId: newStudent.id,
-            allergyId: allergyRecord.id,
-          },
-        },
-        update: {},
-        create: {
-          studentId: newStudent.id,
-          allergyId: allergyRecord.id,
-        },
-      });
+          await prisma.studentAllergy.upsert({
+            where: {
+              studentId_allergyId: {
+                studentId: newStudent.id,
+                allergyId: allergyRecord.id,
+              },
+            },
+            update: {},
+            create: {
+              studentId: newStudent.id,
+              allergyId: allergyRecord.id,
+            },
+          });
+        })
+      );
     }
 
     return NextResponse.json({ success: true, student: newStudent }, { status: 201 });
@@ -241,22 +247,28 @@ export async function PUT(req: Request) {
       },
     });
 
-    // Reset and sync student_allergies relation
+    // Reset and sync student_allergies relation concurrently
     await prisma.studentAllergy.deleteMany({ where: { studentId: id } });
-    for (const alg of finalAllergies) {
-      if (!alg || alg.toLowerCase() === 'none') continue;
-      const allergyRecord = await prisma.allergy.upsert({
-        where: { name: alg },
-        update: {},
-        create: { name: alg },
-      });
+    const validUpdateAllergies = finalAllergies.filter(
+      (alg) => Boolean(alg) && alg.toLowerCase() !== 'none'
+    );
+    if (validUpdateAllergies.length > 0) {
+      await Promise.all(
+        validUpdateAllergies.map(async (alg) => {
+          const allergyRecord = await prisma.allergy.upsert({
+            where: { name: alg },
+            update: {},
+            create: { name: alg },
+          });
 
-      await prisma.studentAllergy.create({
-        data: {
-          studentId: id,
-          allergyId: allergyRecord.id,
-        },
-      });
+          await prisma.studentAllergy.create({
+            data: {
+              studentId: id,
+              allergyId: allergyRecord.id,
+            },
+          });
+        })
+      );
     }
 
     return NextResponse.json({ success: true, student: updated });

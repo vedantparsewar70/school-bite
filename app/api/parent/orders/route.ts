@@ -8,8 +8,10 @@ import { db } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { cleanDoc, generateId } from '@/lib/firestore-db';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
-import { createCashfreeOrder } from '@/lib/cashfree';
+import { createCashfreeOrder, getCashfreeOrder } from '@/lib/cashfree';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
+import { savePendingParentOrder, fulfillParentOrder } from '@/lib/order-fulfillment';
+import { validateCartAvailability } from '@/lib/availability';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +28,10 @@ export async function GET(req: Request) {
     const take = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 100) : 50;
 
     const orders = await prisma.order.findMany({
-      where: { parentId: user.parentId },
+      where: {
+        parentId: user.parentId,
+        paymentStatus: 'PAID', // Strictly exclude incomplete or failed order attempts
+      },
       take,
       include: {
         items: {
@@ -89,6 +94,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let lockAcquired = false;
+  let requestKey: string | undefined = undefined;
+  let lockToken: string | undefined = undefined;
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== 'PARENT' || !user.parentId) {
@@ -130,6 +138,8 @@ export async function POST(req: Request) {
       idempotencyKey?: string;
     } = body;
 
+    requestKey = idempotencyKey;
+
     // Check for duplicate submission using idempotency key if provided
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
@@ -153,6 +163,135 @@ export async function POST(req: Request) {
           order: existingOrder,
           isDuplicateSubmission: true,
         });
+      }
+
+      // Check for pending checkout session to prevent duplicate Cashfree payment sessions
+      const pendingSnap = await db.collection('pending_orders').doc(idempotencyKey).get();
+      if (pendingSnap.exists) {
+        const pendingData = pendingSnap.data() as any;
+        return NextResponse.json({
+          success: true,
+          orderId: idempotencyKey,
+          paymentSessionId: pendingData?.paymentSessionId || null,
+          cfOrderId: pendingData?.cashfreeOrderId || null,
+          isCashfree: Boolean(pendingData?.paymentSessionId),
+          totalAmount: pendingData?.totalAmount,
+          isDuplicateSubmission: true,
+        });
+      }
+    }
+
+    // Atomic Concurrency Lock: Prevent simultaneous parallel checkouts from creating duplicate sessions
+    if (idempotencyKey) {
+      const lockRef = db.collection('idempotency_locks').doc(idempotencyKey);
+      lockToken = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const nowMs = Date.now();
+      const LOCK_TTL_MS = 30000;
+
+      try {
+        await lockRef.create({
+          id: idempotencyKey,
+          parentId: user.parentId,
+          createdAt: new Date().toISOString(),
+          createdAtMs: nowMs,
+          status: 'PROCESSING',
+          lockToken,
+        });
+        lockAcquired = true;
+      } catch (lockErr: any) {
+        // Code 6 is ALREADY_EXISTS: A concurrent request is already in-flight for this exact key
+        if (lockErr.code === 6 || lockErr.message?.includes('ALREADY_EXISTS') || lockErr.message?.includes('already exists')) {
+          // Check if existing lock is stale (e.g. prior crashed request)
+          const existingLockSnap = await lockRef.get();
+          if (existingLockSnap.exists) {
+            const data = existingLockSnap.data() as any;
+            const lockAge = nowMs - (data?.createdAtMs || new Date(data?.createdAt || 0).getTime() || 0);
+            if (lockAge > LOCK_TTL_MS) {
+              await db.runTransaction(async (t) => {
+                const freshSnap = await t.get(lockRef);
+                if (freshSnap.exists) {
+                  const freshData = freshSnap.data() as any;
+                  const freshAge = Date.now() - (freshData?.createdAtMs || new Date(freshData?.createdAt || 0).getTime() || 0);
+                  if (freshAge > LOCK_TTL_MS) {
+                    t.set(lockRef, {
+                      id: idempotencyKey,
+                      parentId: user.parentId,
+                      createdAt: new Date().toISOString(),
+                      createdAtMs: Date.now(),
+                      status: 'PROCESSING',
+                      lockToken,
+                    });
+                    lockAcquired = true;
+                  }
+                }
+              });
+            }
+          }
+
+          if (!lockAcquired) {
+            for (let attempt = 0; attempt < 15; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 200));
+
+              // Check if order was completed and confirmed
+              const readyOrder = await prisma.order.findUnique({
+                where: { id: idempotencyKey },
+                include: { items: { include: { student: true, meal: true } }, payments: true },
+              });
+              if (readyOrder) {
+                return NextResponse.json({
+                  success: true,
+                  orderId: readyOrder.id,
+                  totalAmount: readyOrder.totalAmount,
+                  order: readyOrder,
+                  isDuplicateSubmission: true,
+                });
+              }
+
+              // Check if pending checkout session is saved
+              const readyPending = await db.collection('pending_orders').doc(idempotencyKey).get();
+              if (readyPending.exists) {
+                const pendingData = readyPending.data() as any;
+                return NextResponse.json({
+                  success: true,
+                  orderId: idempotencyKey,
+                  paymentSessionId: pendingData?.paymentSessionId || null,
+                  cfOrderId: pendingData?.cashfreeOrderId || null,
+                  isCashfree: Boolean(pendingData?.paymentSessionId),
+                  totalAmount: pendingData?.totalAmount,
+                  isDuplicateSubmission: true,
+                });
+              }
+
+              // Check if lock was released by earlier request (e.g. error or validation failure)
+              const checkLock = await lockRef.get();
+              if (!checkLock.exists) {
+                try {
+                  await lockRef.create({
+                    id: idempotencyKey,
+                    parentId: user.parentId,
+                    createdAt: new Date().toISOString(),
+                    createdAtMs: Date.now(),
+                    status: 'PROCESSING',
+                    lockToken,
+                  });
+                  lockAcquired = true;
+                  break;
+                } catch {
+                  // Another concurrent request acquired it, keep waiting
+                }
+              }
+            }
+
+            if (!lockAcquired) {
+              return NextResponse.json(
+                { error: 'An order checkout is already in progress for this request. Please wait a moment.' },
+                { status: 409 }
+              );
+            }
+          }
+        } else {
+          throw lockErr;
+        }
       }
     }
 
@@ -195,6 +334,24 @@ export async function POST(req: Request) {
       },
     });
     const mealsMap = new Map(meals.map((m: any) => [m.id, m]));
+
+    // Authoritative Server-side Menu Availability Validation (Single Source of Truth)
+    const availabilityResult = await validateCartAvailability(cartItems);
+    if (!availabilityResult.valid && availabilityResult.firstUnavailableItem) {
+      const unavail = availabilityResult.firstUnavailableItem;
+      return NextResponse.json(
+        {
+          error: availabilityResult.errorMessage || `Meal "${unavail.mealName}" is not available for ${unavail.date}.`,
+          unavailableItem: {
+            mealId: unavail.mealId,
+            mealName: unavail.mealName,
+            date: unavail.date,
+            reason: unavail.reason,
+          },
+        },
+        { status: 400 }
+      );
+    }
 
     // Authoritative Server-side Price & Allergy Evaluation
     let totalAmount = 0;
@@ -295,8 +452,55 @@ export async function POST(req: Request) {
     const host = req.headers.get('host') || 'localhost:3000';
     const originUrl = `${proto}://${host}`;
 
-    let cfSession: any = null;
     const isCashfreeEnabled = Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY);
+    let cfSession: any = null;
+
+    const hasLockOwnership = async (): Promise<boolean> => {
+      if (!idempotencyKey || !lockToken) return true;
+      try {
+        const currentLockSnap = await db.collection('idempotency_locks').doc(idempotencyKey).get();
+        return currentLockSnap.exists && currentLockSnap.data()?.lockToken === lockToken;
+      } catch {
+        return false;
+      }
+    };
+
+    // Pre-gateway Lock Ownership Check: abort if another request reclaimed our expired lock
+    if (idempotencyKey && lockToken) {
+      const isOwner = await hasLockOwnership();
+      if (!isOwner) {
+        const existingOrder = await prisma.order.findUnique({
+          where: { id: idempotencyKey },
+          include: { items: { include: { student: true, meal: true } }, payments: true },
+        });
+        if (existingOrder) {
+          return NextResponse.json({
+            success: true,
+            orderId: existingOrder.id,
+            totalAmount: existingOrder.totalAmount,
+            order: existingOrder,
+            isDuplicateSubmission: true,
+          });
+        }
+        const existingPending = await db.collection('pending_orders').doc(idempotencyKey).get();
+        if (existingPending.exists) {
+          const pendingData = existingPending.data() as any;
+          return NextResponse.json({
+            success: true,
+            orderId: idempotencyKey,
+            paymentSessionId: pendingData?.paymentSessionId || null,
+            cfOrderId: pendingData?.cashfreeOrderId || null,
+            isCashfree: Boolean(pendingData?.paymentSessionId),
+            totalAmount: pendingData?.totalAmount,
+            isDuplicateSubmission: true,
+          });
+        }
+        return NextResponse.json(
+          { error: 'Checkout session lock expired and was reclaimed by a concurrent request. Please retry.' },
+          { status: 409 }
+        );
+      }
+    }
 
     if (isCashfreeEnabled) {
       try {
@@ -315,134 +519,153 @@ export async function POST(req: Request) {
         });
       } catch (cfErr: any) {
         console.error('Failed to create Cashfree payment session:', cfErr);
+        if (cfErr.message?.includes('already present') || cfErr.message?.includes('already exists')) {
+          try {
+            const existingCf = await getCashfreeOrder(orderId);
+            if (existingCf) {
+              cfSession = {
+                cfOrderId: String(existingCf.cf_order_id || ''),
+                orderId: existingCf.order_id,
+                orderStatus: existingCf.order_status,
+                paymentSessionId: existingCf.payment_session_id,
+                orderAmount: Number(existingCf.order_amount),
+                orderCurrency: existingCf.order_currency || 'INR',
+              };
+            }
+          } catch (getErr) {
+            console.error('Failed to retrieve existing Cashfree session:', getErr);
+          }
+        }
+
+        if (!cfSession) {
+          return NextResponse.json(
+            { error: `Payment gateway error: ${cfErr.message || 'Failed to initialize payment session'}` },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
+    // Pre-write Lock Ownership Check: abort before writing if another request reclaimed our expired lock
+    if (idempotencyKey && lockToken) {
+      const stillOwner = await hasLockOwnership();
+      if (!stillOwner) {
+        const existingOrder = await prisma.order.findUnique({
+          where: { id: idempotencyKey },
+          include: { items: { include: { student: true, meal: true } }, payments: true },
+        });
+        if (existingOrder) {
+          return NextResponse.json({
+            success: true,
+            orderId: existingOrder.id,
+            totalAmount: existingOrder.totalAmount,
+            order: existingOrder,
+            isDuplicateSubmission: true,
+          });
+        }
+        const existingPending = await db.collection('pending_orders').doc(idempotencyKey).get();
+        if (existingPending.exists) {
+          const pendingData = existingPending.data() as any;
+          return NextResponse.json({
+            success: true,
+            orderId: idempotencyKey,
+            paymentSessionId: pendingData?.paymentSessionId || null,
+            cfOrderId: pendingData?.cashfreeOrderId || null,
+            isCashfree: Boolean(pendingData?.paymentSessionId),
+            totalAmount: pendingData?.totalAmount,
+            isDuplicateSubmission: true,
+          });
+        }
         return NextResponse.json(
-          { error: `Payment gateway error: ${cfErr.message || 'Failed to initialize payment session'}` },
-          { status: 500 }
+          { error: 'Checkout session lock expired and was reclaimed by a concurrent request. Please retry.' },
+          { status: 409 }
         );
       }
     }
 
-    // ========================================================
-    // ATOMIC FIRESTORE TRANSACTION: Guaranteed concurrency & quota safety
-    // ========================================================
-    const transactionResult = await db.runTransaction(async (transaction) => {
-      // 1. Transactional Reads: Menu portions
-      const menuRefMap = new Map<string, { ref: FirebaseFirestore.DocumentReference; data: any }>();
-
-      for (const item of evaluatedCartItems) {
-        const menuDocId = `${item.mealId}_${item.date}`;
-        const menuRef = db.collection('menus').doc(menuDocId);
-        const menuSnap = await transaction.get(menuRef);
-
-        if (!menuSnap.exists) {
-          throw new Error(`Meal "${item.mealName}" is not scheduled on ${item.date}`);
-        }
-
-        const menuData = menuSnap.data() || {};
-        if (!menuData.isActive) {
-          throw new Error(`Meal "${item.mealName}" is not available on ${item.date}`);
-        }
-
-        if (isDeadlinePassed(item.date, menuData.orderingDeadline || '08:30')) {
-          throw new Error(`Ordering deadline (${menuData.orderingDeadline || '08:30'}) for "${item.mealName}" on ${item.date} has passed.`);
-        }
-
-        const available = Number(menuData.availableQuantity ?? 0);
-        if (available < item.quantity) {
-          throw new Error(`Not enough portions available for "${item.mealName}" on ${item.date}. Only ${available} portions remaining.`);
-        }
-
-        menuRefMap.set(menuDocId, { ref: menuRef, data: menuData });
-      }
-
-      // 2. Transactional Writes: Atomic Decrements & Record Creation
-      // A. Decrement menu portions atomically
-      for (const item of evaluatedCartItems) {
-        const menuDocId = `${item.mealId}_${item.date}`;
-        const entry = menuRefMap.get(menuDocId);
-        if (entry) {
-          transaction.update(entry.ref, {
-            availableQuantity: FieldValue.increment(-Number(item.quantity)),
-            updatedAt: now,
-          });
-        }
-      }
-
-      // C. Create Order
-      const initialPaymentStatus = isCashfreeEnabled ? 'PENDING' : 'PAID';
-      const orderObj = cleanDoc({
+    // If Cashfree Payment Gateway is enabled, save as pending checkout intent.
+    // Strictly DO NOT create any record in 'orders', 'orderItems', or 'payments',
+    // and DO NOT decrement portions until payment is verified as PAID!
+    if (isCashfreeEnabled) {
+      await savePendingParentOrder({
         id: orderId,
         parentId: parentRecord.id,
         totalAmount,
-        paymentStatus: initialPaymentStatus,
-        orderStatus: 'CONFIRMED',
+        paymentMethod,
+        upiId: upiId || null,
+        cardLastFour: cardLastFour || null,
+        bankName: bankName || null,
+        notes: notes || null,
+        cartItems: evaluatedCartItems,
         cashfreeOrderId: cfSession?.cfOrderId || null,
         paymentSessionId: cfSession?.paymentSessionId || null,
-        notes: notes || null,
         createdAt: now,
-        updatedAt: now,
       });
-      transaction.set(db.collection('orders').doc(orderId), orderObj);
 
-      // D. Create OrderItems
-      const createdItems = [];
-      for (const item of evaluatedCartItems) {
-        const itemId = generateId('oit_');
-        const itemObj = cleanDoc({
-          id: itemId,
-          orderId,
-          studentId: item.studentId,
-          mealId: item.mealId,
-          date: item.date,
-          quantity: item.quantity,
-          unitPrice: item.mealPrice,
-          totalPrice: item.mealPrice * item.quantity,
-          hasAllergyAlert: Boolean(item.hasAllergyAlert),
-          conflictAllergens: item.conflictAllergens || null,
-          createdAt: now,
-        });
-        transaction.set(db.collection('orderItems').doc(itemId), itemObj);
-        createdItems.push(itemObj);
-      }
-
-      // E. Create Payment
-      const initialPayStatus = isCashfreeEnabled ? 'PENDING' : 'SUCCESS';
-      const payObj = cleanDoc({
-        id: paymentId,
+      return NextResponse.json({
+        success: true,
         orderId,
-        amount: totalAmount,
-        paymentMethod,
-        status: initialPayStatus,
-        transactionRef: txnRef,
-        upiId: upiId || null,
-        cardLastFour: cardLastFour || (paymentMethod === 'CARD' ? '4242' : null),
-        bankName: bankName || (paymentMethod === 'NET_BANKING' ? 'State Bank of India' : null),
-        createdAt: now,
+        paymentSessionId: cfSession?.paymentSessionId || null,
+        cfOrderId: cfSession?.cfOrderId || null,
+        isCashfree: true,
+        totalAmount,
       });
-      transaction.set(db.collection('payments').doc(paymentId), payObj);
+    }
 
-      return {
-        ...orderObj,
-        items: createdItems,
-        payments: [payObj],
-      };
+    // Direct fallback (when Cashfree is disabled for local mock testing):
+    // Save pending and immediately fulfill as PAID
+    await savePendingParentOrder({
+      id: orderId,
+      parentId: parentRecord.id,
+      totalAmount,
+      paymentMethod,
+      upiId: upiId || null,
+      cardLastFour: cardLastFour || null,
+      bankName: bankName || null,
+      notes: notes || null,
+      cartItems: evaluatedCartItems,
+      cashfreeOrderId: null,
+      paymentSessionId: null,
+      createdAt: now,
+    });
+
+    const fulfillRes = await fulfillParentOrder(orderId, {
+      transactionRef: txnRef,
+      paymentMethod,
+      upiId: upiId || null,
+      cardLastFour: cardLastFour || null,
+      bankName: bankName || null,
+      amount: totalAmount,
     });
 
     return NextResponse.json({
       success: true,
-      orderId: transactionResult.id,
-      paymentSessionId: cfSession?.paymentSessionId || null,
-      cfOrderId: cfSession?.cfOrderId || null,
-      isCashfree: isCashfreeEnabled,
+      orderId: fulfillRes.orderId,
+      paymentSessionId: null,
+      cfOrderId: null,
+      isCashfree: false,
       paymentId,
       transactionRef: txnRef,
       totalAmount,
-      order: transactionResult,
     });
   } catch (error: any) {
     console.error('Error placing order:', error);
     const userMessage = error?.message || 'Failed to process order';
     return NextResponse.json({ error: userMessage }, { status: 400 });
+  } finally {
+    if (lockAcquired && requestKey && lockToken) {
+      try {
+        const lockRef = db.collection('idempotency_locks').doc(requestKey);
+        await db.runTransaction(async (t) => {
+          const snap = await t.get(lockRef);
+          if (snap.exists && snap.data()?.lockToken === lockToken) {
+            t.delete(lockRef);
+          }
+        });
+      } catch (releaseErr) {
+        console.error('Failed to release idempotency lock safely:', releaseErr);
+      }
+    }
   }
 }
 

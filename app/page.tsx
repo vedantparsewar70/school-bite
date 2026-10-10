@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Sparkles,
   KeyRound,
+  GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
@@ -242,6 +243,17 @@ function HomePageContent() {
             </button>
           </div>
         </div>
+
+        {/* Teachers Button */}
+        <div className="pt-1 flex justify-center">
+          <Link
+            href="/teacher/menu"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-full text-xs font-extrabold shadow-2xs transition-colors cursor-pointer"
+          >
+            <GraduationCap className="w-3.5 h-3.5 text-teal-600" />
+            <span>Teachers Only →</span>
+          </Link>
+        </div>
       </div>
 
       {/* Main Form Card */}
@@ -462,7 +474,7 @@ function HomePageContent() {
 
         {/* Footer info & Staff/Admin login links */}
         <div className="mt-6 text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 text-xs">
+          <div className="flex items-center justify-center text-xs pt-1">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-full font-bold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-600" />
               <span>100% Pure Vegetarian</span>

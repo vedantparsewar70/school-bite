@@ -149,8 +149,9 @@ export default function OrderConfirmationPage() {
         )}
       </div>
 
-      {/* Confirmation Card */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6">
+      {/* Confirmation Card: Only rendered when payment is successfully confirmed and order exists */}
+      {isPaid && order ? (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6">
         {/* Order Meta Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 p-3.5 sm:p-4 rounded-2xl bg-amber-50/60 border border-amber-100 text-xs">
           <div>
@@ -255,6 +256,7 @@ export default function OrderConfirmationPage() {
           </Link>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

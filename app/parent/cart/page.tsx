@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,6 +16,7 @@ import {
   FileText,
   Loader2,
   MessageSquare,
+  AlertTriangle,
 } from 'lucide-react';
 import { useCart } from '@/components/CartContext';
 import { useAuth } from '@/components/AuthContext';
@@ -34,6 +35,10 @@ export default function CartPage() {
   const [processing, setProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Live availability tracking: Map of `${mealId}__${date}` -> reason
+  const [unavailableItemsMap, setUnavailableItemsMap] = useState<Record<string, string>>({});
+  const [isValidatingAvailability, setIsValidatingAvailability] = useState(false);
+
   // Group cart items by student and date for clear visual organization
   const groupedByChildAndDate: Record<string, typeof cartItems> = {};
   cartItems.forEach((item) => {
@@ -41,6 +46,77 @@ export default function CartPage() {
     if (!groupedByChildAndDate[key]) groupedByChildAndDate[key] = [];
     groupedByChildAndDate[key].push(item);
   });
+
+  // Revalidate availability on mount and whenever cartItems change
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setUnavailableItemsMap({});
+      return;
+    }
+
+    let isMounted = true;
+    async function checkAvailability() {
+      setIsValidatingAvailability(true);
+      try {
+        const res = await fetch('/api/parent/cart/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cartItems }),
+        });
+
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          const map: Record<string, string> = {};
+          if (Array.isArray(data.items)) {
+            data.items.forEach((it: any) => {
+              if (!it.isAvailable) {
+                map[`${it.mealId}__${it.date}`] = it.reason || 'Not available for this date';
+              }
+            });
+          }
+          setUnavailableItemsMap(map);
+        }
+      } catch (err) {
+        console.error('Failed to validate cart items:', err);
+      } finally {
+        if (isMounted) setIsValidatingAvailability(false);
+      }
+    }
+
+    checkAvailability();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cartItems]);
+
+  const unavailableCount = Object.keys(unavailableItemsMap).length;
+  const hasUnavailableItems = unavailableCount > 0;
+
+  // One-click remove all unavailable meals from cart
+  const handleRemoveAllUnavailable = () => {
+    let removedCount = 0;
+    cartItems.forEach((item) => {
+      const key = `${item.mealId}__${item.date}`;
+      if (unavailableItemsMap[key]) {
+        removeFromCart(item.cartItemId);
+        removedCount++;
+      }
+    });
+    setUnavailableItemsMap({});
+    setErrorMessage('');
+    showToast(`Removed ${removedCount} unavailable item(s) from cart`, 'info');
+  };
+
+  // Preload Cashfree SDK in background so checkout is instant
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).Cashfree) {
+      const script = document.createElement('script');
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const loadCashfreeSdk = (): Promise<any> => {
     if (typeof window !== 'undefined' && (window as any).Cashfree) {
@@ -71,6 +147,11 @@ export default function CartPage() {
       return;
     }
 
+    if (hasUnavailableItems) {
+      showToast('Please remove unavailable meals before proceeding to payment', 'error');
+      return;
+    }
+
     setErrorMessage('');
     setProcessing(true);
 
@@ -93,6 +174,13 @@ export default function CartPage() {
       if (!res.ok) {
         const errorText = data.error || 'Unable to create order. Please try again.';
         setErrorMessage(errorText);
+        if (data.unavailableItem) {
+          const key = `${data.unavailableItem.mealId}__${data.unavailableItem.date}`;
+          setUnavailableItemsMap((prev) => ({
+            ...prev,
+            [key]: data.unavailableItem.reason || 'Disabled by canteen staff',
+          }));
+        }
         showToast(errorText, 'error');
         setProcessing(false);
         return;
@@ -200,6 +288,30 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Cart Items List */}
           <div className="lg:col-span-8 space-y-6">
+            {/* Unavailable Meals Warning Banner */}
+            {hasUnavailableItems && (
+              <div className="bg-rose-50 border border-rose-200 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-rose-900">
+                      Meal Availability Alert ({unavailableCount} item{unavailableCount > 1 ? 's' : ''} unavailable)
+                    </h4>
+                    <p className="text-xs text-rose-700 mt-0.5">
+                      Some meals in your cart are no longer available for their selected date (disabled by canteen staff or ordering cutoff passed). Please remove them to proceed.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleRemoveAllUnavailable}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove Unavailable Items</span>
+                </button>
+              </div>
+            )}
+
             {Object.entries(groupedByChildAndDate).map(([groupKey, items]) => {
               const [studentInfo, dateStr] = groupKey.split('__');
               return (
@@ -221,86 +333,102 @@ export default function CartPage() {
 
                   {/* Items for this student & date */}
                   <div className="divide-y divide-slate-100">
-                    {items.map((item) => (
-                      <div
-                        key={item.cartItemId}
-                        className="p-3.5 sm:p-5 hover:bg-slate-50/50 transition-colors space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4"
-                      >
-                        {/* Top on mobile, Left on desktop: Meal Icon & Info */}
-                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                          <div className="shrink-0 mt-0.5 sm:mt-0">
-                            <MealIcon
-                              name={item.mealName}
-                              category={item.mealCategory}
-                              size="md"
-                            />
-                          </div>
+                    {items.map((item) => {
+                      const itemKey = `${item.mealId}__${item.date}`;
+                      const itemUnavailableReason = unavailableItemsMap[itemKey];
+                      const isItemUnavailable = Boolean(itemUnavailableReason);
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <VegBadge isVegetarian={item.isVegetarian} size="sm" />
-                              <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">
-                                {item.mealName}
-                              </h4>
+                      return (
+                        <div
+                          key={item.cartItemId}
+                          className={`p-3.5 sm:p-5 transition-colors space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4 ${
+                            isItemUnavailable ? 'bg-rose-50/40 border-l-4 border-l-rose-500' : 'hover:bg-slate-50/50'
+                          }`}
+                        >
+                          {/* Top on mobile, Left on desktop: Meal Icon & Info */}
+                          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                            <div className="shrink-0 mt-0.5 sm:mt-0">
+                              <MealIcon
+                                name={item.mealName}
+                                category={item.mealCategory}
+                                size="md"
+                              />
                             </div>
-                            <p className="text-xs font-semibold text-amber-700 mt-0.5">
-                              {formatINR(item.mealPrice)} each
-                            </p>
-                          </div>
 
-                          {/* Mobile-only trash button in top-right corner */}
-                          <button
-                            onClick={() => removeFromCart(item.cartItemId)}
-                            disabled={processing}
-                            className="sm:hidden p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50"
-                            title="Remove meal"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <VegBadge isVegetarian={item.isVegetarian} size="sm" />
+                                <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">
+                                  {item.mealName}
+                                </h4>
+                              </div>
+                              <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                                {formatINR(item.mealPrice)} each
+                              </p>
 
-                        {/* Bottom on mobile, Right on desktop: Quantity Controls & Subtotal */}
-                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pt-2.5 sm:pt-0 border-t border-slate-100 sm:border-0">
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 overflow-hidden shadow-2xs">
-                            <button
-                              onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
-                              disabled={processing}
-                              className="p-1.5 sm:p-2 hover:bg-white text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
-                              title="Decrease quantity"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="px-3 text-xs font-bold text-slate-800 min-w-6 text-center">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
-                              disabled={processing}
-                              className="p-1.5 sm:p-2 hover:bg-white text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
-                              title="Increase quantity"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                              {/* Item Availability Badge */}
+                              {isItemUnavailable && (
+                                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md w-fit">
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                  <span>Unavailable: {itemUnavailableReason}</span>
+                                </div>
+                              )}
+                            </div>
 
-                          <div className="flex items-center gap-3">
-                            <span className="font-extrabold text-slate-900 text-sm sm:text-base text-right whitespace-nowrap">
-                              {formatINR(item.mealPrice * item.quantity)}
-                            </span>
-
-                            {/* Desktop-only trash button */}
+                            {/* Mobile-only trash button in top-right corner */}
                             <button
                               onClick={() => removeFromCart(item.cartItemId)}
                               disabled={processing}
-                              className="hidden sm:block p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                              className="sm:hidden p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50"
                               title="Remove meal"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
+
+                          {/* Bottom on mobile, Right on desktop: Quantity Controls & Subtotal */}
+                          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pt-2.5 sm:pt-0 border-t border-slate-100 sm:border-0">
+                            <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 overflow-hidden shadow-2xs">
+                              <button
+                                onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
+                                disabled={processing}
+                                className="p-1.5 sm:p-2 hover:bg-white text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
+                                title="Decrease quantity"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="px-3 text-xs font-bold text-slate-800 min-w-6 text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                                disabled={processing}
+                                className="p-1.5 sm:p-2 hover:bg-white text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
+                                title="Increase quantity"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="font-extrabold text-slate-900 text-sm sm:text-base text-right whitespace-nowrap">
+                                {formatINR(item.mealPrice * item.quantity)}
+                              </span>
+
+                              {/* Desktop-only trash button */}
+                              <button
+                                onClick={() => removeFromCart(item.cartItemId)}
+                                disabled={processing}
+                                className="hidden sm:block p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                                title="Remove meal"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -361,13 +489,22 @@ export default function CartPage() {
             {/* Proceed to Payment Button */}
             <button
               onClick={handleProceedToPayment}
-              disabled={processing || cartItems.length === 0}
-              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={processing || cartItems.length === 0 || hasUnavailableItems}
+              className={`w-full py-3.5 text-white rounded-2xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                hasUnavailableItems
+                  ? 'bg-rose-500 shadow-rose-500/20 hover:bg-rose-600'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/25 active:scale-[0.99]'
+              }`}
             >
               {processing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Connecting to Cashfree...</span>
+                </>
+              ) : hasUnavailableItems ? (
+                <>
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Remove {unavailableCount} Unavailable Meal{unavailableCount > 1 ? 's' : ''} to Pay</span>
                 </>
               ) : (
                 <>
@@ -376,6 +513,12 @@ export default function CartPage() {
                 </>
               )}
             </button>
+
+            {hasUnavailableItems && (
+              <p className="text-[11px] text-rose-600 text-center font-medium">
+                Please remove disabled meals or update your cart above before paying.
+              </p>
+            )}
 
             {/* Security & Gateway Trust Badge */}
             <div className="pt-1 text-center space-y-1">

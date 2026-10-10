@@ -140,20 +140,42 @@ export default function AboutPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-900">{BUSINESS_CONFIG.schoolName} Canteen</h3>
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-            School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), working hand-in-hand with the on-premise canteen catering team of {BUSINESS_CONFIG.schoolName} in Ravet, Pune. Food is prepared and provided directly by the school canteen. Meal preparations are carried out strictly according to advance verified orders.
+            School-Bite is an online school meal pre-ordering platform operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Registered Business / Trade Names: <strong>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), working hand-in-hand with the on-premise canteen catering team of {BUSINESS_CONFIG.schoolName} in Ravet, Pune. Food is prepared and provided directly by the school canteen. Meal preparations are carried out strictly according to advance verified orders.
           </p>
-          <div className="pt-2 flex flex-wrap gap-6 text-xs font-semibold text-slate-800">
+          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold text-slate-800">
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Operating Entity</span>
+              <span className="text-slate-500 block text-[10px] uppercase">Operating Business</span>
               <span>{BUSINESS_CONFIG.legalEntityName}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Operating Location</span>
-              <span>{formattedAddress}</span>
+              <span className="text-slate-500 block text-[10px] uppercase">Business / Trade Names</span>
+              <span>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Daily Order Cutoff</span>
-              <span>{BUSINESS_CONFIG.cancellationCutoffTime}</span>
+              <span className="text-slate-500 block text-[10px] uppercase">Legal Proprietor</span>
+              <span>{BUSINESS_CONFIG.proprietorName}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Customer Email</span>
+              <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="text-amber-700 hover:underline">
+                {BUSINESS_CONFIG.supportEmail}
+              </a>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Customer Phone</span>
+              <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="text-slate-900 hover:underline">
+                {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
+              </a>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Official Website</span>
+              <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-700 hover:underline">
+                {BUSINESS_CONFIG.websiteUrl}
+              </a>
+            </div>
+            <div className="sm:col-span-2 md:col-span-3">
+              <span className="text-slate-500 block text-[10px] uppercase">Operating Location</span>
+              <span>{formattedAddress}</span>
             </div>
           </div>
         </div>

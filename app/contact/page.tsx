@@ -94,10 +94,10 @@ export default function ContactPage() {
             </div>
             <div className="pt-2 border-t border-slate-100 space-y-1">
               <a
-                href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`}
+                href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`}
                 className="text-xs sm:text-sm font-bold text-emerald-700 hover:underline block"
               >
-                {BUSINESS_CONFIG.supportPhone}
+                {BUSINESS_CONFIG.supportPhone} / {BUSINESS_CONFIG.supportPhoneRaw}
               </a>
               <p className="text-[11px] text-slate-500 font-medium">
                 {BUSINESS_CONFIG.supportAvailability}
@@ -292,36 +292,48 @@ export default function ContactPage() {
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.legalEntityName}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Proprietor</span>
+                  <span className="font-medium text-slate-500">Trade / Business Names</span>
+                  <span className="font-bold text-slate-800 text-right text-[11px]">
+                    BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING
+                  </span>
+                </div>
+                <div className="flex justify-between pb-2 border-b border-slate-100">
+                  <span className="font-medium text-slate-500">Legal Proprietor</span>
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.proprietorName}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Service</span>
+                  <span className="font-medium text-slate-500">Platform Brand</span>
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.brandName}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">School</span>
+                  <span className="font-medium text-slate-500">Official Website</span>
+                  <a href={BUSINESS_CONFIG.websiteUrl} className="font-bold text-amber-700 hover:underline">
+                    {BUSINESS_CONFIG.websiteUrl}
+                  </a>
+                </div>
+                <div className="flex justify-between pb-2 border-b border-slate-100">
+                  <span className="font-medium text-slate-500">Operating School</span>
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.schoolName}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Support Availability</span>
-                  <span className="font-bold text-slate-800">{BUSINESS_CONFIG.supportAvailability}</span>
+                  <span className="font-medium text-slate-500">Support Hours</span>
+                  <span className="font-bold text-slate-800 text-right text-[11px]">{BUSINESS_CONFIG.supportAvailability}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Email</span>
+                  <span className="font-medium text-slate-500">Support Email</span>
                   <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="font-bold text-amber-700 hover:underline">
                     {BUSINESS_CONFIG.supportEmail}
                   </a>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Phone</span>
-                  <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="font-bold text-slate-800 hover:underline">
-                    {BUSINESS_CONFIG.supportPhone}
+                  <span className="font-medium text-slate-500">Support Phone</span>
+                  <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
+                    {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
                   </a>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium text-slate-500">WhatsApp</span>
-                  <span className="font-bold text-green-700">{BUSINESS_CONFIG.whatsAppSupport}</span>
+                  <span className="font-bold text-green-700">{BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhoneRaw})</span>
                 </div>
               </div>
 

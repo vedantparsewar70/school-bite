@@ -177,22 +177,31 @@ export async function checkMealAllergy(studentId: string, mealId: string): Promi
   }
 }
 
+const systemSettingCache = new Map<string, { value: string; expiry: number }>();
+
 /**
- * Helper to fetch system setting (e.g. ALLOW_ALLERGY_ORDERS)
+ * Helper to fetch system setting (e.g. ALLOW_ALLERGY_ORDERS) with in-memory caching
  */
 export async function getSystemSetting(key: string, defaultValue: string = 'true'): Promise<string> {
+  const cached = systemSettingCache.get(key);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.value;
+  }
   try {
     const setting = await prisma.systemSetting.findUnique({ where: { key } });
-    return setting ? setting.value : defaultValue;
+    const val = setting ? setting.value : defaultValue;
+    systemSettingCache.set(key, { value: val, expiry: Date.now() + 60000 });
+    return val;
   } catch {
     return defaultValue;
   }
 }
 
 /**
- * Helper to set system setting
+ * Helper to set system setting with cache invalidation
  */
 export async function setSystemSetting(key: string, value: string): Promise<void> {
+  systemSettingCache.delete(key);
   await prisma.systemSetting.upsert({
     where: { key },
     update: { value },

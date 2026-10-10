@@ -47,17 +47,31 @@ export async function GET(req: Request) {
       ],
     });
 
-    // Strictly filter out CANCELLED orders or FAILED/REFUNDED payments
+    // Strictly filter out CANCELLED orders or FAILED/REFUNDED/CANCELLED payments
     const validItems = items.filter((it) => {
       const order = it.order;
-      if (!order) return true;
+      if (!order) return false;
       if (order.orderStatus === 'CANCELLED') return false;
-      if (order.paymentStatus === 'FAILED' || order.paymentStatus === 'REFUNDED') return false;
+      // Strictly require successful PAID payment
+      if (order.paymentStatus !== 'PAID') {
+        return false;
+      }
       return true;
     });
 
     // Aggregate meal counts for kitchen production
-    const mealCountsMap = new Map<string, { mealId: string; mealName: string; category: string; count: number; isVegetarian: boolean }>();
+    const mealCountsMap = new Map<
+      string,
+      {
+        mealId: string;
+        mealName: string;
+        category: string;
+        count: number;
+        orderCount: number;
+        isVegetarian: boolean;
+        orderIds: Set<string>;
+      }
+    >();
     let totalMeals = 0;
     let allergyAlertsCount = 0;
 
@@ -70,13 +84,19 @@ export async function GET(req: Request) {
       const existing = mealCountsMap.get(it.mealId);
       if (existing) {
         existing.count += it.quantity;
+        if (it.orderId) existing.orderIds.add(it.orderId);
+        existing.orderCount = existing.orderIds.size;
       } else {
+        const orderIds = new Set<string>();
+        if (it.orderId) orderIds.add(it.orderId);
         mealCountsMap.set(it.mealId, {
           mealId: it.mealId,
           mealName: it.meal.name,
           category: it.meal.category,
           count: it.quantity,
+          orderCount: orderIds.size || 1,
           isVegetarian: it.meal.isVegetarian,
+          orderIds,
         });
       }
     }
@@ -116,14 +136,16 @@ export async function GET(req: Request) {
       };
     });
 
-    const uniqueOrderIds = new Set(validItems.map((i) => i.orderId));
+    const uniqueOrderIds = new Set(validItems.map((i) => i.orderId).filter(Boolean));
+    const mealCountsList = Array.from(mealCountsMap.values())
+      .map(({ orderIds, ...rest }) => rest)
+      .sort((a, b) => b.orderCount - a.orderCount);
 
     const payload = {
       date,
-      totalMeals,
       totalOrders: uniqueOrderIds.size,
       allergyAlertsCount,
-      mealCounts: Array.from(mealCountsMap.values()).sort((a, b) => b.count - a.count),
+      mealCounts: mealCountsList,
       classBreakdown: Array.from(classBreakdownMap.entries()).map(([cls, count]) => ({
         classDivision: cls,
         count,
