@@ -78,7 +78,7 @@ export async function fulfillParentOrder(
   const orderRef = db.collection('orders').doc(orderId);
   const pendingRef = db.collection('pending_orders').doc(orderId);
 
-  return await db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     // 1. Check if order is already created
     const existingOrderSnap = await transaction.get(orderRef);
     if (existingOrderSnap.exists) {
@@ -178,6 +178,15 @@ export async function fulfillParentOrder(
 
     return { success: true, orderId };
   });
+
+  try {
+    const { notifyOrdersUpdated } = await import('@/lib/sync-events');
+    await notifyOrdersUpdated();
+  } catch {
+    // non-blocking
+  }
+
+  return result;
 }
 
 /**
@@ -208,6 +217,14 @@ export async function fulfillTeacherOrder(
       cashfreeOrderId: paymentDetails?.cashfreeOrderId || existingData.cashfreeOrderId || null,
       updatedAt: now,
     });
+
+    try {
+      const { notifyOrdersUpdated, notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+      await Promise.all([notifyOrdersUpdated(), notifyTeacherOrdersUpdated()]);
+    } catch {
+      // non-blocking
+    }
+
     return { success: true, orderId };
   }
 
@@ -242,6 +259,13 @@ export async function fulfillTeacherOrder(
 
   // 4. Remove pending checkout
   await pendingRef.delete().catch(() => {});
+
+  try {
+    const { notifyOrdersUpdated, notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+    await Promise.all([notifyOrdersUpdated(), notifyTeacherOrdersUpdated()]);
+  } catch {
+    // non-blocking
+  }
 
   return { success: true, orderId };
 }

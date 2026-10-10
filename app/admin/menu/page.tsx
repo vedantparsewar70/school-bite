@@ -20,6 +20,7 @@ import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
 import { formatINR, formatDatePretty, getTodayString, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
 import { MealData } from '@/types';
 
 export default function AdminMenuPage() {
@@ -86,7 +87,15 @@ export default function AdminMenuPage() {
 
   useEffect(() => {
     fetchData();
+  }, []);
 
+  useSyncWatcher({
+    onMenuUpdate: () => {
+      fetchData();
+    },
+  });
+
+  useEffect(() => {
     // 1. Schedule exact timer at 12:00:00 AM midnight
     let timeoutId: NodeJS.Timeout;
     const scheduleMidnight = () => {
@@ -170,6 +179,7 @@ export default function AdminMenuPage() {
       });
 
       if (res.ok) {
+        broadcastSyncEvent('MENU_UPDATED');
         showToast(
           `Tomorrow's menu successfully published with ${selectedMealIds.length} items!`,
           'success'
@@ -212,6 +222,7 @@ export default function AdminMenuPage() {
         // Add to local state & select it automatically
         setMeals((prev) => [data.meal, ...prev]);
         setSelectedMealIds((prev) => [...prev, data.meal.id]);
+        broadcastSyncEvent('MENU_UPDATED');
       } else {
         showToast('Failed to add food item', 'error');
       }

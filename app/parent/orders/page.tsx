@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ToastContext';
 import { useAuth } from '@/components/AuthContext';
+import { useSyncWatcher } from '@/lib/client-sync';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
@@ -36,9 +37,10 @@ function OrdersPageContent() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
-      const res = await fetch('/api/parent/orders');
+      const res = await fetch('/api/parent/orders', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || []);
@@ -46,13 +48,20 @@ function OrdersPageContent() {
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Live real-time synchronization: updates order status immediately when canteen staff marks it as Given/Collected
+  useSyncWatcher({
+    onOrdersUpdate: () => {
+      fetchOrders(true);
+    },
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

@@ -58,6 +58,13 @@ export async function POST(req: Request) {
 
     await db.collection('teacher_meals').doc(id).set(meal);
 
+    try {
+      const { notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+      await notifyTeacherOrdersUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, meal }, { status: 201 });
   } catch (error) {
     console.error('Error creating teacher meal:', error);
@@ -96,6 +103,14 @@ export async function PUT(req: Request) {
     await ref.update(cleanDoc(updates));
 
     const updatedSnap = await ref.get();
+
+    try {
+      const { notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+      await notifyTeacherOrdersUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, meal: updatedSnap.data() });
   } catch (error) {
     console.error('Error updating teacher meal:', error);
@@ -123,6 +138,13 @@ export async function PATCH(req: Request) {
       updatedAt: new Date().toISOString(),
     });
 
+    try {
+      const { notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+      await notifyTeacherOrdersUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error toggling teacher meal availability:', error);
@@ -145,6 +167,13 @@ export async function DELETE(req: Request) {
     }
 
     await db.collection('teacher_meals').doc(id).delete();
+
+    try {
+      const { notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+      await notifyTeacherOrdersUpdated();
+    } catch {
+      // non-blocking
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -67,6 +67,13 @@ export async function POST(req: Request) {
       include: { meal: true },
     });
 
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, menu }, { status: 201 });
   } catch (error) {
     console.error('Error scheduling menu:', error);
@@ -135,6 +142,13 @@ async function handleBatchPublish(date: string, selectedMealIds: string[]) {
     // ignore
   }
 
+  try {
+    const { notifyMenuUpdated } = await import('@/lib/sync-events');
+    await notifyMenuUpdated();
+  } catch {
+    // ignore
+  }
+
   const updatedMenus = await prisma.menu.findMany({
     where: { date },
     include: { meal: true },
@@ -177,6 +191,13 @@ export async function PUT(req: Request) {
       include: { meal: true },
     });
 
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, menu: updated });
   } catch (error) {
     console.error('Error updating menu item:', error);
@@ -199,6 +220,14 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.menu.delete({ where: { id } });
+
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, message: 'Menu item removed successfully' });
   } catch (error) {
     console.error('Error removing menu item:', error);

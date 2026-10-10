@@ -21,6 +21,7 @@ import { useAuth } from '@/components/AuthContext';
 import { useCart } from '@/components/CartContext';
 import { useToast } from '@/components/ToastContext';
 import { useChildren } from '@/components/ChildrenContext';
+import { useSyncWatcher } from '@/lib/client-sync';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
@@ -65,49 +66,49 @@ function MenuPageContent() {
   }, [preselectedChildId, children, setSelectedChildId]);
 
   // Fetch Tomorrow's Menu evaluated against selected child (single optimized request)
+  const fetchTomorrowMenu = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('date', tomorrowDate);
+      if (selectedChildId) queryParams.append('childId', selectedChildId);
+
+      const res = await fetch(`/api/menu?${queryParams.toString()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const loadedMenus = data.menus || [];
+        setMenus(loadedMenus);
+
+        // If no lunch meals but breakfast meals exist, auto-select breakfast
+        const hasLunch = loadedMenus.some((m: any) => (m.meal?.category || '').toUpperCase().trim() === 'LUNCH');
+        const hasBreakfast = loadedMenus.some((m: any) => {
+          const cat = (m.meal?.category || '').toUpperCase().trim();
+          return cat === 'BREAKFAST' || cat === 'SNACK';
+        });
+
+        if (!hasLunch && hasBreakfast) {
+          setSelectedCategory((prev) => (prev === 'LUNCH' ? 'BREAKFAST' : prev));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch menu:', err);
+    } finally {
+      if (!isBackground) setLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Wait if children are in cold initial loading so we don't fire an unnecessary empty child query
     if (childrenLoading && !selectedChildId) return;
-
-    let isCancelled = false;
-
-    async function fetchTomorrowMenu() {
-      setLoading(true);
-      try {
-        const queryParams = new URLSearchParams();
-        queryParams.append('date', tomorrowDate);
-        if (selectedChildId) queryParams.append('childId', selectedChildId);
-
-        const res = await fetch(`/api/menu?${queryParams.toString()}`);
-        if (res.ok && !isCancelled) {
-          const data = await res.json();
-          const loadedMenus = data.menus || [];
-          setMenus(loadedMenus);
-
-          // If no lunch meals but breakfast meals exist, auto-select breakfast
-          const hasLunch = loadedMenus.some((m: any) => (m.meal?.category || '').toUpperCase().trim() === 'LUNCH');
-          const hasBreakfast = loadedMenus.some((m: any) => {
-            const cat = (m.meal?.category || '').toUpperCase().trim();
-            return cat === 'BREAKFAST' || cat === 'SNACK';
-          });
-
-          if (!hasLunch && hasBreakfast) {
-            setSelectedCategory('BREAKFAST');
-          }
-        }
-      } catch (err) {
-        if (!isCancelled) console.error('Failed to fetch menu:', err);
-      } finally {
-        if (!isCancelled) setLoading(false);
-      }
-    }
-
     fetchTomorrowMenu();
-
-    return () => {
-      isCancelled = true;
-    };
   }, [tomorrowDate, selectedChildId, childrenLoading]);
+
+  // Real-time synchronization: update menu directly when staff saves or edits menu
+  useSyncWatcher({
+    onMenuUpdate: () => {
+      fetchTomorrowMenu(true);
+    },
+  });
 
   const executeAddToCart = (menuItem: any, date: string, hasConflict: boolean, matchingAllergens: string[]) => {
     if (!selectedChild) return;

@@ -77,6 +77,13 @@ export async function PATCH(req: Request) {
       updatedAt: new Date().toISOString(),
     });
 
+    try {
+      const { notifyTeacherOrdersUpdated, notifyOrdersUpdated } = await import('@/lib/sync-events');
+      await Promise.all([notifyTeacherOrdersUpdated(), notifyOrdersUpdated()]);
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, orderId, orderStatus });
   } catch (error) {
     console.error('Error updating teacher order status:', error);

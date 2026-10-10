@@ -23,6 +23,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import { formatDatePretty, getTodayString, getOffsetDateString, formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
 
 function StaffOrdersContent() {
   const todayDateStr = getTodayString();
@@ -151,6 +152,18 @@ function StaffOrdersContent() {
     fetchTeacherOrders();
   }, []);
 
+  // Live real-time synchronization across staff and parents without manual refresh
+  useSyncWatcher({
+    onOrdersUpdate: () => {
+      fetchOrders();
+      fetchTeacherOrders();
+      fetchKitchenSummary(true);
+    },
+    onTeacherOrdersUpdate: () => {
+      fetchTeacherOrders();
+    },
+  });
+
   const handleMarkCollected = async (orderId: string) => {
     setUpdatingId(orderId);
     try {
@@ -165,6 +178,8 @@ function StaffOrdersContent() {
         // Once marked given, remove from active orders and move to history
         setOrders((prev) => prev.filter((o) => o.id !== orderId));
         setHistoryStudentCount((c) => c + 1);
+        broadcastSyncEvent('ORDERS_UPDATED');
+        fetchKitchenSummary(true);
       } else {
         showToast('Failed to update order status', 'error');
       }
@@ -189,6 +204,8 @@ function StaffOrdersContent() {
         // Once marked given, remove from active orders and move to history
         setTeacherOrders((prev) => prev.filter((o) => o.id !== orderId));
         setHistoryTeacherCount((c) => c + 1);
+        broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
+        broadcastSyncEvent('ORDERS_UPDATED');
       } else {
         showToast('Failed to update teacher order', 'error');
       }

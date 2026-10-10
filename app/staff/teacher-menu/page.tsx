@@ -19,6 +19,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import { formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import { broadcastSyncEvent } from '@/lib/client-sync';
 
 interface TeacherMeal {
   id: string;
@@ -103,6 +104,7 @@ export default function StaffTeacherMenuPage() {
         setMeals((prev) =>
           prev.map((m) => (m.id === meal.id ? { ...m, isAvailable: newStatus } : m))
         );
+        broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
         showToast(
           `"${meal.name}" marked as ${newStatus ? 'available' : 'unavailable'} for teachers`,
           'info'
@@ -128,6 +130,7 @@ export default function StaffTeacherMenuPage() {
 
       if (res.ok) {
         setMeals((prev) => prev.filter((m) => m.id !== meal.id));
+        broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
         showToast(`"${meal.name}" removed from teacher menu`, 'success');
       } else {
         showToast('Failed to delete item', 'error');
@@ -171,6 +174,7 @@ export default function StaffTeacherMenuPage() {
         if (res.ok) {
           const data = await res.json();
           setMeals((prev) => prev.map((m) => (m.id === editingMeal.id ? data.meal : m)));
+          broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
           showToast(`"${cleanName}" updated successfully!`, 'success');
           setIsModalOpen(false);
         } else {
@@ -193,6 +197,7 @@ export default function StaffTeacherMenuPage() {
         if (res.ok) {
           const data = await res.json();
           setMeals((prev) => [data.meal, ...prev]);
+          broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
           showToast(`"${cleanName}" added to teacher menu!`, 'success');
           setIsModalOpen(false);
         } else {

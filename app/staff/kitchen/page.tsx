@@ -21,6 +21,7 @@ import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
 import { formatDatePretty, getTodayString, getOffsetDateString, formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
 import { MealData } from '@/types';
 
 function StaffKitchenContent() {
@@ -96,7 +97,16 @@ function StaffKitchenContent() {
 
   useEffect(() => {
     fetchTomorrowMenuData();
+  }, []);
 
+  // Live real-time synchronization across staff and parents without manual refresh
+  useSyncWatcher({
+    onMenuUpdate: () => {
+      fetchTomorrowMenuData();
+    },
+  });
+
+  useEffect(() => {
     // 1. Schedule exact timer at 12:00:00 AM midnight
     let timeoutId: NodeJS.Timeout;
     const scheduleMidnight = () => {
@@ -233,6 +243,7 @@ function StaffKitchenContent() {
 
       if (res.ok) {
         setInitialSavedMealIds([...selectedMealIds]);
+        broadcastSyncEvent('MENU_UPDATED');
         showToast(
           `Tomorrow's menu saved! ${selectedMealIds.length} items will be available for parents.`,
           'success'
@@ -288,6 +299,8 @@ function StaffKitchenContent() {
         if (newMealAvailableTomorrow) {
           setSelectedMealIds((prev) => Array.from(new Set([createdMeal.id, ...prev])));
         }
+
+        broadcastSyncEvent('MENU_UPDATED');
 
         showToast(
           `"${createdMeal.name}" added to menu catalog${
@@ -375,6 +388,7 @@ function StaffKitchenContent() {
 
         setIsEditModalOpen(false);
         setEditingMeal(null);
+        broadcastSyncEvent('MENU_UPDATED');
       } else {
         const err = await res.json();
         showToast(err.error || 'Failed to update item', 'error');
