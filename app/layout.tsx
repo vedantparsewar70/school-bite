@@ -27,16 +27,6 @@ export const metadata: Metadata = {
     'pure vegetarian school meal',
     'Ravet Pune',
   ],
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon.png', type: 'image/png', sizes: '192x192' },
-    ],
-    shortcut: '/favicon.ico',
-    apple: [
-      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-  },
   manifest: '/manifest.json',
   openGraph: {
     title: 'School Bite - School Meal Pre-Ordering Platform',
