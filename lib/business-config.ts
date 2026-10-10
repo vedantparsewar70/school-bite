@@ -11,6 +11,8 @@
 export interface BusinessConfig {
   brandName: string;
   legalEntityName: string;
+  tradeNames: string[];
+  registeredBusinessNames: string;
   proprietorName: string;
   schoolName: string;
   tagline: string;
@@ -18,6 +20,7 @@ export interface BusinessConfig {
   websiteUrl: string;
   supportEmail: string;
   supportPhone: string;
+  supportPhoneRaw: string;
   whatsAppSupport: string;
   supportAvailability: string;
   businessAddress: {
@@ -38,8 +41,10 @@ export const BUSINESS_CONFIG: BusinessConfig = {
   brandName: 'School-Bite',
 
   // Registered legal business entity name matching Cashfree Payments KYC
-  // Options verified with Cashfree: 'BRIGHT CATERING' / 'BRIGHT DESIGNERS' / 'NEW BRIGHT XEROX'
+  // Verified business names: 'BRIGHT CATERING', 'BRIGHT DESIGNERS', 'NEW BRIGHT XEROX'
   legalEntityName: 'BRIGHT CATERING',
+  tradeNames: ['BRIGHT CATERING', 'BRIGHT DESIGNERS', 'NEW BRIGHT XEROX'],
+  registeredBusinessNames: 'BRIGHT CATERING / BRIGHT DESIGNERS / NEW BRIGHT XEROX',
 
   // Registered legal proprietor name matching Cashfree Payments KYC
   proprietorName: 'GANESH GOPAL UDAS',
@@ -50,18 +55,17 @@ export const BUSINESS_CONFIG: BusinessConfig = {
   // Accurate service description
   tagline: 'School Meal Pre-Ordering Platform',
   shortDescription:
-    'School-Bite is a school meal pre-ordering platform operated by BRIGHT CATERING that allows parents to select meals for their child and make online payments through the website. Meals are prepared and provided by the S.B. Patil School canteen.',
+    'School-Bite is an online school meal pre-ordering platform operated by BRIGHT CATERING (Registered Business/Trade Names: BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING; Proprietor: GANESH GOPAL UDAS) that allows parents to select nutritious meals for their children attending S.B. Patil School and make online payments securely. Meals are prepared and provided directly by the S.B. Patil School canteen.',
 
-  // Website URL
-  websiteUrl: 'https://schoolbite.in',
+  // Website URL matching Cashfree application review URL
+  websiteUrl: 'https://school-bite.vercel.app',
 
   // Customer support contact details matching Cashfree KYC
-  // Registered KYC email: 'gayatriparsewar@gmail.com' (Alternative: 'vedantparsewar70@gmail.com')
   supportEmail: 'gayatriparsewar@gmail.com',
-  // Registered KYC phone: '+91 99220 28988' (Alternative: '+91 90289 77988')
   supportPhone: '+91 99220 28988',
+  supportPhoneRaw: '9922028988',
   whatsAppSupport: 'Available',
-  supportAvailability: 'Monday to Sunday',
+  supportAvailability: 'Monday to Sunday, 08:00 AM – 06:00 PM IST',
 
   // Public Operating Address: Operating location of S.B. Patil School & canteen
   businessAddress: {
@@ -91,8 +95,5 @@ export function getFormattedAddress(): string {
  * Returns formatted legal entity string for compliance notices
  */
 export function getLegalOperatorString(): string {
-  if (BUSINESS_CONFIG.proprietorName && BUSINESS_CONFIG.legalEntityName) {
-    return `${BUSINESS_CONFIG.legalEntityName} (Proprietor: ${BUSINESS_CONFIG.proprietorName})`;
-  }
-  return BUSINESS_CONFIG.legalEntityName || BUSINESS_CONFIG.brandName;
+  return `${BUSINESS_CONFIG.legalEntityName} / BRIGHT DESIGNERS / NEW BRIGHT XEROX (Proprietor: ${BUSINESS_CONFIG.proprietorName})`;
 }

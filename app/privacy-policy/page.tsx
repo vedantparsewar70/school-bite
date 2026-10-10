@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
               School-Bite is an online school meal pre-ordering platform that allows parents to select nutritious meals for their children attending <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune) and complete secure online payments.
             </p>
             <p>
-              The food is prepared and provided directly by the {BUSINESS_CONFIG.schoolName} canteen. School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). We are committed to respecting and protecting the privacy of parents, students, and users of our school pre-ordering service.
+              The food is prepared and provided directly by the {BUSINESS_CONFIG.schoolName} canteen. School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Registered Business / Trade Names: <strong>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). We are committed to respecting and protecting the privacy of parents, students, and users of our school pre-ordering service.
             </p>
             <p>
               This Privacy Policy explains what personal information we collect, why it is required, how it is stored and processed, and how you can contact us regarding your data.
@@ -214,8 +214,10 @@ export default function PrivacyPolicyPage() {
 
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2">
               <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
-              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
-              <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Registered Business / Trade Names:</strong> BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</p>
+              <p><strong>Legal Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
+              <p><strong>Platform Brand:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Official Website:</strong> <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-600 font-bold hover:underline">{BUSINESS_CONFIG.websiteUrl}</a></p>
               <p><strong>Operating School:</strong> {BUSINESS_CONFIG.schoolName}</p>
               <p>
                 <strong>Support Email:</strong>{' '}
@@ -225,11 +227,11 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>
                 <strong>Support Phone:</strong>{' '}
-                <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="font-bold text-slate-800 hover:underline">
-                  {BUSINESS_CONFIG.supportPhone}
+                <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
+                  {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
                 </a>
               </p>
-              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhone})</p>
+              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhoneRaw})</p>
               <p><strong>Support Availability:</strong> {BUSINESS_CONFIG.supportAvailability}</p>
               <p><strong>Location:</strong> {formattedAddress}</p>
             </div>

@@ -32,7 +32,11 @@ export default function DeliveryPolicyPage() {
             <span>•</span>
             <span>Operating Entity: <strong className="text-slate-700">{BUSINESS_CONFIG.legalEntityName}</strong></span>
             <span>•</span>
+            <span>Business / Trade Names: <strong className="text-slate-700">{BUSINESS_CONFIG.registeredBusinessNames}</strong></span>
+            <span>•</span>
             <span>Proprietor: <strong className="text-slate-700">{BUSINESS_CONFIG.proprietorName}</strong></span>
+            <span>•</span>
+            <span>Website: <strong className="text-slate-700">{BUSINESS_CONFIG.websiteUrl}</strong></span>
             <span>•</span>
             <span>Operating School: <strong className="text-slate-700">{BUSINESS_CONFIG.schoolName}</strong></span>
           </div>
@@ -47,7 +51,7 @@ export default function DeliveryPolicyPage() {
               <span>1. Fulfillment Model (On-Campus Canteen Service)</span>
             </h2>
             <p>
-              <strong>{BUSINESS_CONFIG.brandName}</strong> is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). Our platform facilitates advance pre-ordering of fresh, hygienic, pure vegetarian school meals for students enrolled at <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
+              <strong>{BUSINESS_CONFIG.brandName}</strong> is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Registered Business / Trade Names: <strong>{BUSINESS_CONFIG.registeredBusinessNames}</strong>; Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>; Website: <strong>{BUSINESS_CONFIG.websiteUrl}</strong>). Our platform facilitates advance pre-ordering of fresh, hygienic, pure vegetarian school meals for students enrolled at <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
             </p>
             <p>
               Because our service involves hot, freshly prepared meals consumed on campus, <strong>physical shipping via third-party couriers or doorstep home delivery is NOT applicable</strong>. All orders placed on our website are fulfilled directly on-premises at the <strong>{BUSINESS_CONFIG.schoolName} Canteen</strong>.
@@ -151,19 +155,26 @@ export default function DeliveryPolicyPage() {
 
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2">
               <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
-              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
-              <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Registered Business / Trade Names:</strong> {BUSINESS_CONFIG.registeredBusinessNames}</p>
+              <p><strong>Legal / Proprietor Name:</strong> {BUSINESS_CONFIG.proprietorName}</p>
+              <p><strong>Brand / Platform Name:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p>
+                <strong>Official Website:</strong>{' '}
+                <a href={BUSINESS_CONFIG.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-amber-600 font-bold hover:underline">
+                  {BUSINESS_CONFIG.websiteUrl}
+                </a>
+              </p>
               <p><strong>Operating School:</strong> {BUSINESS_CONFIG.schoolName}</p>
               <p>
-                <strong>Support Email:</strong>{' '}
+                <strong>Customer Support Email:</strong>{' '}
                 <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="text-amber-600 font-bold hover:underline">
                   {BUSINESS_CONFIG.supportEmail}
                 </a>
               </p>
               <p>
-                <strong>Support Phone:</strong>{' '}
-                <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="font-bold text-slate-800 hover:underline">
-                  {BUSINESS_CONFIG.supportPhone}
+                <strong>Customer Support Phone:</strong>{' '}
+                <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
+                  {BUSINESS_CONFIG.supportPhone} / {BUSINESS_CONFIG.supportPhoneRaw}
                 </a>
               </p>
               <p><strong>Support Availability:</strong> {BUSINESS_CONFIG.supportAvailability}</p>

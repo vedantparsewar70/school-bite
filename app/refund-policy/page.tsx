@@ -55,7 +55,7 @@ export default function RefundPolicyPage() {
               <span>1. Overview & Operational Model</span>
             </h2>
             <p>
-              At <strong>{BUSINESS_CONFIG.brandName}</strong> (operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong>, Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), we are committed to transparent and dependable service for parents and students of <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
+              At <strong>{BUSINESS_CONFIG.brandName}</strong> (operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong>, Registered Business / Trade Names: <strong>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>; Website: <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-700 hover:underline">{BUSINESS_CONFIG.websiteUrl}</a>), we are committed to transparent and dependable service for parents and students of <strong>{BUSINESS_CONFIG.schoolName}</strong> (Ravet, Pune).
             </p>
             <p>
               Because school canteen meals are prepared fresh daily based on advance pre-orders, our cancellation and refund guidelines are structured around real kitchen workflows and preparation cutoffs.
@@ -218,19 +218,21 @@ export default function RefundPolicyPage() {
 
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2 mt-3">
               <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
-              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
-              <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Registered Business / Trade Names:</strong> BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</p>
+              <p><strong>Legal Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
+              <p><strong>Platform Brand:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Official Website:</strong> <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-600 font-bold hover:underline">{BUSINESS_CONFIG.websiteUrl}</a></p>
               <p><strong>Support Email:</strong>{' '}
                 <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="text-amber-600 font-bold hover:underline">
                   {BUSINESS_CONFIG.supportEmail}
                 </a>
               </p>
               <p><strong>Support Phone:</strong>{' '}
-                <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="font-bold text-slate-800 hover:underline">
-                  {BUSINESS_CONFIG.supportPhone}
+                <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
+                  {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
                 </a>
               </p>
-              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhone})</p>
+              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhoneRaw})</p>
               <p><strong>Support Availability:</strong> {BUSINESS_CONFIG.supportAvailability}</p>
               <p><strong>School Location:</strong> {formattedAddress}</p>
             </div>

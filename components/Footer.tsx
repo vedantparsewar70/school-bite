@@ -31,13 +31,23 @@ export default function Footer() {
               School-Bite enables parents to pre-order fresh, hygienic meals for their children. Food is prepared and provided by the {BUSINESS_CONFIG.schoolName} canteen.
             </p>
 
-            <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1 text-xs">
-              <div className="flex items-center gap-2 text-slate-300 font-semibold">
+            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1.5 text-xs">
+              <div className="flex items-center gap-2 text-slate-200 font-semibold">
                 <Building2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span>Operating Business: {BUSINESS_CONFIG.legalEntityName}</span>
               </div>
               <p className="text-[11px] text-slate-400 pl-5.5">
-                Proprietor: {BUSINESS_CONFIG.proprietorName}
+                Business / Trade Names:{' '}
+                <span className="text-slate-300 font-medium">BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</span>
+              </p>
+              <p className="text-[11px] text-slate-400 pl-5.5">
+                Proprietor: <span className="text-slate-300 font-medium">{BUSINESS_CONFIG.proprietorName}</span>
+              </p>
+              <p className="text-[11px] text-slate-400 pl-5.5">
+                Official Website:{' '}
+                <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-400 hover:underline">
+                  {BUSINESS_CONFIG.websiteUrl}
+                </a>
               </p>
             </div>
 
@@ -113,8 +123,8 @@ export default function Footer() {
                 <Phone className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 block uppercase font-semibold">Phone ({BUSINESS_CONFIG.supportAvailability})</span>
-                  <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="hover:text-amber-400 text-slate-300 font-medium">
-                    {BUSINESS_CONFIG.supportPhone}
+                  <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="hover:text-amber-400 text-slate-300 font-medium">
+                    {BUSINESS_CONFIG.supportPhone} / {BUSINESS_CONFIG.supportPhoneRaw}
                   </a>
                 </div>
               </div>
@@ -129,7 +139,7 @@ export default function Footer() {
                     rel="noopener noreferrer"
                     className="hover:text-green-400 text-slate-300 font-medium"
                   >
-                    WhatsApp Support Available
+                    WhatsApp Support Available ({BUSINESS_CONFIG.supportPhoneRaw})
                   </a>
                 </div>
               </div>
@@ -150,7 +160,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <p>
-            © {currentYear} {BUSINESS_CONFIG.legalEntityName}. All rights reserved. Operated by {BUSINESS_CONFIG.legalEntityName} (Proprietor: {BUSINESS_CONFIG.proprietorName}) for {BUSINESS_CONFIG.schoolName} canteen meal orders.
+            © {currentYear} {BUSINESS_CONFIG.legalEntityName}. All rights reserved. Operated by {BUSINESS_CONFIG.legalEntityName} (Registered Business/Trade Names: BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING; Proprietor: {BUSINESS_CONFIG.proprietorName}) for {BUSINESS_CONFIG.schoolName} canteen meal orders.
           </p>
 
           <div className="flex flex-wrap items-center gap-4">

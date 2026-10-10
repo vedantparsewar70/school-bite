@@ -45,10 +45,10 @@ export default function TermsAndConditionsPage() {
               <span>1. Introduction & Acceptance of Terms</span>
             </h2>
             <p>
-              These Terms and Conditions (&quot;Terms&quot;) constitute a legally binding agreement between you (&quot;User&quot; or &quot;Parent&quot;) and <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (operating the <strong>{BUSINESS_CONFIG.brandName}</strong> platform, Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;).
+              These Terms and Conditions (&quot;Terms&quot;) constitute a legally binding agreement between you (&quot;User&quot; or &quot;Parent&quot;) and <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (also operating under registered business / trade names <strong>BRIGHT DESIGNERS</strong> and <strong>NEW BRIGHT XEROX</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>, operating the <strong>{BUSINESS_CONFIG.brandName}</strong> platform, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;).
             </p>
             <p>
-              School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). By creating an account, browsing menus, or placing meal orders on our website ({BUSINESS_CONFIG.websiteUrl}), you acknowledge that you have read, understood, and agreed to be bound by these Terms, together with our Privacy Policy, Refund &amp; Cancellation Policy, and Shipping &amp; Delivery Policy.
+              School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Registered Business / Trade Names: <strong>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). By creating an account, browsing menus, or placing meal orders on our official website ({BUSINESS_CONFIG.websiteUrl}), you acknowledge that you have read, understood, and agreed to be bound by these Terms, together with our Privacy Policy, Refund &amp; Cancellation Policy, and Shipping &amp; Delivery Policy.
             </p>
           </section>
 
@@ -229,8 +229,10 @@ export default function TermsAndConditionsPage() {
             </p>
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-2">
               <p><strong>Operating Business:</strong> {BUSINESS_CONFIG.legalEntityName}</p>
-              <p><strong>Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
-              <p><strong>Service:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Registered Business / Trade Names:</strong> BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</p>
+              <p><strong>Legal Proprietor:</strong> {BUSINESS_CONFIG.proprietorName}</p>
+              <p><strong>Platform Brand:</strong> {BUSINESS_CONFIG.brandName}</p>
+              <p><strong>Official Website:</strong> <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-600 font-bold hover:underline">{BUSINESS_CONFIG.websiteUrl}</a></p>
               <p><strong>Operating School:</strong> {BUSINESS_CONFIG.schoolName}</p>
               <p>
                 <strong>Support Email:</strong>{' '}
@@ -240,11 +242,11 @@ export default function TermsAndConditionsPage() {
               </p>
               <p>
                 <strong>Support Phone:</strong>{' '}
-                <a href={`tel:${BUSINESS_CONFIG.supportPhone.replace(/\s+/g, '')}`} className="font-bold text-slate-800 hover:underline">
-                  {BUSINESS_CONFIG.supportPhone}
+                <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
+                  {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
                 </a>
               </p>
-              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhone})</p>
+              <p><strong>WhatsApp Support:</strong> {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhoneRaw})</p>
               <p><strong>Support Availability:</strong> {BUSINESS_CONFIG.supportAvailability}</p>
               <p><strong>Location:</strong> {formattedAddress}</p>
             </div>
