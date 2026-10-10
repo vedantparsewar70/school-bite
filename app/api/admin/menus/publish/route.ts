@@ -73,10 +73,17 @@ export async function POST(req: Request) {
       console.error('Failed to record menu publication:', e);
     }
 
-    // Invalidate menu cache so parents immediately see updated menu
+    // Invalidate menu cache and notify live sync system so parents immediately see updated menu
     try {
       const { clearMenuCache } = await import('@/app/api/menu/route');
       clearMenuCache();
+    } catch {
+      // ignore
+    }
+
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
     } catch {
       // ignore
     }

@@ -24,6 +24,7 @@ import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
+import { useSyncWatcher } from '@/lib/client-sync';
 import { MenuDayItem } from '@/types';
 
 export default function ParentDashboard() {
@@ -38,33 +39,44 @@ export default function ParentDashboard() {
 
   const todayStr = getTodayString();
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        // Query recent 20 orders and today's menu in parallel (children already provided by auth context)
-        const [ordersRes, menuRes] = await Promise.all([
-          fetch('/api/parent/orders?limit=20'),
-          fetch(`/api/menu?date=${todayStr}`),
-        ]);
+  const loadDashboardData = async (isBackground = false) => {
+    if (!isBackground) setDataLoading(true);
+    try {
+      // Query recent 20 orders and today's menu in parallel (children already provided by auth context)
+      const [ordersRes, menuRes] = await Promise.all([
+        fetch('/api/parent/orders?limit=20', { cache: 'no-store' }),
+        fetch(`/api/menu?date=${todayStr}`, { cache: 'no-store' }),
+      ]);
 
-        if (ordersRes.ok) {
-          const ordData = await ordersRes.json();
-          setOrders(ordData.orders || []);
-        }
-
-        if (menuRes.ok) {
-          const mData = await menuRes.json();
-          setTodayMenu(mData.menus || []);
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-      } finally {
-        setDataLoading(false);
+      if (ordersRes.ok) {
+        const ordData = await ordersRes.json();
+        setOrders(ordData.orders || []);
       }
-    }
 
+      if (menuRes.ok) {
+        const mData = await menuRes.json();
+        setTodayMenu(mData.menus || []);
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+    } finally {
+      if (!isBackground) setDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadDashboardData();
   }, [todayStr]);
+
+  // Live real-time synchronization for parent dashboard without manual page refresh
+  useSyncWatcher({
+    onOrdersUpdate: () => {
+      loadDashboardData(true);
+    },
+    onMenuUpdate: () => {
+      loadDashboardData(true);
+    },
+  });
 
   if (isLoading || dataLoading) {
     return (

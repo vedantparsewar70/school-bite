@@ -25,6 +25,7 @@ import VegBadge from '@/components/VegBadge';
 import { formatINR, formatDatePretty, getTodayString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { loadCashfreeSdk } from '@/lib/cashfree-client';
+import { useSyncWatcher } from '@/lib/client-sync';
 
 interface TeacherMeal {
   id: string;
@@ -62,10 +63,10 @@ export default function TeacherMenuPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Fetch teacher menu
-  const fetchMenu = async () => {
-    setLoading(true);
+  const fetchMenu = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
-      const res = await fetch('/api/teacher/menu');
+      const res = await fetch('/api/teacher/menu', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setMeals(data.meals || []);
@@ -73,13 +74,23 @@ export default function TeacherMenuPage() {
     } catch (err) {
       console.error('Failed to load teacher menu:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchMenu();
   }, []);
+
+  // Real-time synchronization when staff updates/saves the teacher menu
+  useSyncWatcher({
+    onTeacherOrdersUpdate: () => {
+      fetchMenu(true);
+    },
+    onMenuUpdate: () => {
+      fetchMenu(true);
+    },
+  });
 
   const categories = useMemo(() => {
     const set = new Set<string>();

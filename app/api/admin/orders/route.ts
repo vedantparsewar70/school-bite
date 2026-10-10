@@ -269,6 +269,13 @@ export async function PATCH(req: Request) {
       return { ...orderData, ...updateData };
     });
 
+    try {
+      const { notifyOrdersUpdated } = await import('@/lib/sync-events');
+      await notifyOrdersUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, order: updated });
   } catch (error: any) {
     console.error('Error updating order status:', error);

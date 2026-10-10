@@ -112,6 +112,13 @@ export async function POST(req: Request) {
       });
     }
 
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, meal }, { status: 201 });
   } catch (error) {
     console.error('Error creating meal:', error);
@@ -184,6 +191,13 @@ export async function PUT(req: Request) {
       });
     }
 
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, meal: updated });
   } catch (error) {
     console.error('Error updating meal:', error);
@@ -215,6 +229,14 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.meal.delete({ where: { id } });
+
+    try {
+      const { notifyMenuUpdated } = await import('@/lib/sync-events');
+      await notifyMenuUpdated();
+    } catch {
+      // non-blocking
+    }
+
     return NextResponse.json({ success: true, message: 'Meal deleted successfully' });
   } catch (error) {
     console.error('Error deleting meal:', error);
