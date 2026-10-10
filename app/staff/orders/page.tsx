@@ -18,13 +18,15 @@ import {
   Printer,
   UtensilsCrossed,
   History,
+  Calendar,
 } from 'lucide-react';
 import VegBadge from '@/components/VegBadge';
-import { formatDatePretty, getTodayString, formatINR } from '@/lib/utils';
+import { formatDatePretty, getTodayString, getOffsetDateString, formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 
 function StaffOrdersContent() {
   const todayDateStr = getTodayString();
+  const tomorrowDateStr = getOffsetDateString(1);
   const { showToast } = useToast();
 
   // Active tab: 'STUDENTS' | 'TEACHERS'
@@ -40,26 +42,34 @@ function StaffOrdersContent() {
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [historyTeacherCount, setHistoryTeacherCount] = useState(0);
 
-  // Total Orders breakdown modal state
+  // Kitchen Production Modal state (Today & Tomorrow)
   const [showTotalOrdersModal, setShowTotalOrdersModal] = useState(false);
-  const [modalTab, setModalTab] = useState<'STUDENTS' | 'TEACHERS'>('STUDENTS');
-  const [kitchenData, setKitchenData] = useState<any>(null);
+  const [todayKitchenData, setTodayKitchenData] = useState<any>(null);
+  const [tomorrowKitchenData, setTomorrowKitchenData] = useState<any>(null);
   const [loadingKitchen, setLoadingKitchen] = useState(false);
 
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Fetch kitchen production summary for today
-  const fetchKitchenSummary = async () => {
+  // Fetch kitchen production summaries for today and tomorrow
+  const fetchKitchenSummary = async (bypassCache = false) => {
     setLoadingKitchen(true);
     try {
-      const res = await fetch(`/api/admin/kitchen?date=${todayDateStr}`);
-      if (res.ok) {
-        const data = await res.json();
-        setKitchenData(data);
+      const cacheParam = bypassCache ? '&bypassCache=true' : '';
+      const [todayRes, tomorrowRes] = await Promise.all([
+        fetch(`/api/admin/kitchen?date=${todayDateStr}${cacheParam}`, { cache: 'no-store' }),
+        fetch(`/api/admin/kitchen?date=${tomorrowDateStr}${cacheParam}`, { cache: 'no-store' }),
+      ]);
+      if (todayRes.ok) {
+        const todayData = await todayRes.json();
+        setTodayKitchenData(todayData);
+      }
+      if (tomorrowRes.ok) {
+        const tomorrowData = await tomorrowRes.json();
+        setTomorrowKitchenData(tomorrowData);
       }
     } catch (err) {
-      console.error('Failed to load kitchen summary:', err);
+      console.error('Failed to load kitchen production summary:', err);
     } finally {
       setLoadingKitchen(false);
     }
@@ -189,46 +199,18 @@ function StaffOrdersContent() {
     }
   };
 
-  // Aggregate teacher meals
-  const teacherMealCounts = useMemo(() => {
-    const map = new Map<string, { mealName: string; isVegetarian: boolean; category: string; orderIds: Set<string> }>();
-    for (const o of teacherOrders) {
-      for (const it of o.items || []) {
-        const name = it.mealName || 'Meal';
-        const existing = map.get(name);
-        if (existing) {
-          if (o.id) existing.orderIds.add(o.id);
-        } else {
-          const orderIds = new Set<string>();
-          if (o.id) orderIds.add(o.id);
-          map.set(name, {
-            mealName: name,
-            isVegetarian: it.isVegetarian ?? true,
-            category: it.category || 'LUNCH',
-            orderIds,
-          });
-        }
-      }
-    }
-    return Array.from(map.values())
-      .map((item) => ({
-        mealName: item.mealName,
-        isVegetarian: item.isVegetarian,
-        category: item.category,
-        orderCount: item.orderIds.size,
-      }))
-      .sort((a, b) => b.orderCount - a.orderCount);
-  }, [teacherOrders]);
+  // Memoized active food products to prepare for today & tomorrow
+  const todayMealCounts = useMemo(() => {
+    return (todayKitchenData?.mealCounts || []).filter(
+      (mc: any) => (mc.quantityToPrepare ?? mc.count ?? mc.orderCount ?? 0) > 0
+    );
+  }, [todayKitchenData]);
 
-  const currentTotalOrders =
-    modalTab === 'STUDENTS'
-      ? kitchenData?.totalOrders ?? orders.length
-      : teacherOrders.length;
-
-  const currentMealCounts =
-    modalTab === 'STUDENTS'
-      ? kitchenData?.mealCounts || []
-      : teacherMealCounts;
+  const tomorrowMealCounts = useMemo(() => {
+    return (tomorrowKitchenData?.mealCounts || []).filter(
+      (mc: any) => (mc.quantityToPrepare ?? mc.count ?? mc.orderCount ?? 0) > 0
+    );
+  }, [tomorrowKitchenData]);
 
   const pendingTeacherOrdersCount = teacherOrders.filter(
     (o) => o.orderStatus !== 'GIVEN' && o.orderStatus !== 'COLLECTED'
@@ -318,8 +300,7 @@ function StaffOrdersContent() {
         <button
           type="button"
           onClick={() => {
-            fetchKitchenSummary();
-            setModalTab(activeTab);
+            fetchKitchenSummary(true);
             setShowTotalOrdersModal(true);
           }}
           className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-[0.99] text-white rounded-2xl font-black text-sm shadow-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer"
@@ -637,27 +618,31 @@ function StaffOrdersContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: Total Orders & Kitchen Production Breakdown                        */}
+      {/* MODAL: Total Orders & Kitchen Production Dashboard (Today & Tomorrow)     */}
       {/* ========================================================================= */}
       {showTotalOrdersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-2xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:fixed print:inset-0 print:z-[9999] print:block">
+          <div className="bg-slate-50 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200/80 animate-in fade-in zoom-in-95 duration-150 print:max-w-none print:w-full print:max-h-none print:shadow-none print:border-none print:p-0 print:rounded-none">
+            {/* Modal Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-200 bg-white sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
                   <ChefHat className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 leading-tight">Total Orders</h3>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Kitchen Production</span>
+                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 leading-tight">
+                    Kitchen Production Dashboard
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block mt-0.5">
+                    Student Meals &bull; Quantity to Prepare
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 print:hidden">
                 <button
                   type="button"
-                  onClick={() => fetchKitchenSummary()}
+                  onClick={() => fetchKitchenSummary(true)}
                   disabled={loadingKitchen}
                   className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                   title="Refresh counts"
@@ -682,114 +667,206 @@ function StaffOrdersContent() {
               </div>
             </div>
 
-            {/* Tab Switcher inside Modal: Student vs Teacher */}
-            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setModalTab('STUDENTS')}
-                className={`py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  modalTab === 'STUDENTS'
-                    ? 'bg-amber-500 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Student ({kitchenData?.totalOrders ?? orders.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalTab('TEACHERS')}
-                className={`py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  modalTab === 'TEACHERS'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <GraduationCap className="w-3.5 h-3.5" />
-                <span>Teacher ({teacherOrders.length})</span>
-              </button>
-            </div>
-
-            {/* Dark Summary Card (Screenshot 2) */}
-            <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                  TODAY&apos;S DATE
-                </span>
-                <p className="text-xl font-black text-amber-400 mt-0.5">
-                  {formatDatePretty(todayDateStr)}
-                </p>
-                <span className="text-xs text-slate-400 font-bold mt-1 block">
-                  {currentTotalOrders} total orders
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                  TOTAL ORDERS
-                </span>
-                <p className="text-4xl font-black text-white mt-0.5">
-                  {currentTotalOrders}
-                </p>
-              </div>
-            </div>
-
-            {/* Section Header: ORDERS BY FOOD PRODUCT */}
-            <div className="flex items-center justify-between px-1 pt-1">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
-                ORDERS BY FOOD PRODUCT
-              </h4>
-              <span className="text-xs font-bold text-slate-400">
-                {currentTotalOrders} total orders
-              </span>
-            </div>
-
-            {/* Food Items Cards List (Screenshot 2) */}
-            {loadingKitchen && modalTab === 'STUDENTS' ? (
-              <div className="py-10 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : currentMealCounts.length === 0 ? (
-              <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-2">
-                <UtensilsCrossed className="w-8 h-8 mx-auto text-slate-300" />
-                <h4 className="font-extrabold text-slate-700 text-sm">No Orders Found</h4>
-                <p className="text-xs text-slate-500">
-                  No food product orders recorded for {modalTab === 'STUDENTS' ? 'students' : 'teachers'} today.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {currentMealCounts.map((mc: any, idx: number) => (
-                  <div
-                    key={mc.mealId || idx}
-                    className="bg-white p-4 rounded-2xl border-2 border-slate-200/90 shadow-2xs flex items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
-                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                          {mc.category || 'LUNCH'}
-                        </span>
-                      </div>
-                      <h5 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase truncate">
-                        {mc.mealName}
-                      </h5>
-                      <p className="text-xs font-bold text-slate-500">
-                        Need to prepare: <span className="text-slate-800">{mc.orderCount} orders</span>
-                      </p>
-                    </div>
-
-                    <div className="bg-amber-50/80 border border-amber-200/90 px-4 py-2.5 rounded-2xl min-w-[90px] text-center shrink-0">
-                      <span className="text-3xl font-black text-amber-600 block leading-tight">
-                        {mc.orderCount}
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* Top Summary Cards (Requirement 2) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                {/* Today's Summary Card */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 p-5 text-white shadow-lg shadow-amber-500/15">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 text-amber-100 text-[10px] font-black uppercase tracking-wider">
+                        <Calendar className="w-3 h-3" />
+                        Today&apos;s Production
                       </span>
-                      <span className="text-[10px] font-black text-amber-900 uppercase tracking-wider">
-                        ORDERS
+                      <p className="text-sm font-black text-amber-100 mt-2">
+                        {formatDatePretty(todayDateStr)}
+                      </p>
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-200 mt-2 block">
+                        Today&apos;s Total Orders
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
+                        {todayKitchenData?.totalOrders ?? 0}
+                      </p>
+                      <span className="text-[10px] font-black text-amber-100 uppercase tracking-wider block mt-1">
+                        Orders
                       </span>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Tomorrow's Summary Card */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 p-5 text-white shadow-lg shadow-indigo-600/15">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 text-indigo-100 text-[10px] font-black uppercase tracking-wider">
+                        <Calendar className="w-3 h-3" />
+                        Tomorrow&apos;s Production
+                      </span>
+                      <p className="text-sm font-black text-indigo-100 mt-2">
+                        {formatDatePretty(tomorrowDateStr)}
+                      </p>
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-200 mt-2 block">
+                        Tomorrow&apos;s Total Orders
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
+                        {tomorrowKitchenData?.totalOrders ?? 0}
+                      </p>
+                      <span className="text-[10px] font-black text-indigo-100 uppercase tracking-wider block mt-1">
+                        Orders
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Two Separate Production Sections (Requirements 1, 3, 5, 6) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-start">
+                {/* SECTION 1: TODAY'S TOTAL ORDERS */}
+                <div className="bg-white rounded-2xl border-2 border-amber-200/80 p-4 sm:p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-amber-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <div>
+                        <h4 className="font-black text-sm text-slate-900 uppercase tracking-wider">
+                          Today&apos;s Total Orders
+                        </h4>
+                        <span className="text-xs font-bold text-slate-500">
+                          {formatDatePretty(todayDateStr)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-black">
+                      {todayKitchenData?.totalOrders ?? 0} Orders
+                    </span>
+                  </div>
+
+                  {loadingKitchen && !todayKitchenData ? (
+                    <div className="py-12 flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : todayMealCounts.length === 0 ? (
+                    <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-2">
+                      <UtensilsCrossed className="w-8 h-8 mx-auto text-slate-300" />
+                      <h5 className="font-extrabold text-slate-700 text-sm">No Orders for Today</h5>
+                      <p className="text-xs text-slate-500">
+                        No food product orders recorded for today ({formatDatePretty(todayDateStr)}).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {todayMealCounts.map((mc: any, idx: number) => {
+                        const qty = mc.quantityToPrepare ?? mc.count ?? mc.orderCount ?? 0;
+                        return (
+                          <div
+                            key={mc.mealId || idx}
+                            className="bg-slate-50/70 hover:bg-amber-50/40 p-4 rounded-2xl border border-slate-200 hover:border-amber-300 shadow-2xs transition-all flex items-center justify-between gap-3"
+                          >
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                                  {mc.category || 'LUNCH'}
+                                </span>
+                              </div>
+                              <h5 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase truncate">
+                                {mc.mealName}
+                              </h5>
+                              <p className="text-xs font-bold text-slate-600">
+                                Qty to Prepare: <span className="text-slate-900 font-extrabold">{qty}</span>
+                              </p>
+                            </div>
+
+                            <div className="bg-amber-50 border-2 border-amber-300 px-3.5 py-2 rounded-2xl min-w-[95px] text-center shrink-0 shadow-2xs">
+                              <span className="text-2xl sm:text-3xl font-black text-amber-600 block leading-tight">
+                                {qty}
+                              </span>
+                              <span className="text-[9px] font-black text-amber-900 uppercase tracking-wider block">
+                                QTY TO PREPARE
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 2: TOMORROW'S TOTAL ORDERS */}
+                <div className="bg-white rounded-2xl border-2 border-indigo-200/80 p-4 sm:p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                      <div>
+                        <h4 className="font-black text-sm text-slate-900 uppercase tracking-wider">
+                          Tomorrow&apos;s Total Orders
+                        </h4>
+                        <span className="text-xs font-bold text-slate-500">
+                          {formatDatePretty(tomorrowDateStr)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-lg text-xs font-black">
+                      {tomorrowKitchenData?.totalOrders ?? 0} Orders
+                    </span>
+                  </div>
+
+                  {loadingKitchen && !tomorrowKitchenData ? (
+                    <div className="py-12 flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : tomorrowMealCounts.length === 0 ? (
+                    <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-2">
+                      <UtensilsCrossed className="w-8 h-8 mx-auto text-slate-300" />
+                      <h5 className="font-extrabold text-slate-700 text-sm">No Orders for Tomorrow</h5>
+                      <p className="text-xs text-slate-500">
+                        No food product orders recorded for tomorrow ({formatDatePretty(tomorrowDateStr)}).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {tomorrowMealCounts.map((mc: any, idx: number) => {
+                        const qty = mc.quantityToPrepare ?? mc.count ?? mc.orderCount ?? 0;
+                        return (
+                          <div
+                            key={mc.mealId || idx}
+                            className="bg-slate-50/70 hover:bg-indigo-50/40 p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 shadow-2xs transition-all flex items-center justify-between gap-3"
+                          >
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                                  {mc.category || 'LUNCH'}
+                                </span>
+                              </div>
+                              <h5 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase truncate">
+                                {mc.mealName}
+                              </h5>
+                              <p className="text-xs font-bold text-slate-600">
+                                Qty to Prepare: <span className="text-slate-900 font-extrabold">{qty}</span>
+                              </p>
+                            </div>
+
+                            <div className="bg-indigo-50 border-2 border-indigo-300 px-3.5 py-2 rounded-2xl min-w-[95px] text-center shrink-0 shadow-2xs">
+                              <span className="text-2xl sm:text-3xl font-black text-indigo-600 block leading-tight">
+                                {qty}
+                              </span>
+                              <span className="text-[9px] font-black text-indigo-900 uppercase tracking-wider block">
+                                QTY TO PREPARE
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

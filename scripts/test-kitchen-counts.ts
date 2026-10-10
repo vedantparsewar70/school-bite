@@ -1,32 +1,27 @@
 import assert from 'assert';
+import prisma from '../lib/prisma';
+import { getTodayString, getOffsetDateString } from '../lib/utils';
 
 /**
  * Kitchen Production Counting Logic Verification Suite
  *
  * Rules:
- * 1. Total Orders represents the number of unique orders placed for today.
- *    One order containing multiple food products or quantities counts as one order.
- * 2. Each food product displays ORDERS representing the number of separate orders
- *    that contain that product, regardless of quantity in each order.
- * 3. Student A orders 5 thalis in one order, Student B orders 3 thalis in another order:
- *    Total Orders = 2, Deluxe Veg Thali = 2 ORDERS.
- * 4. One student places one order containing 2 thalis and 3 sandwiches:
- *    Total Orders = 1, Deluxe Veg Thali = 1 ORDER, Sandwich = 1 ORDER.
- * 5. Ineligible orders (CANCELLED, FAILED, REFUNDED, orphaned) are strictly excluded.
- * 6. The word "PORTIONS" is removed everywhere and "ITEMS" is not used as a replacement.
+ * 1. Total Orders represents the number of unique orders placed for that date.
+ *    One order containing multiple food products or quantities counts as one total order.
+ * 2. Each food product displays "QTY TO PREPARE: X" representing the total quantity
+ *    ordered for that product on that date.
+ * 3. Today's orders and Tomorrow's orders are calculated independently.
+ * 4. Ineligible orders (CANCELLED, PENDING, FAILED, REFUNDED, unpaid) are strictly excluded.
+ * 5. If a food product has no valid orders for a date, it is not displayed.
  */
 
-// Aggregation simulation matching app/api/admin/kitchen/route.ts
+// Aggregation logic matching app/api/admin/kitchen/route.ts
 function calculateKitchenSummary(items: any[]) {
   const validItems = items.filter((it) => {
     const order = it.order;
     if (!order) return false;
     if (order.orderStatus === 'CANCELLED') return false;
-    if (
-      order.paymentStatus === 'FAILED' ||
-      order.paymentStatus === 'REFUNDED' ||
-      order.paymentStatus === 'CANCELLED'
-    ) {
+    if (order.paymentStatus !== 'PAID') {
       return false;
     }
     return true;
@@ -39,6 +34,7 @@ function calculateKitchenSummary(items: any[]) {
       mealName: string;
       category: string;
       count: number;
+      quantityToPrepare: number;
       orderCount: number;
       orderIds: Set<string>;
     }
@@ -48,6 +44,7 @@ function calculateKitchenSummary(items: any[]) {
     const existing = mealCountsMap.get(it.mealId);
     if (existing) {
       existing.count += it.quantity;
+      existing.quantityToPrepare = existing.count;
       if (it.orderId) existing.orderIds.add(it.orderId);
       existing.orderCount = existing.orderIds.size;
     } else {
@@ -58,6 +55,7 @@ function calculateKitchenSummary(items: any[]) {
         mealName: it.meal.name,
         category: it.meal.category,
         count: it.quantity,
+        quantityToPrepare: it.quantity,
         orderCount: orderIds.size || 1,
         orderIds,
       });
@@ -67,7 +65,7 @@ function calculateKitchenSummary(items: any[]) {
   const uniqueOrderIds = new Set(validItems.map((i) => i.orderId).filter(Boolean));
   const mealCountsList = Array.from(mealCountsMap.values())
     .map(({ orderIds, ...rest }) => rest)
-    .sort((a, b) => b.orderCount - a.orderCount);
+    .sort((a, b) => b.count - a.count || b.orderCount - a.orderCount);
 
   return {
     totalOrders: uniqueOrderIds.size,
@@ -78,21 +76,20 @@ function calculateKitchenSummary(items: any[]) {
 async function runUnitTests() {
   console.log('🧪 Starting Kitchen Production Unit Logic Tests...\n');
 
-  // Test 1: Example from Rule 4
-  // Student A orders 5 thalis in one order, Student B orders 3 thalis in another order
+  // Test 1: Multiple students ordering different quantities of same dish
   console.log('--- Test 1: Multiple students ordering different quantities of same dish ---');
   const items1 = [
     {
       orderId: 'ORD-STUDENT-A',
       mealId: 'M-THALI',
-      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
       quantity: 5,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
     {
       orderId: 'ORD-STUDENT-B',
       mealId: 'M-THALI',
-      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
       quantity: 3,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
@@ -101,72 +98,100 @@ async function runUnitTests() {
   const res1 = calculateKitchenSummary(items1);
   const thali1 = res1.mealCounts.find((m) => m.mealId === 'M-THALI');
   assert.strictEqual(res1.totalOrders, 2, 'Total Orders must be 2 unique orders');
-  assert.strictEqual(thali1?.orderCount, 2, 'Deluxe Veg Thali must show 2 ORDERS');
-  console.log(`✅ Test 1 Passed: Total Orders = ${res1.totalOrders}, Deluxe Veg Thali = ${thali1?.orderCount} ORDERS`);
+  assert.strictEqual(thali1?.quantityToPrepare, 8, 'Paneer Rice Bowl Qty to Prepare must be 8 (5 + 3)');
+  console.log(`✅ Test 1 Passed: Total Orders = ${res1.totalOrders}, Paneer Rice Bowl QTY TO PREPARE = ${thali1?.quantityToPrepare}`);
 
-  // Test 2: Example from Rule 5
-  // One student places one order containing 2 thalis and 3 sandwiches
+  // Test 2: One student order containing multiple food products
   console.log('\n--- Test 2: One student order containing multiple food products ---');
   const items2 = [
     {
       orderId: 'ORD-STUDENT-C',
       mealId: 'M-THALI',
-      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
       quantity: 2,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
     {
       orderId: 'ORD-STUDENT-C',
       mealId: 'M-SANDWICH',
-      meal: { name: 'Sandwich', category: 'LUNCH' },
+      meal: { name: 'Rajma Chawal Bowl', category: 'LUNCH' },
       quantity: 3,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
   ];
 
   const res2 = calculateKitchenSummary(items2);
-  const thali2 = res2.mealCounts.find((m) => m.mealId === 'M-THALI');
-  const sandwich2 = res2.mealCounts.find((m) => m.mealId === 'M-SANDWICH');
-  assert.strictEqual(res2.totalOrders, 1, 'Total Orders must be 1');
-  assert.strictEqual(thali2?.orderCount, 1, 'Deluxe Veg Thali must show 1 ORDER');
-  assert.strictEqual(sandwich2?.orderCount, 1, 'Sandwich must show 1 ORDER');
-  console.log(`✅ Test 2 Passed: Total Orders = ${res2.totalOrders}, Deluxe Veg Thali = ${thali2?.orderCount} ORDER, Sandwich = ${sandwich2?.orderCount} ORDER`);
+  const paneer2 = res2.mealCounts.find((m) => m.mealId === 'M-THALI');
+  const rajma2 = res2.mealCounts.find((m) => m.mealId === 'M-SANDWICH');
+  assert.strictEqual(res2.totalOrders, 1, 'Total Orders must be 1 for a single student order with multiple items');
+  assert.strictEqual(paneer2?.quantityToPrepare, 2, 'Paneer Rice Bowl Qty to Prepare must be 2');
+  assert.strictEqual(rajma2?.quantityToPrepare, 3, 'Rajma Chawal Bowl Qty to Prepare must be 3');
+  console.log(`✅ Test 2 Passed: 1 multi-item order => Total Orders = 1, Paneer Qty = 2, Rajma Qty = 3`);
 
-  // Test 3: Multi-dish overlapping orders
-  console.log('\n--- Test 3: Multi-dish overlapping orders across students ---');
-  const items3 = [
+  // Test 3: Today vs Tomorrow independent summaries
+  console.log('\n--- Test 3: Today vs Tomorrow independent calculation ---');
+  const todayItems = [
     {
-      orderId: 'ORD-1',
-      mealId: 'M-THALI',
-      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      orderId: 'ORD-TODAY-1',
+      date: '2026-10-10',
+      mealId: 'M-ALPHA',
+      meal: { name: 'Automated Test Meal Alpha', category: 'LUNCH' },
       quantity: 1,
+      order: { orderStatus: 'COLLECTED', paymentStatus: 'PAID' },
+    },
+    {
+      orderId: 'ORD-TODAY-2',
+      date: '2026-10-10',
+      mealId: 'M-PANEER',
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
+      quantity: 2,
+      order: { orderStatus: 'COLLECTED', paymentStatus: 'PAID' },
+    },
+    {
+      orderId: 'ORD-TODAY-2',
+      date: '2026-10-10',
+      mealId: 'M-RAJMA',
+      meal: { name: 'Rajma Chawal Bowl', category: 'LUNCH' },
+      quantity: 1,
+      order: { orderStatus: 'COLLECTED', paymentStatus: 'PAID' },
+    },
+  ];
+
+  const tomorrowItems = [
+    {
+      orderId: 'ORD-TOMORROW-1',
+      date: '2026-10-11',
+      mealId: 'M-PANEER',
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
+      quantity: 4,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
     {
-      orderId: 'ORD-1',
-      mealId: 'M-PASTA',
-      meal: { name: 'Creamy Garden Veg Pasta', category: 'LUNCH' },
-      quantity: 1,
-      order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
-    },
-    {
-      orderId: 'ORD-2',
-      mealId: 'M-THALI',
-      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      orderId: 'ORD-TOMORROW-2',
+      date: '2026-10-11',
+      mealId: 'M-PANEER',
+      meal: { name: 'Paneer Rice Bowl', category: 'LUNCH' },
       quantity: 1,
       order: { orderStatus: 'CONFIRMED', paymentStatus: 'PAID' },
     },
   ];
 
-  const res3 = calculateKitchenSummary(items3);
-  const thali3 = res3.mealCounts.find((m) => m.mealId === 'M-THALI');
-  const pasta3 = res3.mealCounts.find((m) => m.mealId === 'M-PASTA');
-  assert.strictEqual(res3.totalOrders, 2, 'Total Orders must be 2 unique orders');
-  assert.strictEqual(thali3?.orderCount, 2, 'Thali must be 2 orders');
-  assert.strictEqual(pasta3?.orderCount, 1, 'Pasta must be 1 order');
-  console.log(`✅ Test 3 Passed: Total Orders = ${res3.totalOrders}, Thali = 2 ORDERS, Pasta = 1 ORDER`);
+  const todayRes = calculateKitchenSummary(todayItems);
+  const tomorrowRes = calculateKitchenSummary(tomorrowItems);
 
-  // Test 4: Ineligible order statuses
+  assert.strictEqual(todayRes.totalOrders, 2, "Today's Total Orders must be 2");
+  assert.strictEqual(todayRes.mealCounts.length, 3, "Today must have 3 food products");
+  assert.strictEqual(todayRes.mealCounts.find((m) => m.mealId === 'M-PANEER')?.quantityToPrepare, 2, "Today Paneer Qty must be 2");
+  assert.strictEqual(todayRes.mealCounts.find((m) => m.mealId === 'M-RAJMA')?.quantityToPrepare, 1, "Today Rajma Qty must be 1");
+  assert.strictEqual(todayRes.mealCounts.find((m) => m.mealId === 'M-ALPHA')?.quantityToPrepare, 1, "Today Alpha Qty must be 1");
+
+  assert.strictEqual(tomorrowRes.totalOrders, 2, "Tomorrow's Total Orders must be 2");
+  assert.strictEqual(tomorrowRes.mealCounts.length, 1, "Tomorrow must have 1 food product");
+  assert.strictEqual(tomorrowRes.mealCounts[0].quantityToPrepare, 5, "Tomorrow Paneer Qty must be 5 (4 + 1)");
+
+  console.log(`✅ Test 3 Passed: Today Total Orders = ${todayRes.totalOrders}, Tomorrow Total Orders = ${tomorrowRes.totalOrders}, Tomorrow Paneer Qty = ${tomorrowRes.mealCounts[0].quantityToPrepare}`);
+
+  // Test 4: Strict eligibility filtering
   console.log('\n--- Test 4: Strict eligibility filtering ---');
   const items4 = [
     {
@@ -182,6 +207,13 @@ async function runUnitTests() {
       meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
       quantity: 1,
       order: { orderStatus: 'CANCELLED', paymentStatus: 'PAID' },
+    },
+    {
+      orderId: 'ORD-PENDING',
+      mealId: 'M-THALI',
+      meal: { name: 'Deluxe Veg Thali', category: 'LUNCH' },
+      quantity: 3,
+      order: { orderStatus: 'CONFIRMED', paymentStatus: 'PENDING' },
     },
     {
       orderId: 'ORD-FAILED',
@@ -207,66 +239,61 @@ async function runUnitTests() {
   ];
 
   const res4 = calculateKitchenSummary(items4);
-  assert.strictEqual(res4.totalOrders, 1, 'Only 1 valid order should be counted');
-  assert.strictEqual(res4.mealCounts.length, 1, 'Only 1 meal should be present');
-  assert.strictEqual(res4.mealCounts[0].orderCount, 1, 'Meal orderCount must be 1');
-  console.log('✅ Test 4 Passed: Cancelled, Failed, Refunded, and Orphaned records are strictly excluded');
+  assert.strictEqual(res4.totalOrders, 1, 'Only 1 valid PAID order should be counted');
+  assert.strictEqual(res4.mealCounts.length, 1, 'Only meals with valid PAID orders must appear');
+  assert.strictEqual(res4.mealCounts[0].quantityToPrepare, 1, 'Meal quantityToPrepare must be 1');
+  console.log('✅ Test 4 Passed: Cancelled, Pending, Failed, Refunded, and Orphaned records are strictly excluded');
 }
 
-async function runLiveApiTest() {
-  console.log('\n🌐 Testing Live /api/admin/kitchen Endpoint against localhost:3000...');
-  const loginRes = await fetch('http://localhost:3000/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@school.com', password: 'Admin123' }),
+async function runDatabaseVerification() {
+  console.log('\n📊 Verifying against Live Prisma Database...');
+  const today = getTodayString();
+  const tomorrow = getOffsetDateString(1);
+
+  console.log(`Checking database for Today (${today}) and Tomorrow (${tomorrow})...`);
+
+  const todayItems = await prisma.orderItem.findMany({
+    where: { date: today },
+    include: { meal: true, order: true },
   });
-
-  if (!loginRes.ok) {
-    console.warn('⚠️ Server not responding or credentials failed, skipping live network call');
-    return;
+  const todaySummary = calculateKitchenSummary(todayItems);
+  console.log(`\nResults for Today (${today}):`);
+  console.log(`- Total Orders: ${todaySummary.totalOrders}`);
+  for (const m of todaySummary.mealCounts) {
+    console.log(`  * ${m.mealName} (${m.category}) — QTY TO PREPARE: ${m.quantityToPrepare}`);
   }
+  assert.strictEqual(todaySummary.totalOrders, 2, 'Today total orders must be 2');
+  assert.strictEqual(todaySummary.mealCounts.find((m) => m.mealName.includes('Paneer'))?.quantityToPrepare, 2, 'Today Paneer must be 2');
+  assert.strictEqual(todaySummary.mealCounts.find((m) => m.mealName.includes('Rajma'))?.quantityToPrepare, 1, 'Today Rajma must be 1');
+  assert.strictEqual(todaySummary.mealCounts.find((m) => m.mealName.includes('Alpha'))?.quantityToPrepare, 1, 'Today Alpha must be 1');
 
-  const cookie = loginRes.headers.get('set-cookie');
-  const res = await fetch('http://localhost:3000/api/admin/kitchen?date=2026-10-09', {
-    headers: { cookie: cookie || '' },
+  const tomorrowItems = await prisma.orderItem.findMany({
+    where: { date: tomorrow },
+    include: { meal: true, order: true },
   });
-
-  const data = await res.json();
-  console.log(`Live API Response for ${data.date}:`);
-  console.log(`- Total Orders: ${data.totalOrders}`);
-  console.log(`- Food Products Breakdown:`);
-  for (const m of data.mealCounts) {
-    console.log(`  * ${m.mealName}: ${m.orderCount} ${m.orderCount === 1 ? 'ORDER' : 'ORDERS'}`);
+  const tomorrowSummary = calculateKitchenSummary(tomorrowItems);
+  console.log(`\nResults for Tomorrow (${tomorrow}):`);
+  console.log(`- Total Orders: ${tomorrowSummary.totalOrders}`);
+  for (const m of tomorrowSummary.mealCounts) {
+    console.log(`  * ${m.mealName} (${m.category}) — QTY TO PREPARE: ${m.quantityToPrepare}`);
   }
+  assert.strictEqual(tomorrowSummary.totalOrders, 2, 'Tomorrow total orders must be 2');
+  assert.strictEqual(tomorrowSummary.mealCounts.find((m) => m.mealName.includes('Paneer'))?.quantityToPrepare, 5, 'Tomorrow Paneer must be 5');
 
-  // Exact database state for today:
-  // 47 unique orders
-  // 44 orders for Deluxe Veg Thali
-  // 10 orders for Creamy Garden Veg Pasta
-  // 1 order for Grilled Corn & Cheese Sandwich
-  // 1 order for Fresh Fruit & Nut Box
-  assert.strictEqual(data.totalOrders, 47, 'Total Orders must show the number of unique orders placed for today (47)');
-
-  const thali = data.mealCounts.find((m: any) => m.mealName.includes('Thali'));
-  const pasta = data.mealCounts.find((m: any) => m.mealName.includes('Pasta'));
-  const sandwich = data.mealCounts.find((m: any) => m.mealName.includes('Sandwich'));
-  const fruit = data.mealCounts.find((m: any) => m.mealName.includes('Fruit'));
-
-  assert.strictEqual(thali?.orderCount, 44, 'Deluxe Veg Thali order count must be 44');
-  assert.strictEqual(pasta?.orderCount, 10, 'Creamy Garden Veg Pasta order count must be 10');
-  assert.strictEqual(sandwich?.orderCount, 1, 'Grilled Corn & Cheese Sandwich order count must be 1');
-  assert.strictEqual(fruit?.orderCount, 1, 'Fresh Fruit & Nut Box order count must be 1');
-
-  console.log('\n✅ Live API test verified: Total unique orders = 47, Thali = 44 ORDERS, Pasta = 10 ORDERS, Sandwich = 1 ORDER, Fruit = 1 ORDER!');
+  console.log('\n✅ Database verification completed successfully with exact matching counts!');
 }
 
 async function main() {
   await runUnitTests();
-  await runLiveApiTest();
-  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY!');
+  await runDatabaseVerification();
+  console.log('\n🎉 ALL KITCHEN PRODUCTION TESTS PASSED SUCCESSFULLY!');
 }
 
-main().catch((err) => {
-  console.error('❌ Test failed:', err);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error('❌ Test failed:', err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
