@@ -12,13 +12,16 @@ export async function POST(req: Request) {
     const signature = req.headers.get('x-webhook-signature') || '';
     const timestamp = req.headers.get('x-webhook-timestamp') || '';
 
-    // Verify webhook signature if signature header is provided
-    if (signature && timestamp) {
-      const isValid = verifyCashfreeWebhookSignature(rawBody, signature, timestamp);
-      if (!isValid) {
-        console.warn('[Cashfree Webhook] Invalid webhook signature detected');
-        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
-      }
+    // Verify webhook signature: Must be present and cryptographically valid
+    if (!signature || !timestamp) {
+      console.warn('[Cashfree Webhook] Missing required x-webhook-signature or x-webhook-timestamp header');
+      return NextResponse.json({ error: 'Missing required webhook signature headers' }, { status: 401 });
+    }
+
+    const isValid = verifyCashfreeWebhookSignature(rawBody, signature, timestamp);
+    if (!isValid) {
+      console.warn('[Cashfree Webhook] Invalid webhook signature detected');
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
     }
 
     let payload: any = {};
