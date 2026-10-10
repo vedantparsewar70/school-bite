@@ -15,9 +15,11 @@ export default function Footer() {
           {/* Brand & Description (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
-                <UtensilsCrossed className="w-4 h-4" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="School Bite"
+                className="w-9 h-9 rounded-xl object-contain shadow-md shadow-amber-500/20"
+              />
               <span className="font-extrabold text-xl text-white tracking-tight">
                 School<span className="text-amber-500">-Bite</span>
               </span>

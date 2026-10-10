@@ -10,10 +10,15 @@ import Footer from '@/components/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'School-Bite - School Meal Pre-Ordering Platform | S.B. Patil School',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://school-bite.vercel.app'),
+  title: {
+    default: 'School Bite - School Meal Pre-Ordering Platform | S.B. Patil School',
+    template: '%s | School Bite',
+  },
   description:
-    'School-Bite is a school meal pre-ordering platform that allows parents to select fresh, wholesome canteen meals for their children at S.B. Patil School and make online payments.',
+    'School Bite is a school meal pre-ordering platform that allows parents to select fresh, wholesome canteen meals for their children at S.B. Patil School and make online payments.',
   keywords: [
+    'School Bite',
     'School-Bite',
     'S.B. Patil School',
     'school canteen',
@@ -22,11 +27,30 @@ export const metadata: Metadata = {
     'pure vegetarian school meal',
     'Ravet Pune',
   ],
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '192x192' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  manifest: '/manifest.json',
   openGraph: {
-    title: 'School-Bite - School Meal Pre-Ordering Platform',
+    title: 'School Bite - School Meal Pre-Ordering Platform',
     description:
       'School meal pre-ordering made simple for parents of S.B. Patil School students.',
     type: 'website',
+    images: [
+      {
+        url: '/logo.png',
+        width: 512,
+        height: 512,
+        alt: 'School Bite Logo',
+      },
+    ],
   },
 };
 

@@ -203,8 +203,12 @@ function HomePageContent() {
     <div className="min-h-[calc(100vh-4rem)] flex flex-col justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-amber-50/50 via-white to-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
         {/* Brand Icon */}
-        <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 items-center justify-center text-white shadow-lg shadow-amber-500/25">
-          <UtensilsCrossed className="w-7 h-7" />
+        <div className="inline-block">
+          <img
+            src="/logo.png"
+            alt="School Bite Logo"
+            className="w-16 h-16 rounded-2xl shadow-lg shadow-amber-500/25 object-contain mx-auto"
+          />
         </div>
 
         <div>
