@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getTodayString } from '@/lib/utils';
+import { getTodayString, getOffsetDateString, APP_TIMEZONE, isDeadlinePassed } from '@/lib/utils';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
+
+export function clearMenuCache() {
+  // Authoritative database querying is always real-time
+}
 
 export async function GET(req: Request) {
   try {
@@ -12,6 +16,7 @@ export async function GET(req: Request) {
     const childId = searchParams.get('childId');
 
     let whereClause: any = { isActive: true };
+    const targetDate = date || (!startDate && !endDate ? getTodayString() : null);
 
     if (date) {
       whereClause.date = date;
@@ -24,27 +29,38 @@ export async function GET(req: Request) {
       whereClause.date = getTodayString();
     }
 
-    const [menus, allowAllergyOrdersSetting] = await Promise.all([
-      prisma.menu.findMany({
-        where: whereClause,
-        include: {
-          meal: {
-            include: {
-              mealAllergens: {
-                include: { allergen: true },
-              },
+    const tomorrowStr = getOffsetDateString(1, APP_TIMEZONE);
+    if (targetDate === tomorrowStr || whereClause.date === tomorrowStr) {
+      try {
+        const { ensureTomorrowMenuReset } = await import('@/lib/menu-schedule');
+        await ensureTomorrowMenuReset(tomorrowStr);
+      } catch {
+        // ignore
+      }
+    }
+
+    const allowAllergyOrdersSettingPromise = getSystemSetting('ALLOW_ALLERGY_ORDERS', 'true');
+
+    // Authoritative real-time query (no stale in-memory cache)
+    const menus = await prisma.menu.findMany({
+      where: whereClause,
+      include: {
+        meal: {
+          include: {
+            mealAllergens: {
+              include: { allergen: true },
             },
           },
         },
-        orderBy: [
-          { date: 'asc' },
-          { meal: { category: 'asc' } },
-          { meal: { name: 'asc' } },
-        ],
-      }),
-      getSystemSetting('ALLOW_ALLERGY_ORDERS', 'true'),
-    ]);
+      },
+      orderBy: [
+        { date: 'asc' },
+        { meal: { category: 'asc' } },
+        { meal: { name: 'asc' } },
+      ],
+    });
 
+    const allowAllergyOrdersSetting = await allowAllergyOrdersSettingPromise;
     const allowAllergyOrders = allowAllergyOrdersSetting === 'true';
 
     // Optimize: Fetch child allergies ONCE instead of re-fetching in a loop per meal!
@@ -102,8 +118,13 @@ export async function GET(req: Request) {
         };
       }
 
+      const deadlinePassed = isDeadlinePassed(item.date, item.orderingDeadline || '08:30');
+      const isAvailable = Boolean(item.isActive) && (item.availableQuantity > 0) && !deadlinePassed;
+
       return {
         ...item,
+        isAvailable,
+        isDeadlinePassed: deadlinePassed,
         meal: {
           ...item.meal,
           allergensList,
@@ -113,13 +134,11 @@ export async function GET(req: Request) {
       };
     });
 
-    const headers: Record<string, string> = {};
-    if (!childId) {
-      // Safe public cache for general menu requests
-      headers['Cache-Control'] = 'public, s-maxage=60, stale-while-revalidate=300';
-    } else {
-      headers['Cache-Control'] = 'private, no-cache';
-    }
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
 
     return NextResponse.json(
       {

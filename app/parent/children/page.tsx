@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
+import { useChildren } from '@/components/ChildrenContext';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { StudentData } from '@/types';
@@ -21,9 +22,14 @@ import { StudentData } from '@/types';
 export default function ChildrenPage() {
   const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
-
-  const [children, setChildren] = useState<StudentData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    children,
+    isLoading: loading,
+    addChild,
+    updateChild,
+    removeChild,
+    refreshChildren,
+  } = useChildren();
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -45,24 +51,6 @@ export default function ChildrenPage() {
   const [formNotes, setFormNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-
-  const fetchChildren = async () => {
-    try {
-      const res = await fetch('/api/parent/children');
-      if (res.ok) {
-        const data = await res.json();
-        setChildren(data.students || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch children:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchChildren();
-  }, []);
 
   const openAddModal = () => {
     setEditingChild(null);
@@ -122,13 +110,41 @@ export default function ChildrenPage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        const savedChild: StudentData = {
+          id: data.student?.id || editingChild?.id || '',
+          parentId: user?.parentId || '',
+          name: formName,
+          dob: formDob || null,
+          grade: formGrade,
+          division: formDivision,
+          rollNo: formRollNo,
+          studentId: data.student?.studentId || formStudentId,
+          allergies: null,
+          allergiesList: [],
+          dietaryRestrictions: formDietaryRestrictions || null,
+          foodPreference: formFoodPreference || null,
+          notes: formNotes || null,
+          isVegetarian: formIsVeg,
+          profilePhoto: null,
+          isActive: true,
+          allergyAlertStatus: 'NO_ALLERGY',
+          ...data.student,
+        };
+
+        if (editingChild) {
+          updateChild(savedChild);
+        } else {
+          addChild(savedChild);
+        }
+
         showToast(
           editingChild ? `Updated profile for ${formName}` : `Added ${formName} to your children list!`,
           'success'
         );
         setIsAddModalOpen(false);
-        await fetchChildren();
-        await refreshUser();
+        refreshChildren();
+        refreshUser();
       } else {
         const err = await res.json();
         showToast(err.error || 'Failed to save child details', 'error');
@@ -148,9 +164,10 @@ export default function ChildrenPage() {
         method: 'DELETE',
       });
       if (res.ok) {
+        removeChild(childId);
         showToast(`Removed ${name}`, 'info');
-        await fetchChildren();
-        await refreshUser();
+        refreshChildren();
+        refreshUser();
       } else {
         showToast('Failed to remove child', 'error');
       }

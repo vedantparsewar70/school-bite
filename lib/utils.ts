@@ -28,27 +28,41 @@ export function formatDateTimePretty(dateStrOrObj: string | Date): string {
   });
 }
 
-export function getTodayString(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+export const APP_TIMEZONE = 'Asia/Kolkata';
+
+export function getTodayString(timeZone: string = APP_TIMEZONE): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(new Date());
+  } catch {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 }
 
-export function getOffsetDateString(offsetDays: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+export function getOffsetDateString(offsetDays: number, timeZone: string = APP_TIMEZONE): string {
+  const todayStr = getTodayString(timeZone);
+  const [year, month, day] = todayStr.split('-').map(Number);
+  const target = new Date(Date.UTC(year, month - 1, day + offsetDays));
+  const targetYear = target.getUTCFullYear();
+  const targetMonth = String(target.getUTCMonth() + 1).padStart(2, '0');
+  const targetDay = String(target.getUTCDate()).padStart(2, '0');
+  return `${targetYear}-${targetMonth}-${targetDay}`;
 }
 
 export function isDeadlinePassed(dateStr: string, deadlineTime: string = '08:30'): boolean {
   try {
     const [hours, minutes] = deadlineTime.split(':').map(Number);
-    const deadline = new Date(`${dateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+    // Explicitly parse in Asia/Kolkata timezone (+05:30)
+    const deadline = new Date(`${dateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+05:30`);
     const now = new Date();
     return now.getTime() > deadline.getTime();
   } catch {

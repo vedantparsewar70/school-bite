@@ -18,6 +18,8 @@ import {
   BarChart3,
   ShieldCheck,
   ChevronDown,
+  GraduationCap,
+  History,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCart } from './CartContext';
@@ -92,22 +94,47 @@ export default function Navbar() {
               <>
                 <Link
                   href="/staff/kitchen"
-                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/staff/kitchen')
-                    ? 'bg-amber-500 text-white font-bold shadow-xs'
-                    : 'text-amber-900 bg-amber-50 hover:bg-amber-100 font-semibold'
-                    }`}
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                    isActive('/staff/kitchen')
+                      ? 'bg-amber-100 text-amber-900 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
                 >
                   <ChefHat className="w-4 h-4" />
-                  Kitchen Summary
+                  Student Menu
                 </Link>
                 <Link
                   href="/staff/orders"
-                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/staff/orders')
-                    ? 'bg-amber-100 text-amber-900 font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                    isActive('/staff/orders')
+                      ? 'bg-amber-100 text-amber-900 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
                 >
-                  Student Orders
+                  <FileText className="w-4 h-4" />
+                  Orders
+                </Link>
+                <Link
+                  href="/staff/history"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                    isActive('/staff/history')
+                      ? 'bg-emerald-100 text-emerald-900 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <History className="w-4 h-4" />
+                  History
+                </Link>
+                <Link
+                  href="/staff/teacher-menu"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                    isActive('/staff/teacher-menu')
+                      ? 'bg-emerald-100 text-emerald-900 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Teacher Menu
                 </Link>
               </>
             )}
@@ -452,17 +479,50 @@ export default function Navbar() {
               <Link
                 href="/staff/kitchen"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-bold text-amber-800 bg-amber-100 rounded-lg flex items-center gap-2"
+                className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${
+                  isActive('/staff/kitchen')
+                    ? 'font-bold text-amber-800 bg-amber-100'
+                    : 'font-medium text-slate-700 hover:bg-slate-50'
+                }`}
               >
-                <ChefHat className="w-4 h-4 text-amber-600" />
-                Kitchen Summary
+                <ChefHat className={`w-4 h-4 ${isActive('/staff/kitchen') ? 'text-amber-600' : 'text-slate-400'}`} />
+                Student Menu
               </Link>
               <Link
                 href="/staff/orders"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+                className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${
+                  isActive('/staff/orders')
+                    ? 'font-bold text-amber-800 bg-amber-100'
+                    : 'font-medium text-slate-700 hover:bg-slate-50'
+                }`}
               >
-                Student Orders
+                <FileText className={`w-4 h-4 ${isActive('/staff/orders') ? 'text-amber-600' : 'text-slate-400'}`} />
+                Orders
+              </Link>
+              <Link
+                href="/staff/history"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${
+                  isActive('/staff/history')
+                    ? 'font-bold text-emerald-900 bg-emerald-100'
+                    : 'font-medium text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <History className={`w-4 h-4 ${isActive('/staff/history') ? 'text-emerald-600' : 'text-slate-400'}`} />
+                History
+              </Link>
+              <Link
+                href="/staff/teacher-menu"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${
+                  isActive('/staff/teacher-menu')
+                    ? 'font-bold text-emerald-900 bg-emerald-100'
+                    : 'font-medium text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <GraduationCap className={`w-4 h-4 ${isActive('/staff/teacher-menu') ? 'text-emerald-600' : 'text-slate-400'}`} />
+                Teacher Menu
               </Link>
               <button
                 onClick={() => {

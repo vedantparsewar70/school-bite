@@ -185,20 +185,65 @@ function docData(doc: DocumentSnapshot): any {
   };
 }
 
-// Ultra-fast batch fetch of documents by ID using Firestore db.getAll in chunks
+interface StaticCacheEntry {
+  data: any;
+  expiry: number;
+}
+const staticDocCache = new Map<string, StaticCacheEntry>();
+const STATIC_CACHE_TTL = 30000; // 30s TTL
+const STATIC_COLLECTIONS = new Set(['allergens', 'allergies', 'meals']);
+
+export function invalidateStaticCache(collectionName?: string) {
+  if (!collectionName) {
+    staticDocCache.clear();
+  } else {
+    for (const key of staticDocCache.keys()) {
+      if (key.startsWith(`${collectionName}:`)) {
+        staticDocCache.delete(key);
+      }
+    }
+  }
+}
+
+// Ultra-fast batch fetch of documents by ID using Firestore db.getAll in chunks with static caching
 async function batchGetDocs(collectionName: string, ids: (string | undefined | null)[]): Promise<Map<string, any>> {
   const map = new Map<string, any>();
   const uniqueIds = Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
   if (uniqueIds.length === 0) return map;
 
+  const now = Date.now();
+  const isStatic = STATIC_COLLECTIONS.has(collectionName);
+  const idsToFetch: string[] = [];
+
+  if (isStatic) {
+    for (const id of uniqueIds) {
+      const cacheKey = `${collectionName}:${id}`;
+      const cached = staticDocCache.get(cacheKey);
+      if (cached && now < cached.expiry) {
+        map.set(id, cached.data);
+      } else {
+        idsToFetch.push(id);
+      }
+    }
+    if (idsToFetch.length === 0) {
+      return map;
+    }
+  } else {
+    idsToFetch.push(...uniqueIds);
+  }
+
   const chunkSize = 200;
-  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-    const chunk = uniqueIds.slice(i, i + chunkSize);
+  for (let i = 0; i < idsToFetch.length; i += chunkSize) {
+    const chunk = idsToFetch.slice(i, i + chunkSize);
     const refs = chunk.map((id) => db.collection(collectionName).doc(id));
     const snaps = await db.getAll(...refs);
     for (const snap of snaps) {
       if (snap.exists) {
-        map.set(snap.id, docData(snap));
+        const item = docData(snap);
+        map.set(snap.id, item);
+        if (isStatic) {
+          staticDocCache.set(`${collectionName}:${snap.id}`, { data: item, expiry: now + STATIC_CACHE_TTL });
+        }
       }
     }
   }
@@ -345,6 +390,14 @@ export class FirestoreDbAdapter {
         await db.collection('users').doc(where.id).set({ id: where.id, ...create });
       }
       return docData(await db.collection('users').doc(where.id).get());
+    },
+    count: async (args?: any): Promise<number> => {
+      const snap = await db.collection('users').count().get();
+      return snap.data().count;
+    },
+    findMany: async (args?: any): Promise<DbUser[]> => {
+      const snap = await db.collection('users').get();
+      return snap.docs.map((d) => docData(d));
     },
     deleteMany: async (): Promise<any> => {
       const snap = await db.collection('users').get();
@@ -745,6 +798,7 @@ export class FirestoreDbAdapter {
       return m;
     },
     create: async ({ data }: any): Promise<DbMeal> => {
+      invalidateStaticCache('meals');
       const id = data.id || generateId('mel_');
       const now = new Date().toISOString();
       const obj = { id, mealAllergens: [], ...data, createdAt: now, updatedAt: now };
@@ -752,6 +806,7 @@ export class FirestoreDbAdapter {
       return obj;
     },
     upsert: async ({ where, update, create }: any): Promise<DbMeal> => {
+      invalidateStaticCache('meals');
       const ref = db.collection('meals').doc(where.id);
       const snap = await ref.get();
       if (snap.exists) {
@@ -762,12 +817,14 @@ export class FirestoreDbAdapter {
       return docData(await ref.get());
     },
     update: async ({ where, data }: any): Promise<DbMeal> => {
+      invalidateStaticCache('meals');
       const ref = db.collection('meals').doc(where.id);
       const now = new Date().toISOString();
       await ref.set({ ...data, updatedAt: now }, { merge: true });
       return docData(await ref.get());
     },
     delete: async ({ where }: any): Promise<any> => {
+      invalidateStaticCache('meals');
       await db.collection('meals').doc(where.id).delete();
       return { id: where.id };
     },
@@ -776,6 +833,7 @@ export class FirestoreDbAdapter {
       return snap.data().count;
     },
     deleteMany: async (): Promise<any> => {
+      invalidateStaticCache('meals');
       const snap = await db.collection('meals').get();
       const batch = db.batch();
       snap.docs.forEach((d) => batch.delete(d.ref));
@@ -857,9 +915,39 @@ export class FirestoreDbAdapter {
   menu = {
     findMany: async ({ where, include, orderBy }: any = {}): Promise<DbMenu[]> => {
       let query: Query = db.collection('menus');
-      if (where?.date) query = query.where('date', '==', where.date);
+      if (typeof where?.date === 'string') {
+        query = query.where('date', '==', where.date);
+      }
       const snap = await query.get();
       let list = snap.docs.map((d) => docData(d));
+
+      if (where?.date) {
+        if (typeof where.date === 'string') {
+          list = list.filter((m: any) => m.date === where.date);
+        } else if (where.date?.in && Array.isArray(where.date.in)) {
+          const dateSet = new Set(where.date.in);
+          list = list.filter((m: any) => dateSet.has(m.date));
+        }
+      }
+
+      if (where?.mealId) {
+        if (typeof where.mealId === 'string') {
+          list = list.filter((m: any) => m.mealId === where.mealId);
+        } else if (where.mealId?.in && Array.isArray(where.mealId.in)) {
+          const mealIdSet = new Set(where.mealId.in);
+          list = list.filter((m: any) => mealIdSet.has(m.mealId));
+        }
+      }
+
+      if (where?.id) {
+        if (typeof where.id === 'string') {
+          list = list.filter((m: any) => m.id === where.id);
+        } else if (where.id?.in && Array.isArray(where.id.in)) {
+          const idSet = new Set(where.id.in);
+          list = list.filter((m: any) => idSet.has(m.id));
+        }
+      }
+
       if (where?.isActive !== undefined) {
         list = list.filter((m: any) => Boolean(m.isActive) === Boolean(where.isActive));
       }

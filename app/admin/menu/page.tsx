@@ -18,13 +18,14 @@ import {
 import VegBadge from '@/components/VegBadge';
 import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
-import { formatINR, formatDatePretty, getOffsetDateString } from '@/lib/utils';
+import { formatINR, formatDatePretty, getTodayString, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { MealData } from '@/types';
 
 export default function AdminMenuPage() {
   const { showToast } = useToast();
-  const tomorrowDate = getOffsetDateString(1);
+  const [todayDate, setTodayDate] = useState(() => getTodayString());
+  const [tomorrowDate, setTomorrowDate] = useState(() => getOffsetDateString(1));
 
   const [meals, setMeals] = useState<MealData[]>([]);
   const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
@@ -42,11 +43,12 @@ export default function AdminMenuPage() {
   const [newMealDesc, setNewMealDesc] = useState('');
   const [creatingMeal, setCreatingMeal] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (targetDate?: string) => {
+    const queryDate = targetDate || tomorrowDate;
     try {
       const [mealsRes, menusRes] = await Promise.all([
         fetch('/api/admin/meals'),
-        fetch(`/api/admin/menus?date=${tomorrowDate}`),
+        fetch(`/api/admin/menus?date=${queryDate}`),
       ]);
 
       let allMeals: MealData[] = [];
@@ -58,9 +60,20 @@ export default function AdminMenuPage() {
 
       if (menusRes.ok) {
         const menuData = await menusRes.json();
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
         const activeIds = (menuData.menus || [])
-          .filter((item: any) => item.isActive)
+          .filter((item: any) => {
+            if (!item.isActive) return false;
+            if (item.updatedAt) {
+              const updatedTime = new Date(item.updatedAt).getTime();
+              return updatedTime >= todayStart.getTime();
+            }
+            return false;
+          })
           .map((item: any) => item.mealId);
+
         setSelectedMealIds(activeIds);
       }
     } catch (err) {
@@ -73,7 +86,57 @@ export default function AdminMenuPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+
+    // 1. Schedule exact timer at 12:00:00 AM midnight
+    let timeoutId: NodeJS.Timeout;
+    const scheduleMidnight = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 200);
+      const msUntilMidnight = Math.max(500, nextMidnight.getTime() - now.getTime());
+
+      timeoutId = setTimeout(() => {
+        const newToday = getTodayString();
+        const newTomorrow = getOffsetDateString(1);
+
+        setTodayDate(newToday);
+        setTomorrowDate(newTomorrow);
+        setSelectedMealIds([]);
+
+        showToast(
+          '12:00 AM Rollover: All meals unticked for the new day. Please select tomorrow\'s menu.',
+          'info'
+        );
+
+        fetchData(newTomorrow);
+        scheduleMidnight();
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnight();
+
+    // 2. Periodic safety interval (every 15s)
+    const intervalId = setInterval(() => {
+      const currentToday = getTodayString();
+      if (currentToday !== todayDate) {
+        const newTomorrow = getOffsetDateString(1);
+        setTodayDate(currentToday);
+        setTomorrowDate(newTomorrow);
+        setSelectedMealIds([]);
+
+        showToast(
+          'Date changed: All meals unticked for the new day. Please select tomorrow\'s menu.',
+          'info'
+        );
+
+        fetchData(newTomorrow);
+      }
+    }, 15000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+  }, [todayDate]);
 
   const handleToggleMeal = (mealId: string) => {
     setSelectedMealIds((prev) =>

@@ -2,10 +2,18 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
+import { ensureTomorrowMenuReset } from '@/lib/menu-schedule';
+import { getOffsetDateString, APP_TIMEZONE } from '@/lib/utils';
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
+    const tomorrowStr = getOffsetDateString(1, APP_TIMEZONE);
+
+    if (!date || date === tomorrowStr) {
+      await ensureTomorrowMenuReset(tomorrowStr);
+    }
 
     const menus = await prisma.menu.findMany({
       where: date ? { date } : {},
@@ -23,8 +31,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -74,20 +82,22 @@ async function handleBatchPublish(date: string, selectedMealIds: string[]) {
 
   const existingMealIdMap = new Map(existingMenus.map((m: any) => [m.mealId, m]));
 
+  const now = new Date().toISOString();
+
   // 2. Enable selected meals (upserting if not yet in database for that date)
   for (const mealId of selectedMealIds) {
     const existing = existingMealIdMap.get(mealId);
     if (existing) {
       await prisma.menu.update({
         where: { id: existing.id },
-        data: { isActive: true },
+        data: { isActive: true, updatedAt: now },
       });
     } else {
       await prisma.menu.upsert({
         where: {
           mealId_date: { mealId, date },
         },
-        update: { isActive: true },
+        update: { isActive: true, updatedAt: now },
         create: {
           mealId,
           date,
@@ -95,6 +105,7 @@ async function handleBatchPublish(date: string, selectedMealIds: string[]) {
           maxQuantity: 50,
           orderingDeadline: '08:30',
           isActive: true,
+          updatedAt: now,
         },
       });
     }
@@ -105,9 +116,23 @@ async function handleBatchPublish(date: string, selectedMealIds: string[]) {
     if (!selectedMealIds.includes(existing.mealId)) {
       await prisma.menu.update({
         where: { id: existing.id },
-        data: { isActive: false },
+        data: { isActive: false, updatedAt: now },
       });
     }
+  }
+
+  try {
+    const { recordMenuPublication } = await import('@/lib/menu-schedule');
+    await recordMenuPublication(date, selectedMealIds);
+  } catch (e) {
+    console.error('Failed to record publication in handleBatchPublish:', e);
+  }
+
+  try {
+    const { clearMenuCache } = await import('@/app/api/menu/route');
+    clearMenuCache();
+  } catch {
+    // ignore
   }
 
   const updatedMenus = await prisma.menu.findMany({
@@ -125,8 +150,8 @@ async function handleBatchPublish(date: string, selectedMealIds: string[]) {
 export async function PUT(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -162,8 +187,8 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

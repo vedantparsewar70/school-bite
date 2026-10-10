@@ -36,7 +36,10 @@ export async function GET(req: Request) {
       }
 
       orders = await prisma.order.findMany({
-        where: { id: { in: matchingOrderIds } },
+        where: {
+          id: { in: matchingOrderIds },
+          paymentStatus: 'PAID',
+        },
         include: {
           parent: {
             include: { user: true },
@@ -54,6 +57,9 @@ export async function GET(req: Request) {
     } else {
       // Query recent orders with sensible ceiling for admin history view
       orders = await prisma.order.findMany({
+        where: {
+          paymentStatus: 'PAID',
+        },
         take: 100,
         include: {
           parent: {
@@ -214,9 +220,11 @@ export async function PATCH(req: Request) {
 
       if (currentStatus === 'COLLECTED') {
         if (orderStatus === 'COLLECTED') {
-          throw new Error('This order has already been collected.');
+          throw new Error('This order has already been marked as given.');
         }
-        throw new Error('Collected orders have already been fulfilled and cannot be changed.');
+        if (orderStatus !== 'CONFIRMED') {
+          throw new Error('Collected orders can only be reverted back to active.');
+        }
       }
 
       const now = new Date().toISOString();
@@ -243,12 +251,17 @@ export async function PATCH(req: Request) {
       }
 
       // 3. Status progression
-      transaction.update(orderRef, {
+      const updateData: any = {
         orderStatus,
         updatedAt: now,
-      });
+      };
+      if (orderStatus === 'COLLECTED') {
+        updateData.collectedAt = now;
+      }
 
-      return { ...orderData, orderStatus, updatedAt: now };
+      transaction.update(orderRef, updateData);
+
+      return { ...orderData, ...updateData };
     });
 
     return NextResponse.json({ success: true, order: updated });

@@ -40,8 +40,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -57,12 +57,14 @@ export async function POST(req: Request) {
       price,
     } = body;
 
-    if (!name || !description || price === undefined) {
+    if (!name || price === undefined || Number(price) <= 0) {
       return NextResponse.json(
-        { error: 'Name, description, and price are required' },
+        { error: 'Name and a valid price (> 0) are required' },
         { status: 400 }
       );
     }
+
+    const finalDesc = description?.trim() || `${name.trim()} - Freshly prepared at school canteen`;
 
     // Build unified allergens array
     let finalAllergens: string[] = [];
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
     const meal = await prisma.meal.create({
       data: {
         name: name.trim(),
-        description: description.trim(),
+        description: finalDesc,
         category: category.toUpperCase().trim(),
         isVegetarian: Boolean(isVegetarian),
         ingredients: ingredients?.trim() || null,
@@ -120,8 +122,8 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
     }
 
     const body = await req.json();

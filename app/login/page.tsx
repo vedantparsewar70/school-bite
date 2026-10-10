@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   KeyRound,
   UtensilsCrossed,
+  GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
@@ -257,8 +258,19 @@ function StaffOrAdminLoginForm() {
           </div>
         </div>
 
+        {/* Teacher Direct Food Order Button */}
+        <div className="mt-4">
+          <Link
+            href="/teacher/menu"
+            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-emerald-950 border-2 border-emerald-300 font-extrabold text-xs sm:text-sm rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xs group cursor-pointer"
+          >
+            <GraduationCap className="w-4 h-4 text-emerald-700 group-hover:scale-110 transition-transform" />
+            <span>Teachers Only →</span>
+          </Link>
+        </div>
+
         {/* Clear Return to Parent Portal link */}
-        <div className="mt-6 text-center space-y-2">
+        <div className="mt-4 text-center space-y-2">
           <p className="text-xs text-slate-500">
             Are you a parent looking to pre-order food?{' '}
             <Link

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyCashfreeWebhookSignature } from '@/lib/cashfree';
 import { db } from '@/lib/firebase-admin';
-import { cleanDoc, generateId } from '@/lib/firestore-db';
+import { fulfillParentOrder, fulfillTeacherOrder } from '@/lib/order-fulfillment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,16 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, message: 'No order_id present' });
     }
 
-    const orderRef = db.collection('orders').doc(orderId);
-    const orderSnap = await orderRef.get();
-    if (!orderSnap.exists) {
-      console.warn(`[Cashfree Webhook] Order ${orderId} not found in Firestore`);
-      return NextResponse.json({ received: true, message: 'Order not found' });
-    }
-
-    const orderData = orderSnap.data() || {};
-    const now = new Date().toISOString();
-
+    // Only fulfill and create orders on verified SUCCESS events
     if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' || paymentObj.payment_status === 'SUCCESS') {
       const txnRef =
         paymentObj.cf_payment_id ||
@@ -63,49 +54,31 @@ export async function POST(req: Request) {
       const cardLastFour = paymentObj.payment_method?.card?.card_number ? paymentObj.payment_method.card.card_number.slice(-4) : null;
       const bankName = paymentObj.payment_method?.netbanking?.netbanking_bank_name || null;
 
-      await db.runTransaction(async (transaction) => {
-        // 1. Mark order as PAID
-        transaction.update(orderRef, {
-          paymentStatus: 'PAID',
-          orderStatus: 'CONFIRMED',
+      // Check if this is a Teacher order
+      const isTeacherId = orderId.startsWith('TCH-') || orderId.startsWith('TORD-');
+      const pendingTeacherSnap = await db.collection('pending_teacher_orders').doc(orderId).get();
+
+      if (isTeacherId || pendingTeacherSnap.exists) {
+        await fulfillTeacherOrder(orderId, {
+          transactionRef: String(txnRef),
           cashfreeOrderId: orderObj.cf_order_id || null,
-          updatedAt: now,
         });
-
-        // 2. Check if payment record exists
-        const paymentsSnap = await db.collection('payments').where('orderId', '==', orderId).get();
-        if (paymentsSnap.empty) {
-          const paymentId = generateId('PAY-');
-          const payDoc = cleanDoc({
-            id: paymentId,
-            orderId,
-            amount: Number(paymentObj.payment_amount || orderData.totalAmount),
-            paymentMethod: methodStr,
-            status: 'SUCCESS',
-            transactionRef: String(txnRef),
-            upiId,
-            cardLastFour,
-            bankName,
-            createdAt: now,
-          });
-          transaction.set(db.collection('payments').doc(paymentId), payDoc);
-        } else {
-          const existingPayRef = paymentsSnap.docs[0].ref;
-          transaction.update(existingPayRef, {
-            status: 'SUCCESS',
-            transactionRef: String(txnRef),
-            paymentMethod: methodStr,
-            upiId: upiId || paymentsSnap.docs[0].data()?.upiId || null,
-            cardLastFour: cardLastFour || paymentsSnap.docs[0].data()?.cardLastFour || null,
-            bankName: bankName || paymentsSnap.docs[0].data()?.bankName || null,
-            updatedAt: now,
-          });
-        }
-      });
-
-      console.log(`[Cashfree Webhook] Order ${orderId} successfully confirmed via webhook!`);
-    } else if (eventType === 'PAYMENT_FAILED_WEBHOOK') {
-      console.log(`[Cashfree Webhook] Payment failed event for order ${orderId}`);
+        console.log(`[Cashfree Webhook] Teacher Order ${orderId} successfully confirmed via webhook!`);
+      } else {
+        await fulfillParentOrder(orderId, {
+          transactionRef: String(txnRef),
+          paymentMethod: methodStr,
+          upiId,
+          cardLastFour,
+          bankName,
+          cashfreeOrderId: orderObj.cf_order_id || null,
+          amount: Number(paymentObj.payment_amount || 0),
+        });
+        console.log(`[Cashfree Webhook] Parent Order ${orderId} successfully confirmed via webhook!`);
+      }
+    } else {
+      // Payment failed or incomplete: Strictly DO NOT create any order!
+      console.log(`[Cashfree Webhook] Non-success event (${eventType}) for order ${orderId}. Strictly no order created.`);
     }
 
     return NextResponse.json({ success: true, received: true });

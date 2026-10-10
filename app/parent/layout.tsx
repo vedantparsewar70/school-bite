@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthContext';
+import { ChildrenProvider } from '@/components/ChildrenContext';
 import ParentMobileBottomNav from '@/components/ParentMobileBottomNav';
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
@@ -38,9 +39,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 md:pb-8">
-      {children}
-      <ParentMobileBottomNav />
-    </div>
+    <ChildrenProvider>
+      <div className="min-h-screen bg-slate-50/50 pb-20 md:pb-8">
+        {children}
+        <ParentMobileBottomNav />
+      </div>
+    </ChildrenProvider>
   );
 }
