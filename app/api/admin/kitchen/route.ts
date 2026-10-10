@@ -4,6 +4,9 @@ import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
 import { db } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const kitchenCache = new Map<string, { data: any; timestamp: number }>();
 const KITCHEN_CACHE_TTL = 10000;
 
@@ -16,11 +19,12 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date') || getTodayString();
+    const bypassCache = searchParams.get('bypassCache') === 'true' || searchParams.get('refresh') === 'true';
 
     const cached = kitchenCache.get(date);
-    if (cached && Date.now() - cached.timestamp < KITCHEN_CACHE_TTL) {
+    if (!bypassCache && cached && Date.now() - cached.timestamp < KITCHEN_CACHE_TTL) {
       return NextResponse.json(cached.data, {
-        headers: { 'X-Cache': 'HIT' },
+        headers: { 'X-Cache': 'HIT', 'Cache-Control': 'no-store, max-age=0' },
       });
     }
 
@@ -67,6 +71,7 @@ export async function GET(req: Request) {
         mealName: string;
         category: string;
         count: number;
+        quantityToPrepare: number;
         orderCount: number;
         isVegetarian: boolean;
         orderIds: Set<string>;
@@ -84,6 +89,7 @@ export async function GET(req: Request) {
       const existing = mealCountsMap.get(it.mealId);
       if (existing) {
         existing.count += it.quantity;
+        existing.quantityToPrepare = existing.count;
         if (it.orderId) existing.orderIds.add(it.orderId);
         existing.orderCount = existing.orderIds.size;
       } else {
@@ -94,6 +100,7 @@ export async function GET(req: Request) {
           mealName: it.meal.name,
           category: it.meal.category,
           count: it.quantity,
+          quantityToPrepare: it.quantity,
           orderCount: orderIds.size || 1,
           isVegetarian: it.meal.isVegetarian,
           orderIds,
@@ -139,11 +146,12 @@ export async function GET(req: Request) {
     const uniqueOrderIds = new Set(validItems.map((i) => i.orderId).filter(Boolean));
     const mealCountsList = Array.from(mealCountsMap.values())
       .map(({ orderIds, ...rest }) => rest)
-      .sort((a, b) => b.orderCount - a.orderCount);
+      .sort((a, b) => b.count - a.count || b.orderCount - a.orderCount);
 
     const payload = {
       date,
       totalOrders: uniqueOrderIds.size,
+      totalMeals,
       allergyAlertsCount,
       mealCounts: mealCountsList,
       classBreakdown: Array.from(classBreakdownMap.entries()).map(([cls, count]) => ({
@@ -155,7 +163,9 @@ export async function GET(req: Request) {
 
     kitchenCache.set(date, { data: payload, timestamp: Date.now() });
 
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
   } catch (error) {
     console.error('Error fetching kitchen data:', error);
     return NextResponse.json({ error: 'Failed to fetch kitchen data' }, { status: 500 });
