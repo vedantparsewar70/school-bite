@@ -587,7 +587,7 @@ export default function CartPage() {
                 <span>Secured by Cashfree Payments</span>
               </div>
               <p className="text-[10px] text-slate-400">
-                Supports UPI, Cards, Net Banking & Wallets • 256-bit Bank Grade Security
+                Supports UPI, Cards & Net Banking • 256-bit Bank Grade Security
               </p>
             </div>
           </div>

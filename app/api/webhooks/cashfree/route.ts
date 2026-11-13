@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import {
+  checkCashfreeWebhookSignature,
+  getCashfreeMode,
   getCashfreeRefund,
   getVerifiedCashfreePayment,
+  paidAtFromWebhookPayload,
   paymentDetailsFromCashfree,
-  verifyCashfreeWebhookSignature,
 } from '@/lib/cashfree';
 import { db } from '@/lib/firebase-admin';
 import { fulfillParentOrder, fulfillTeacherOrder } from '@/lib/order-fulfillment';
@@ -21,13 +23,17 @@ export async function POST(req: Request) {
 
     // Verify webhook signature: Must be present and cryptographically valid
     if (!signature || !timestamp) {
-      console.warn('[Cashfree Webhook] Missing required x-webhook-signature or x-webhook-timestamp header');
+      console.warn('[Cashfree Webhook] Rejected (401): missing header', {
+        signatureHeaderPresent: Boolean(signature),
+        timestampHeaderPresent: Boolean(timestamp),
+      });
       return NextResponse.json({ error: 'Missing required webhook signature headers' }, { status: 401 });
     }
 
-    const isValid = verifyCashfreeWebhookSignature(rawBody, signature, timestamp);
-    if (!isValid) {
-      console.warn('[Cashfree Webhook] Invalid webhook signature detected');
+    const check = checkCashfreeWebhookSignature(rawBody, signature, timestamp);
+    if (!check.valid) {
+      // Only safe facts: never the secret, the signature value or the body.
+      console.warn(`[Cashfree Webhook] Rejected (401): ${check.reason}`, { ...check.details, cashfreeMode: modeForLog() });
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
     }
 
@@ -35,6 +41,7 @@ export async function POST(req: Request) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      console.warn('[Cashfree Webhook] Rejected (400): body is not valid JSON', { bodyLength: rawBody.length });
       return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
     }
 
@@ -57,6 +64,7 @@ export async function POST(req: Request) {
 
     const orderId = payload.data?.order?.order_id;
     if (!orderId) {
+      console.warn(`[Cashfree Webhook] Ignored: no order_id in ${eventType || 'unknown'} event`);
       return NextResponse.json({ received: true, message: 'No order_id present' });
     }
 
@@ -77,9 +85,24 @@ export async function POST(req: Request) {
 
     const isTeacherId = orderId.startsWith('TCH-') || orderId.startsWith('TORD-');
     const pendingTeacherSnap = isTeacherId ? null : await db.collection('pending_teacher_orders').doc(orderId).get();
+    const isTeacherOrder = isTeacherId || Boolean(pendingTeacherSnap?.exists);
+
+    // Parent orders are judged against the ordering cutoff at the time the customer paid. If Cashfree's
+    // payment record could not be read, use the payment time in this signed webhook; without either,
+    // answer 503 so Cashfree retries later, rather than guessing "now" and wrongly flagging a late payment.
+    if (!isTeacherOrder && !details.paidAt) {
+      const webhookPaidAt = paidAtFromWebhookPayload(payload, String(orderId));
+      if (webhookPaidAt) {
+        details.paidAt = webhookPaidAt;
+        console.warn(`[Cashfree Webhook] Payment time for ${orderId} taken from the webhook (payments lookup ${verified.payment ? 'had no time' : 'failed'})`);
+      } else if (!verified.payment) {
+        console.warn(`[Cashfree Webhook] Deferred (503): payments lookup for ${orderId} failed and the webhook has no payment time; Cashfree will retry`);
+        return NextResponse.json({ error: 'Payment details temporarily unavailable' }, { status: 503 });
+      }
+    }
 
     // Fulfilment is idempotent, so repeated deliveries of the same event cannot create duplicate orders.
-    const result = isTeacherId || pendingTeacherSnap?.exists
+    const result = isTeacherOrder
       ? await fulfillTeacherOrder(orderId, details)
       : await fulfillParentOrder(orderId, details);
 
@@ -96,7 +119,18 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, received: true });
   } catch (error: any) {
-    console.error('[Cashfree Webhook Error]:', error);
+    // 500 makes Cashfree retry. Common causes: unknown checkout ID (e.g. a webhook from another
+    // environment), Cashfree API unavailable, or a configuration error.
+    console.error('[Cashfree Webhook] Failed (500):', error instanceof Error ? `${error.name}: ${error.message}` : 'Unknown error');
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+  }
+}
+
+/** Cashfree mode for diagnostics only; a misconfiguration is reported, never thrown. */
+function modeForLog(): string {
+  try {
+    return getCashfreeMode();
+  } catch {
+    return 'not configured';
   }
 }

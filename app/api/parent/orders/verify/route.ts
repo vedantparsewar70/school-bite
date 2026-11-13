@@ -77,6 +77,15 @@ export async function POST(req: Request) {
     // fulfillParentOrder checks the paid amount and currency against the pending order total.
     if (verified.paid) {
       const details = paymentDetailsFromCashfree(verified);
+      // The ordering cutoff is judged at the time the customer paid. Without Cashfree's payment record
+      // that time is unknown, so ask the parent to refresh instead of assuming the payment was late.
+      if (!verified.payment) {
+        console.warn(`[Cashfree Verify] Payments lookup for ${orderId} failed; not fulfilling yet`);
+        return NextResponse.json(
+          { error: 'Could not confirm payment status right now. Please refresh in a moment.' },
+          { status: 503 }
+        );
+      }
       const result = await fulfillParentOrder(orderId, details);
 
       if (!result.success) {

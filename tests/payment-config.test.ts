@@ -3,11 +3,13 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
 import {
+  checkCashfreeWebhookSignature,
   getAppBaseUrl,
   getCashfreeMode,
   getVerifiedCashfreePayment,
   isCashfreeConfigured,
   isMockPaymentAllowed,
+  paidAtFromWebhookPayload,
   paymentDetailsFromCashfree,
   PaymentConfigError,
   verifyCashfreeWebhookSignature,
@@ -133,4 +135,36 @@ test('webhook signatures are verified with HMAC-SHA256 over timestamp + body', (
 
   delete env.CASHFREE_SECRET_KEY;
   assert.equal(verifyCashfreeWebhookSignature(body, sig, ts), false);
+});
+
+test('a rejected webhook signature reports a reason, and the logged details contain no secret or signature', () => {
+  env.CASHFREE_SECRET_KEY = 'test_webhook_secret';
+  const body = '{"type":"PAYMENT_SUCCESS_WEBHOOK"}';
+  const ts = '1761500000000';
+  const sig = crypto.createHmac('sha256', 'test_webhook_secret').update(ts + body).digest('base64');
+  const otherSig = crypto.createHmac('sha256', 'wrong_secret').update(ts + body).digest('base64');
+
+  assert.equal(checkCashfreeWebhookSignature(body, sig, ts).valid, true);
+  assert.equal(checkCashfreeWebhookSignature(body, otherSig, ts).reason, 'SIGNATURE_MISMATCH');
+  assert.equal(checkCashfreeWebhookSignature(body, 'not base64!', ts).reason, 'SIGNATURE_NOT_BASE64');
+  assert.equal(checkCashfreeWebhookSignature(body, 'c2hvcnQ=', ts).reason, 'SIGNATURE_LENGTH_MISMATCH');
+  assert.equal(checkCashfreeWebhookSignature(body, sig, '').reason, 'MISSING_HEADERS');
+  const logged = JSON.stringify(checkCashfreeWebhookSignature(body, otherSig, ts));
+  for (const secret of ['test_webhook_secret', sig, otherSig, body]) assert.ok(!logged.includes(secret));
+
+  delete env.CASHFREE_SECRET_KEY;
+  assert.equal(checkCashfreeWebhookSignature(body, sig, ts).reason, 'SECRET_NOT_CONFIGURED');
+});
+
+test('the payment time is taken from a webhook only for a successful payment of the same order', () => {
+  const payload = (overrides: Record<string, unknown> = {}, orderId = 'ORD-1') => ({
+    data: { order: { order_id: orderId }, payment: { payment_status: 'SUCCESS', payment_time: '2026-11-02T08:25:00+05:30', ...overrides } },
+  });
+  assert.equal(paidAtFromWebhookPayload(payload(), 'ORD-1'), '2026-11-02T02:55:00.000Z');
+  assert.equal(paidAtFromWebhookPayload(payload({ payment_completion_time: '2026-11-02T08:26:00+05:30' }), 'ORD-1'), '2026-11-02T02:56:00.000Z');
+  assert.equal(paidAtFromWebhookPayload(payload(), 'ORD-2'), null, 'different order');
+  assert.equal(paidAtFromWebhookPayload(payload({ payment_status: 'FAILED' }), 'ORD-1'), null);
+  assert.equal(paidAtFromWebhookPayload(payload({ payment_time: 'yesterday' }), 'ORD-1'), null);
+  assert.equal(paidAtFromWebhookPayload(payload({ payment_time: '2999-01-01T00:00:00Z' }), 'ORD-1'), null, 'future time');
+  assert.equal(paidAtFromWebhookPayload({}, 'ORD-1'), null);
 });

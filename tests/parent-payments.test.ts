@@ -25,6 +25,8 @@ let refundStatus: string;
 let adminAuth: Record<string, string>;
 /** Payment attempts Cashfree reports for an unpaid order (null: none). */
 let attempts: Array<{ payment_status: string }> | null;
+/** Cashfree's payments endpoint is failing (HTTP 500). */
+let paymentsDown: boolean;
 
 const at = (istLocal: string) => {
   mock.timers.reset();
@@ -52,6 +54,7 @@ beforeEach(async () => {
   refundsCreated = [];
   refundStatus = 'PENDING';
   attempts = null;
+  paymentsDown = false;
   adminAuth = await signedInAs(fs, 'ADMIN');
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     const url = String(input);
@@ -74,6 +77,7 @@ beforeEach(async () => {
       return Response.json({ refund_id: body.refund_id, cf_refund_id: 'cfr_1', refund_status: 'PENDING', refund_amount: body.refund_amount });
     }
     if (path.endsWith('/payments')) {
+      if (paymentsDown) return Response.json({ message: 'internal error' }, { status: 500 });
       if (attempts && cf.status !== 'PAID') return Response.json(attempts);
       return Response.json(cf.status === 'PAID'
         ? [{ payment_status: 'SUCCESS', payment_amount: cf.amount, payment_currency: 'INR', cf_payment_id: 'pay_1', payment_completion_time: cf.paidAt }]
@@ -300,6 +304,44 @@ test('a payment made before the deadline is honoured even if confirmation arrive
   const result = await verifyOrder(orderId);
   assert.equal(result.state, 'PAID');
   assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CONFIRMED');
+});
+
+test('if Cashfree payment details cannot be read, a payment made before the cutoff is never marked late', async () => {
+  at('2026-11-02T08:20');
+  const { orderId } = await (await startCheckout()).json();
+  at('2026-11-02T09:30');
+  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T08:25:00+05:30' };
+  paymentsDown = true;
+
+  // Verify cannot tell when the parent paid: it asks them to refresh and records nothing.
+  const verifyRes = await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parentAuth));
+  assert.equal(verifyRes.status, 503);
+  // A webhook without a payment time is deferred, so Cashfree retries it.
+  assert.equal((await paymentWebhook(orderId)).status, 503);
+  assert.equal(fs.list('orders').length, 0);
+  assert.equal(fs.getDoc('payment_exceptions', orderId), undefined, 'not marked as a late payment');
+
+  // A signed webhook carrying the payment time is enough to confirm the order on time.
+  const res = await deliverWebhook({
+    type: 'PAYMENT_SUCCESS_WEBHOOK',
+    data: { order: { order_id: orderId }, payment: { payment_status: 'SUCCESS', payment_time: '2026-11-02T08:25:00+05:30' } },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CONFIRMED');
+  assert.equal(fs.getDoc('payment_exceptions', orderId), undefined);
+});
+
+test('once Cashfree payment details are readable again, verification confirms the on-time payment', async () => {
+  at('2026-11-02T08:20');
+  const { orderId } = await (await startCheckout()).json();
+  at('2026-11-02T09:30');
+  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T08:25:00+05:30' };
+  paymentsDown = true;
+  assert.equal((await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parentAuth))).status, 503);
+
+  paymentsDown = false;
+  assert.equal((await verifyOrder(orderId)).state, 'PAID');
+  assert.equal(fs.getDoc('payment_exceptions', orderId), undefined);
 });
 
 test('a menu disabled (or turned into a holiday) after checkout makes the payment an exception', async () => {

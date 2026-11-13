@@ -191,6 +191,24 @@ export default function Navbar() {
                   Payment Issues
                 </Link>
                 <Link
+                  href="/admin/reports"
+                  className={`hidden lg:block px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/reports')
+                    ? 'bg-purple-50 text-purple-700 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  Reports
+                </Link>
+                <Link
+                  href="/admin/users"
+                  className={`hidden lg:block px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${isActive('/admin/users')
+                    ? 'bg-purple-50 text-purple-700 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  Users
+                </Link>
+                <Link
                   href="/admin/kitchen"
                   className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/admin/kitchen')
                     ? 'bg-amber-500 text-white font-bold shadow-xs'
@@ -224,6 +242,16 @@ export default function Navbar() {
                 >
                   <FileText className="w-4 h-4" />
                   Order History
+                </Link>
+                <Link
+                  href="/parent/payments"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isActive('/parent/payments')
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Payments
                 </Link>
                 <Link
                   href="/parent/children"
@@ -339,6 +367,13 @@ export default function Navbar() {
                             Order History
                           </Link>
                           <Link
+                            href="/parent/payments"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                          >
+                            <CreditCard className="w-4 h-4 text-slate-400" />
+                            Payments
+                          </Link>
+                          <Link
                             href="/parent/menu"
                             className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
                           >
@@ -358,6 +393,25 @@ export default function Navbar() {
                           >
                             <UserIcon className="w-4 h-4 text-slate-400" />
                             Parent Profile
+                          </Link>
+                        </>
+                      )}
+
+                      {isAdmin && (
+                        <>
+                          <Link
+                            href="/admin/reports"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                          >
+                            <FileText className="w-4 h-4 text-slate-400" />
+                            Reports
+                          </Link>
+                          <Link
+                            href="/admin/users"
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                          >
+                            <Users className="w-4 h-4 text-slate-400" />
+                            Users
                           </Link>
                         </>
                       )}
@@ -481,6 +535,13 @@ export default function Navbar() {
               >
                 Order History
               </Link>
+              <Link
+                href="/parent/payments"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Payments
+              </Link>
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
@@ -602,6 +663,20 @@ export default function Navbar() {
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
                 Payment Issues
+              </Link>
+              <Link
+                href="/admin/reports"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Reports
+              </Link>
+              <Link
+                href="/admin/users"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Users
               </Link>
               <Link
                 href="/admin/kitchen"

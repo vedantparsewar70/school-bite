@@ -21,7 +21,21 @@ import MealCategoryBadge from '@/components/MealCategoryBadge';
 import { formatINR, formatDatePretty, getTodayString, getOffsetDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
+import { effectiveMenuEntry } from '@/lib/menu-entries';
 import { MealData } from '@/types';
+
+const STUDENT_CATEGORIES = ['Pre-primary', 'Primary', 'Secondary'];
+
+/**
+ * The dish currently on sale for this date and category (one per date and category, as on the server).
+ * For "All Students" it is the dish all three categories share, or none if they differ.
+ */
+function currentDishId(menus: any[], date: string, category: string): string | null {
+  const ids = (category === 'ALL' ? STUDENT_CATEGORIES : [category]).map(
+    (cat) => effectiveMenuEntry(menus, date, cat)?.mealId || null
+  );
+  return ids[0] && ids.every((id) => id === ids[0]) ? ids[0] : null;
+}
 
 export default function AdminMenuPage() {
   const { showToast } = useToast();
@@ -72,11 +86,8 @@ export default function AdminMenuPage() {
         const menusList = menuData.menus || [];
         setCurrentDayMenus(menusList);
 
-        const activeIds = menusList
-          .filter((item: any) => Boolean(item.isActive))
-          .map((item: any) => item.mealId);
-
-        setSelectedMealIds(activeIds);
+        const current = currentDishId(menusList.filter((item: any) => !item.isHoliday), queryDate, queryCat || 'ALL');
+        setSelectedMealIds(current ? [current] : []);
       }
     } catch (err) {
       console.error('Failed to load menu data:', err);
@@ -148,26 +159,21 @@ export default function AdminMenuPage() {
     };
   }, [todayDate]);
 
+  // One dish per date and category: picking a dish replaces the previous choice.
   const handleToggleMeal = (mealId: string) => {
-    setSelectedMealIds((prev) =>
-      prev.includes(mealId) ? prev.filter((id) => id !== mealId) : [...prev, mealId]
-    );
+    setSelectedMealIds((prev) => (prev.includes(mealId) ? [] : [mealId]));
   };
 
-  const handleSelectAll = () => {
-    const visibleIds = filteredMeals.map((m) => m.id);
-    const combined = Array.from(new Set([...selectedMealIds, ...visibleIds]));
-    setSelectedMealIds(combined);
-    showToast(`Selected all ${visibleIds.length} visible items`, 'info');
-  };
-
-  const handleUnselectAll = () => {
-    const visibleIds = new Set(filteredMeals.map((m) => m.id));
-    setSelectedMealIds((prev) => prev.filter((id) => !visibleIds.has(id)));
-    showToast('Unselected visible items', 'info');
+  const handleClearSelection = () => {
+    setSelectedMealIds([]);
   };
 
   const handlePublishMenu = async (replace = false) => {
+    // Saving with no dish stops sales for this date and category, so it is never done by accident.
+    if (selectedMealIds.length === 0 && !replace) {
+      const who = selectedStudentCategory === 'ALL' ? 'all categories' : selectedStudentCategory;
+      if (!window.confirm(`No dish is selected. Saving will stop sales for ${who} on ${formatDatePretty(selectedDate)}. Continue?`)) return;
+    }
     setSaving(true);
     try {
       const res = await fetch('/api/admin/menus/publish', {
@@ -184,11 +190,7 @@ export default function AdminMenuPage() {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         broadcastSyncEvent('MENU_UPDATED');
-        showToast(
-          `Menu for ${formatDatePretty(selectedDate)} saved successfully with ${selectedMealIds.length} items!`,
-          'success'
-        );
-        window.alert(data.message || 'Menu saved.');
+        showToast(data.message || `Menu for ${formatDatePretty(selectedDate)} saved.`, 'success');
         fetchData();
       } else if (data.code === 'NEEDS_REPLACE' && !replace) {
         // One dish per date and category: replacing a different dish needs confirmation.
@@ -196,11 +198,10 @@ export default function AdminMenuPage() {
         if (window.confirm(`${data.error}\n\nReplace it?`)) await handlePublishMenu(true);
         return;
       } else {
-        // Toasts are silent in this app, so the reason is shown directly.
-        window.alert(data.error || 'Failed to publish menu');
+        showToast(data.error || 'Failed to publish menu', 'error');
       }
     } catch {
-      window.alert('Network error publishing menu');
+      showToast('Network error publishing menu', 'error');
     } finally {
       setSaving(false);
     }
@@ -232,7 +233,7 @@ export default function AdminMenuPage() {
         setNewMealDesc('');
         // Add to local state & select it automatically
         setMeals((prev) => [data.meal, ...prev]);
-        setSelectedMealIds((prev) => [...prev, data.meal.id]);
+        setSelectedMealIds([data.meal.id]);
         broadcastSyncEvent('MENU_UPDATED');
       } else {
         showToast('Failed to add food item', 'error');
@@ -253,6 +254,7 @@ export default function AdminMenuPage() {
   });
 
   const holidayItem = currentDayMenus.find((m) => m.isHoliday);
+  const selectedMeal = meals.find((m) => m.id === selectedMealIds[0]) || null;
 
   if (loading) {
     return (
@@ -402,10 +404,11 @@ export default function AdminMenuPage() {
           </div>
           <div>
             <p className="font-extrabold text-purple-950">
-              {selectedMealIds.length} Food Items Active for {formatDatePretty(selectedDate)}
+              {selectedMeal ? selectedMeal.name : 'No dish selected'} for {formatDatePretty(selectedDate)}
             </p>
             <p className="text-[11px] text-purple-800">
-              Only checked items are orderable for {selectedStudentCategory === 'ALL' ? 'all categories' : selectedStudentCategory}.
+              One dish per date and category ({selectedStudentCategory === 'ALL' ? 'all categories' : selectedStudentCategory}).
+              Choosing another dish replaces it; saving with no dish stops sales for this date.
             </p>
           </div>
         </div>
@@ -413,20 +416,11 @@ export default function AdminMenuPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleSelectAll}
-            className="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-800 font-bold rounded-lg border border-purple-200 transition-colors shadow-2xs text-xs cursor-pointer flex items-center gap-1"
-          >
-            <CheckSquare className="w-3.5 h-3.5" />
-            <span>Select All</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleUnselectAll}
+            onClick={handleClearSelection}
             className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-lg border border-slate-200 transition-colors shadow-2xs text-xs cursor-pointer flex items-center gap-1"
           >
             <Square className="w-3.5 h-3.5" />
-            <span>Unselect All</span>
+            <span>Clear Selection</span>
           </button>
         </div>
       </div>

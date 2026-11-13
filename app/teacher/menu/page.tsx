@@ -224,16 +224,31 @@ export default function TeacherMenuPage() {
                 showToast(result.error.message || 'Payment cancelled', 'error');
                 setSubmitting(false);
               } else {
-                // Verify payment on server
+                // Verify payment on server. The confirmation page checks again, so a failure here
+                // is reported to the teacher (never shown as success) and they are not asked to pay again.
+                let verified: { state?: string; message?: string } | null = null;
                 try {
-                  await fetch('/api/teacher/orders/verify', {
+                  const verifyRes = await fetch('/api/teacher/orders/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ orderId }),
                   });
-                } catch {}
+                  verified = verifyRes.ok ? await verifyRes.json().catch(() => null) : null;
+                } catch {
+                  verified = null;
+                }
 
-                showToast('Payment successful! Your order has been placed.', 'success');
+                if (verified?.state === 'PAID') {
+                  showToast('Payment successful! Your order has been placed.', 'success');
+                } else if (verified?.state === 'EXCEPTION') {
+                  showToast(verified.message || 'Your payment was received but the order needs review by the canteen.', 'error');
+                } else if (verified?.state) {
+                  showToast('Your payment is still being confirmed. Please do not pay again.', 'info');
+                } else {
+                  const message = 'We could not confirm your payment yet. Please do not pay again; check the status on the next page.';
+                  setErrorMessage(message);
+                  showToast(message, 'error');
+                }
                 router.push(`/teacher/confirmation/${orderId}`);
               }
             })
