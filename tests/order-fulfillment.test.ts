@@ -9,7 +9,7 @@ import {
   generateParentOrderId,
 } from '../lib/order-fulfillment';
 
-const DATE = '2026-11-02';
+const DATE = '2099-11-02';
 
 function seedMenus(fs: FakeFirestore, primaryQty = 50, prePrimaryQty = 50) {
   fs.seed('menus', `menu_${DATE}_primary`, {

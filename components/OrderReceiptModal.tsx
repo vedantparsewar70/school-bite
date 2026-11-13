@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Printer, CheckCircle2, ShieldCheck, Utensils, QrCode } from 'lucide-react';
+import { X, Printer, CheckCircle2, ShieldCheck, Utensils } from 'lucide-react';
 import { formatINR, formatDateTimePretty, formatDatePretty } from '@/lib/utils';
 import VegBadge from './VegBadge';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
@@ -130,19 +130,14 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
             </div>
           </div>
 
-          {/* Verification Token / Barcode Mock */}
-          <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-amber-900">Student Lunch Pickup Voucher</p>
-              <p className="text-[11px] text-amber-800/80 leading-snug">
-                Student needs to present their name/roll number or this token ID at the canteen lunch counter.
-              </p>
-              <p className="text-[11px] font-mono font-bold text-amber-950">TOKEN: {order.id.slice(-6)}</p>
-            </div>
-            <div className="w-16 h-16 bg-white border border-amber-300 rounded-xl flex flex-col items-center justify-center p-1 shrink-0 text-slate-800">
-              <QrCode className="w-10 h-10 text-slate-800" />
-              <span className="text-[8px] font-mono">SCAN</span>
-            </div>
+          {/* Order ID for canteen lookup */}
+          <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-1.5 text-center">
+            <p className="text-xs font-bold text-amber-900">Student Lunch Pickup</p>
+            <p className="text-[11px] text-amber-800/80 leading-snug">
+              Show the student&apos;s name/roll number or this order ID at the canteen lunch counter.
+            </p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900/70">Order ID</p>
+            <p className="text-2xl sm:text-3xl font-mono font-black text-amber-950 break-all select-all">{order.id}</p>
           </div>
 
           {/* Footer note */}

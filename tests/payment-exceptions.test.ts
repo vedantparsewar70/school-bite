@@ -9,7 +9,7 @@ import { applyExceptionRefundStatus, listPaymentExceptions, refundPaymentExcepti
 import { classifyCancelledOrder } from '../lib/refund-reconciliation';
 import { publicHealthPayload } from '../lib/health';
 
-const DATE = '2026-11-04';
+const DATE = '2099-11-04';
 
 /** A checkout that Cashfree reports as paid but whose meal sold out meanwhile. */
 async function soldOutPayment(fs: FakeFirestore, orderId = 'ORD-X', amount = 120) {

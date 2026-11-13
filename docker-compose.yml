@@ -11,7 +11,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL:-}
-      - JWT_SECRET=${JWT_SECRET:-super-secure-school-mealbox-jwt-secret-key-2026}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET (at least 32 random characters) before starting}
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-school-bite-91432}
       - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
       - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}

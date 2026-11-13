@@ -218,26 +218,41 @@ export async function getCashfreeOrder(orderId: string): Promise<any> {
  * Fetches all payment attempts and gateway references for a given order
  */
 export async function getCashfreeOrderPayments(orderId: string): Promise<any[]> {
+  return (await fetchCashfreeOrderPayments(orderId)) ?? [];
+}
+
+/** Payment attempts for an order, or null when Cashfree could not be asked (logged, without payment data). */
+async function fetchCashfreeOrderPayments(orderId: string): Promise<Array<Record<string, unknown>> | null> {
   const { appId, secretKey, apiVersion, baseUrl } = getCredentials();
 
-  const res = await fetch(`${baseUrl}/orders/${encodeURIComponent(orderId)}/payments`, {
-    method: 'GET',
-    headers: {
-      'x-client-id': appId,
-      'x-client-secret': secretKey,
-      'x-api-version': apiVersion,
-      'Accept': 'application/json',
-    },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    return [];
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/orders/${encodeURIComponent(orderId)}/payments`, {
+      method: 'GET',
+      headers: {
+        'x-client-id': appId,
+        'x-client-secret': secretKey,
+        'x-api-version': apiVersion,
+        'Accept': 'application/json',
+      },
+      cache: 'no-store',
+    });
+  } catch (err) {
+    console.warn(`[Cashfree] Payments lookup for ${orderId} failed: ${err instanceof Error ? err.name : 'network error'}`);
+    return null;
   }
 
-  const data = await res.json().catch(() => []);
-  return Array.isArray(data) ? data : [];
+  if (!res.ok) {
+    console.warn(`[Cashfree] Payments lookup for ${orderId} failed with HTTP ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json().catch(() => null);
+  return Array.isArray(data) ? data : null;
 }
+
+const PAYMENT_LOOKUP_ATTEMPTS = 3;
+const PAYMENT_LOOKUP_RETRY_MS = 300;
 
 export interface VerifiedCashfreePayment {
   paid: boolean;
@@ -250,20 +265,41 @@ export interface VerifiedCashfreePayment {
 
 /**
  * Authoritative payment state for an order, read from the Cashfree API (never from client or webhook payloads).
- * An order counts as paid only when Cashfree reports order_status PAID.
+ * An order counts as paid only when Cashfree reports order_status PAID. The successful payment (and with it
+ * the time the customer paid) is looked up a few times; `payment` is null if it still cannot be read.
  */
 export async function getVerifiedCashfreePayment(orderId: string): Promise<VerifiedCashfreePayment> {
   const order = await getCashfreeOrder(orderId);
   const paid = order?.order_status === 'PAID';
-  const payments = paid ? await getCashfreeOrderPayments(orderId) : [];
+  let payment: Record<string, unknown> | null = null;
+  for (let attempt = 1; paid && !payment && attempt <= PAYMENT_LOOKUP_ATTEMPTS; attempt++) {
+    if (attempt > 1) await new Promise((resolve) => setTimeout(resolve, PAYMENT_LOOKUP_RETRY_MS * (attempt - 1)));
+    const payments = await fetchCashfreeOrderPayments(orderId);
+    payment = payments?.find((p) => p.payment_status === 'SUCCESS') || null;
+  }
   return {
     paid,
     orderStatus: String(order?.order_status || 'UNKNOWN'),
     orderAmount: Number(order?.order_amount),
     orderCurrency: String(order?.order_currency || ''),
     cfOrderId: order?.cf_order_id ? String(order.cf_order_id) : null,
-    payment: payments.find((p: any) => p.payment_status === 'SUCCESS') || null,
+    payment,
   };
+}
+
+/**
+ * When the customer paid, from a signature-verified webhook payload. Used only when the Cashfree payments
+ * lookup failed. Returns null unless the payload is a successful payment for this order with a usable time.
+ */
+export function paidAtFromWebhookPayload(payload: unknown, orderId: string): string | null {
+  const data = (payload as { data?: { order?: { order_id?: unknown }; payment?: Record<string, unknown> } } | null)?.data;
+  const pay = data?.payment;
+  if (!pay || String(data?.order?.order_id || '') !== orderId || pay.payment_status !== 'SUCCESS') return null;
+  const value = pay.payment_completion_time || pay.payment_time;
+  const time = value ? Date.parse(String(value)) : NaN;
+  // A time in the future cannot be a completed payment.
+  if (!Number.isFinite(time) || time > Date.now() + 5 * 60 * 1000) return null;
+  return new Date(time).toISOString();
 }
 
 /**
@@ -434,6 +470,47 @@ export async function getCashfreeOrderRefunds(orderId: string): Promise<Cashfree
   return Array.isArray(data) ? data.map(mapRefund) : [];
 }
 
+export type WebhookSignatureFailure =
+  | 'SECRET_NOT_CONFIGURED'
+  | 'MISSING_HEADERS'
+  | 'SIGNATURE_NOT_BASE64'
+  | 'SIGNATURE_LENGTH_MISMATCH'
+  | 'SIGNATURE_MISMATCH'
+  | 'VERIFICATION_ERROR';
+
+/**
+ * Checks a Cashfree webhook signature: Base64(HMAC-SHA256(timestamp + rawBody, secret key)).
+ * On failure, `details` holds only safe facts for logging: never the secret, the signature or the body.
+ */
+export function checkCashfreeWebhookSignature(rawBody: string, signature: string, timestamp: string): {
+  valid: boolean;
+  reason?: WebhookSignatureFailure;
+  details: { secretConfigured: boolean; timestampPresent: boolean; signaturePresent: boolean; receivedLength: number; expectedLength: number };
+} {
+  const secretKey = process.env.CASHFREE_SECRET_KEY?.trim();
+  const received = String(signature || '').trim();
+  const details = {
+    secretConfigured: Boolean(secretKey),
+    timestampPresent: Boolean(timestamp),
+    signaturePresent: Boolean(received),
+    receivedLength: received.length,
+    expectedLength: 44, // Base64 of a 32-byte SHA-256 HMAC
+  };
+  if (!secretKey) return { valid: false, reason: 'SECRET_NOT_CONFIGURED', details };
+  if (!timestamp || !received) return { valid: false, reason: 'MISSING_HEADERS', details };
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(received) || received.length % 4 !== 0) {
+    return { valid: false, reason: 'SIGNATURE_NOT_BASE64', details };
+  }
+  try {
+    const expected = Buffer.from(crypto.createHmac('sha256', secretKey).update(timestamp + rawBody).digest('base64'));
+    const given = Buffer.from(received);
+    if (given.length !== expected.length) return { valid: false, reason: 'SIGNATURE_LENGTH_MISMATCH', details };
+    return crypto.timingSafeEqual(given, expected) ? { valid: true, details } : { valid: false, reason: 'SIGNATURE_MISMATCH', details };
+  } catch {
+    return { valid: false, reason: 'VERIFICATION_ERROR', details };
+  }
+}
+
 /**
  * Verifies the authenticity of Cashfree webhook notifications using HMAC-SHA256 signature
  */
@@ -442,20 +519,5 @@ export function verifyCashfreeWebhookSignature(
   signature: string,
   timestamp: string
 ): boolean {
-  try {
-    const secretKey = process.env.CASHFREE_SECRET_KEY?.trim();
-    if (!secretKey) return false;
-    const dataToSign = timestamp + rawBody;
-    const expectedSignature = crypto
-      .createHmac('sha256', secretKey)
-      .update(dataToSign)
-      .digest('base64');
-
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
-  } catch {
-    return false;
-  }
+  return checkCashfreeWebhookSignature(rawBody, signature, timestamp).valid;
 }
