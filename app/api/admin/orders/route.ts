@@ -215,15 +215,18 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
     }
 
-    // Cancellation by Admin / Staff: restores stock once and refunds through Cashfree.
+    // Cancellation is admin-only: restores stock once and refunds through Cashfree.
     // Repeating it on a cancelled order with a pending/failed refund retries the same refund.
     if (orderStatus === 'CANCELLED') {
+      if (user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Only an administrator can cancel and refund an order.' }, { status: 403 });
+      }
       const result = await cancelOrderWithRefund({
         orderId,
         cancelledBy: user.id,
         blockedStatuses: ['COLLECTED'],
-        // Refunding a meal that was already handed over is an admin decision, never staff's.
-        allowPreviouslyCollected: user.role === 'ADMIN',
+        // Refunding a meal that was handed over earlier (and later undone) is an admin decision.
+        allowPreviouslyCollected: true,
         serviceDate: typeof date === 'string' && date ? date : undefined,
       });
       if (result.alreadyCancelled && result.refundAmount === 0) {

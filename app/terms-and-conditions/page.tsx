@@ -172,7 +172,7 @@ export default function TermsAndConditionsPage() {
               Due to the perishable nature of fresh culinary preparation, cancellations and refunds are governed strictly by our <Link href="/refund-policy" className="text-amber-600 font-bold hover:underline">Refund &amp; Cancellation Policy</Link>:
             </p>
             <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-slate-600">
-              <li>Cancellations are accepted prior to the daily cutoff time (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>) for that meal date. Full refund is initiated to the original payment source.</li>
+              <li>Orders cannot be cancelled online. Cancellations are only by contacting the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>, prior to the daily cutoff time (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>) for that meal date. Approved refunds go back to the original payment method.</li>
               <li>Cancellations cannot be processed once the cutoff time has passed and fresh kitchen cooking has commenced.</li>
               <li>Full refunds are automatically or promptly issued if the school canteen is unable to serve an ordered item or in the event of an unscheduled school closure.</li>
             </ul>
