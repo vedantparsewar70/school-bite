@@ -48,6 +48,19 @@ export function getTodayString(timeZone: string = APP_TIMEZONE, at: Date = new D
   }
 }
 
+/** The canteen is closed on Sundays. `dateStr` is a YYYY-MM-DD school date. */
+export function isSundayDate(dateStr: string): boolean {
+  return new Date(`${dateStr}T00:00:00Z`).getUTCDay() === 0;
+}
+
+/** The first date after today (IST) that is not a Sunday. */
+export function nextNonSundayDateString(timeZone: string = APP_TIMEZONE): string {
+  const tomorrow = getOffsetDateString(1, timeZone);
+  return isSundayDate(tomorrow) ? getOffsetDateString(2, timeZone) : tomorrow;
+}
+
+export const SUNDAY_CLOSED_MESSAGE = 'The canteen is closed on Sundays. Please choose another date.';
+
 export function getOffsetDateString(offsetDays: number, timeZone: string = APP_TIMEZONE): string {
   const todayStr = getTodayString(timeZone);
   const [year, month, day] = todayStr.split('-').map(Number);

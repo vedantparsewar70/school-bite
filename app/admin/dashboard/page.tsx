@@ -16,7 +16,7 @@ import {
   Layers,
 } from 'lucide-react';
 import VegBadge from '@/components/VegBadge';
-import { formatINR, formatDatePretty, getOffsetDateString } from '@/lib/utils';
+import { formatINR, formatDatePretty, nextNonSundayDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 
 export default function AdminDashboardPage() {
@@ -26,7 +26,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
 
-  const tomorrowStr = getOffsetDateString(1);
+  // The next meal date comes from the server (skips Sundays and holidays); until it loads, the next non-Sunday date.
+  const tomorrowStr: string = stats?.nextMealDate || nextNonSundayDateString();
 
   const fetchStats = async () => {
     try {
@@ -126,8 +127,8 @@ export default function AdminDashboardPage() {
             </div>
             <p className="text-sm sm:text-base font-extrabold mt-0.5">
               {isMenuPublished
-                ? `Tomorrow's Menu is Published (${stats?.tomorrowPublishedCount || 0} items available to parents)`
-                : "Tomorrow's Menu is NOT published yet. Parents cannot order until published."}
+                ? `The menu for ${formatDatePretty(tomorrowStr)} is published (${stats?.tomorrowPublishedCount || 0} items available to parents)`
+                : `The menu for ${formatDatePretty(tomorrowStr)} is NOT published yet. Parents cannot order until published.`}
             </p>
           </div>
         </div>
@@ -140,7 +141,7 @@ export default function AdminDashboardPage() {
               : 'bg-amber-600 text-white hover:bg-amber-700'
           }`}
         >
-          {isMenuPublished ? "Edit Tomorrow's Menu →" : "Set & Publish Tomorrow's Menu →"}
+          {isMenuPublished ? 'Edit Menu →' : 'Set & Publish Menu →'}
         </Link>
       </div>
 
@@ -203,7 +204,7 @@ export default function AdminDashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <ChefHat className="w-5 h-5 text-amber-500" />
-                <h2 className="text-lg font-extrabold text-slate-900">Tomorrow&apos;s Production Requirements</h2>
+                <h2 className="text-lg font-extrabold text-slate-900">Next Meal Date Production Requirements</h2>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Exact kitchen portions to prepare for <strong>{formatDatePretty(tomorrowStr)}</strong>

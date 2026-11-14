@@ -17,6 +17,10 @@ import { validateCartAvailability } from '../lib/availability';
 import { serviceProblem } from '../lib/order-fulfillment';
 import { GET as adminStats } from '../app/api/admin/stats/route';
 import { GET as menuGet } from '../app/api/menu/route';
+import { publishDish } from '../lib/menu-publish';
+import { parseMonthlyMenu } from '../lib/monthly-menu';
+import { readFirstSheet } from '../lib/xlsx-reader';
+import { buildXlsx } from './helpers/xlsx-builder';
 
 let fs: FakeFirestore;
 
@@ -131,7 +135,7 @@ test('OK: formatDatePretty shows the right weekday for a YYYY-MM-DD in UTC', () 
 
 // ---------------------------------------------------------------- 2. SCHOOL DAYS
 
-test('BUG (HIGH): admin stats "nextMealDate" is calendar tomorrow (Sunday) on Saturday, ignoring holidays', async () => {
+test('FIXED: admin stats "nextMealDate" on Saturday is Monday (skips Sunday), and Monday orders are counted', async () => {
   atIST(`${SAT}T10:00`);
   const admin = await signedInAs(fs, 'ADMIN');
   fs.seed('orders', 'ORD-1', { id: 'ORD-1', parentId: 'par_x', totalAmount: 80, paymentStatus: 'PAID', orderStatus: 'CONFIRMED', createdAt: `${SAT}T04:00:00.000Z` });
@@ -139,13 +143,24 @@ test('BUG (HIGH): admin stats "nextMealDate" is calendar tomorrow (Sunday) on Sa
   const res = await adminStats(jsonRequest('/api/admin/stats', 'GET', undefined, admin));
   assert.equal(res.status, 200);
   const { stats, tomorrowProduction } = await res.json();
-  assert.equal(stats.nextMealDate, SUN, 'next meal date is the Sunday holiday');
-  assert.equal(stats.isTomorrowMenuPublished, false, 'banner says "NOT published - parents cannot order"');
-  assert.equal(stats.tomorrowTotalMeals, 0, "Monday's paid order is not counted in the production preview");
-  assert.equal(tomorrowProduction.length, 0);
+  assert.equal(stats.nextMealDate, MON);
+  assert.equal(stats.isTomorrowMenuPublished, true);
+  assert.equal(stats.tomorrowTotalMeals, 1, "Monday's paid order is in the production preview");
+  assert.equal(tomorrowProduction.length, 1);
 });
 
-test('BUG (MEDIUM/HIGH): parent checkout has no weekday guard - an active menu on a Sunday is orderable', async () => {
+test('FIXED: the next meal date skips holidays and a Sunday that has an active menu entry', async () => {
+  atIST(`${SAT}T10:05`); // past the stats route's 15 s cache
+  const admin = await signedInAs(fs, 'ADMIN');
+  // Monday becomes a holiday; a stray active Sunday entry exists; Tuesday is the next served day.
+  fs.seed('menus', `menu_${MON}_primary`, { ...fs.getDoc('menus', `menu_${MON}_primary`), isHoliday: true, mealId: '', isActive: false });
+  fs.seed('menus', `menu_${SUN}_primary`, { ...fs.getDoc('menus', `menu_${SUN}_primary`), isHoliday: false, mealId: 'meal_dal', isActive: true });
+  fs.seed('menus', 'menu_2026-11-17_primary', { id: 'menu_2026-11-17_primary', date: '2026-11-17', studentCategory: 'Primary', mealId: 'meal_dal', isHoliday: false, isActive: true, availableQuantity: 5 });
+  const { stats } = await (await adminStats(jsonRequest('/api/admin/stats', 'GET', undefined, admin))).json();
+  assert.equal(stats.nextMealDate, '2026-11-17');
+});
+
+test('FIXED: parent checkout refuses a Sunday even when an active menu entry exists for it', async () => {
   // Nothing in lib/availability.ts checks the weekday; only a menu row with isHoliday blocks a date.
   // If an admin follows the dashboard's "Set & Publish Tomorrow's Menu" on a Saturday, this happens:
   fs.seed('menus', `menu_${SUN}_primary`, {
@@ -154,14 +169,34 @@ test('BUG (MEDIUM/HIGH): parent checkout has no weekday guard - an active menu o
   });
   atIST(`${SAT}T20:00`);
   const r = await validateCartAvailability([{ mealId: 'meal_dal', date: SUN, quantity: 1, studentCategory: 'Primary' } as any]);
-  assert.equal(r.valid, true);
+  assert.equal(r.valid, false);
+  assert.match(String(r.items[0].reason), /closed on Sundays/);
+});
+
+test('FIXED: a dish cannot be published on a Sunday, by hand or by the monthly import', async () => {
+  atIST(`${SAT}T10:00`);
+  const res = await publishDish({ date: SUN, studentCategory: 'Primary', mealId: 'meal_dal', actorId: 'usr_admin' } as any, fs.asFirestore());
+  assert.equal(res.status, 400);
+  assert.match(String((res.body as any).error), /closed on Sundays/);
+  assert.equal(fs.getDoc('menus', `menu_${SUN}_primary`)?.isActive, false, 'nothing published');
+
+  // Monthly import: a meal on a Sunday row is an error (blocks publishing); a Sunday holiday is fine.
+  const D = (day: number) => 46326 + day; // 46327 = 2026-11-01 (a Sunday)
+  const plan = parseMonthlyMenu(readFirstSheet(buildXlsx('Menu', [
+    ['November 2026 Brunch Menu'],
+    ['Day', 'Date', 'Pre-primary', 'Primary', 'Secondary'],
+    ['Sunday', D(1), 'Dal Rice', 'Dal Rice', 'Dal Rice'],
+    ['Sunday', D(8), 'Holiday', 'Holiday', 'Holiday'],
+  ])));
+  assert.match(plan.days[0].errors.join(' '), /closed on Sundays/);
+  assert.deepEqual(plan.days[1].errors, []);
 });
 
 test('OK: a Sunday stored as a holiday row is rejected at checkout', async () => {
   atIST(`${SAT}T20:00`);
   const r = await validateCartAvailability([{ mealId: 'meal_dal', date: SUN, quantity: 1, studentCategory: 'Primary' } as any]);
   assert.equal(r.valid, false);
-  assert.match(String(r.items[0].reason), /Sunday Holiday/);
+  assert.match(String(r.items[0].reason), /closed on Sundays/);
 });
 
 test('OK: a date with no menu row at all (e.g. unimported Sunday) is rejected at checkout', async () => {

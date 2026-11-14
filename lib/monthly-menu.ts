@@ -6,7 +6,7 @@ import { isLiveMenuEntry, menuEntryAppliesTo, rankMenuEntries, type MenuEntryLik
 
 type StoredMenu = MenuEntryLike & { id: string; holidayReason?: string | null };
 type StoredOrderItem = { menuId?: string; mealId?: string; studentCategory?: string | null };
-import { getTodayString, APP_TIMEZONE } from './utils';
+import { getTodayString, APP_TIMEZONE, isSundayDate } from './utils';
 import type { XlsxSheet } from './xlsx-reader';
 
 /**
@@ -165,6 +165,10 @@ export function parseMonthlyMenu(sheet: XlsxSheet): MonthlyMenuPlan {
         cells[cat] = { kind: 'MEAL', dish: value.trim(), merged };
       }
     });
+
+    if (date && isSundayDate(date) && STUDENT_CATEGORIES.some((cat) => cells[cat].kind === 'MEAL')) {
+      errors.push(`${date} is a Sunday. The canteen is closed on Sundays, so no meal can be published.`);
+    }
 
     days.push({ row: r, date, dayLabel, weekday, cells, errors });
     for (const message of errors) issues.push({ severity: 'error', row: r, date: date || undefined, message });

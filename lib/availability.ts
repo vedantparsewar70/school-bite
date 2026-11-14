@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { isDeadlinePassed, APP_TIMEZONE, getTodayString } from '@/lib/utils';
+import { isDeadlinePassed, APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from '@/lib/utils';
 import { effectiveMenuEntry } from '@/lib/menu-entries';
 
 export interface MealItemAvailability {
@@ -135,6 +135,22 @@ export async function validateCartAvailability(
     }
 
     const itemCat = normalizeCat((item as any).studentCategory);
+
+    // The canteen never serves on Sundays, even if a menu entry exists for one.
+    if (isSundayDate(item.date)) {
+      itemResults.push({
+        mealId: item.mealId,
+        date: item.date,
+        mealName,
+        isAvailable: false,
+        isActive: false,
+        isDeadlinePassed: false,
+        availableQuantity: 0,
+        serverPrice,
+        reason: SUNDAY_CLOSED_MESSAGE,
+      });
+      continue;
+    }
 
     // Reject holiday items explicitly
     if (item.mealId === 'meal_holiday_no_brunch' || mealName.toLowerCase().includes('holiday')) {

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { FakeFirestore } from './helpers/fake-firestore';
 import { jsonRequest, signedInAs, useFakeFirestore } from './helpers/session';
 import { setFirestoreForTesting } from '../lib/firebase-admin';
-import { getOffsetDateString, getTodayString, APP_TIMEZONE } from '../lib/utils';
+import { getOffsetDateString, getTodayString, nextNonSundayDateString, APP_TIMEZONE } from '../lib/utils';
 import { GET as adminOrders } from '../app/api/admin/orders/route';
 import { GET as kitchen } from '../app/api/admin/kitchen/route';
 import { GET as stats } from '../app/api/admin/stats/route';
@@ -236,8 +236,9 @@ test('BUG: admin reports count any non-cancelled order as revenue (an unpaid ord
 });
 
 test('BUG: admin dashboard stats count unpaid orders in orders/value/meal totals; teacher orders are left out', async () => {
-  const tomorrow = getOffsetDateString(1, APP_TIMEZONE);
-  seedMix(tomorrow, getOffsetDateString(2, APP_TIMEZONE));
+  // The dashboard's "tomorrow" is the next meal date (never a Sunday).
+  const tomorrow = nextNonSundayDateString(APP_TIMEZONE);
+  seedMix(tomorrow, getOffsetDateString(tomorrow === getOffsetDateString(1, APP_TIMEZONE) ? 2 : 3, APP_TIMEZONE));
   const s = await (await get(stats, '/api/admin/stats', admin)).json();
   // Correct: 2 paid orders worth 400, 4 student meals tomorrow.
   assert.equal(s.stats.totalOrders, 3);

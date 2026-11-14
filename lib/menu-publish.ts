@@ -3,6 +3,7 @@ import { db } from './firebase-admin';
 import { applyMonthlyMenu, dishKey, STUDENT_CATEGORIES, type MonthlyMenuPlan, type StudentCategory } from './monthly-menu';
 import { rankMenuEntries, type MenuEntryLike } from './menu-entries';
 import { normalizeStudentCategory } from './menu-stock';
+import { isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
 
 /**
  * The single way to put a catalog dish on the menu for one date: Staff → Kitchen, Admin → Menu and
@@ -35,6 +36,9 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
   const { date, studentCategory, mealId, replace, actorId } = input;
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
     return { status: 400, body: { error: 'Please choose a valid date.' } };
+  }
+  if (isSundayDate(date)) {
+    return { status: 400, body: { error: SUNDAY_CLOSED_MESSAGE, code: 'SUNDAY_CLOSED' } };
   }
   const categories: StudentCategory[] =
     studentCategory === 'ALL' ? [...STUDENT_CATEGORIES] : STUDENT_CATEGORIES.includes(studentCategory as StudentCategory) ? [studentCategory as StudentCategory] : [];
