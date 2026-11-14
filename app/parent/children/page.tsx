@@ -153,7 +153,9 @@ export default function ChildrenPage() {
         refreshChildren();
         refreshUser();
       } else {
-        showToast('Failed to remove child', 'error');
+        // e.g. "This child has upcoming paid meals. Please contact the canteen at …"
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Failed to remove child', 'error');
       }
     } catch {
       showToast('Network error while deleting child', 'error');
