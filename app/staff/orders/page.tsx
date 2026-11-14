@@ -24,6 +24,7 @@ import VegBadge from '@/components/VegBadge';
 import { formatDatePretty, getTodayString, getOffsetDateString, formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
+import { handoverConfirmText } from '@/lib/handover-confirm';
 
 /** The fields used to show one day of an order (the API returns more). */
 type DayOrder = { serviceStatus?: string | null; orderStatus?: string; items?: Array<{ date?: string }> };
@@ -198,8 +199,11 @@ function StaffOrdersContent() {
     },
   });
 
-  const handleMarkCollected = async (orderId: string) => {
+  const handleMarkCollected = async (orderId: string, students: Parameters<typeof handoverConfirmText>[0] = []) => {
     if (updatingIds.has(orderId)) return;
+    // Several children in one order: confirm each child (name and class) before handing over.
+    const question = handoverConfirmText(students);
+    if (question && !window.confirm(question)) return;
     setUpdating(orderId, true);
     try {
       const res = await fetch('/api/admin/orders', {
@@ -549,7 +553,7 @@ function StaffOrdersContent() {
                       ) : (
                       <button
                         type="button"
-                        onClick={() => handleMarkCollected(o.id)}
+                        onClick={() => handleMarkCollected(o.id, students)}
                         disabled={updatingIds.has(o.id)}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-60 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl text-xs font-black shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
                       >

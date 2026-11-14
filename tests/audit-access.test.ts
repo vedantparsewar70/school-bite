@@ -323,3 +323,19 @@ test('FIXED: admin Users shows "Meal conflict detected" only for a child with an
   assert.equal(flagged.allergyAlertState, 'CONFLICT_DETECTED');
   assert.equal(flagged.conflictOrdersCount, 1);
 });
+
+test('FIXED (stop-gap): staff confirm each child by name and class before "Mark Given" on a multi-child order', async () => {
+  const { handoverConfirmText } = await import('../lib/handover-confirm');
+  assert.equal(handoverConfirmText([{ name: 'Riya', grade: '3', division: 'A', rollNo: '7' }]), null, 'one child: no extra step');
+  const text = handoverConfirmText([
+    { name: 'Riya', grade: '3', division: 'A', rollNo: '7' },
+    { name: 'Arjun', grade: 'Primary', division: '-', rollNo: '-' },
+  ])!;
+  assert.match(text, /all 2 children/);
+  assert.match(text, /Riya \(Class 3-A, Roll 7\)/);
+  assert.match(text, /Arjun \(Class Primary\)/, 'placeholder division/roll are not shown');
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../app/staff/orders/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /handleMarkCollected\(o\.id, students\)/, 'the counter button passes every child');
+  assert.match(page, /window\.confirm\(question\)/);
+});
