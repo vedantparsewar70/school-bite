@@ -26,6 +26,8 @@ import { validateCartAvailability } from '@/lib/availability';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Rush-hour headroom: several Firestore round-trips plus a Cashfree call per request.
+export const maxDuration = 60;
 
 function currentCashfreeMode(): string | null {
   try {

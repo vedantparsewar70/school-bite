@@ -7,6 +7,8 @@ import { isAutoRefundReason, parentIssueState, PAYMENT_EXCEPTIONS, refundPayment
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Rush-hour headroom: several Firestore round-trips plus a Cashfree call per request.
+export const maxDuration = 60;
 
 function exceptionMessage(reason: string | undefined, refundState: string | null, amount: number): string {
   const why =

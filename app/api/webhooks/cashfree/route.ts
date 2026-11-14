@@ -14,6 +14,8 @@ import { applyExceptionRefundStatus, isAutoRefundReason, refundPaymentException 
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Rush-hour headroom: several Firestore round-trips plus a Cashfree call per request.
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {

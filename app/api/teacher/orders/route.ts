@@ -26,6 +26,8 @@ import { getCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Rush-hour headroom: several Firestore round-trips plus a Cashfree call per request.
+export const maxDuration = 60;
 
 const teacherCartSignature = (items: Array<{ mealId?: string; quantity?: number }>) =>
   items.map((i) => `${i.mealId}|${i.quantity}`).sort().join(';');

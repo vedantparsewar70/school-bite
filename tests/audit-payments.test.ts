@@ -466,3 +466,14 @@ test('OK 11: verify while payment pending never reports success and never create
   assert.equal(v.success, false);
   assert.equal(fs.list('orders').length, 0);
 });
+
+test('FIXED: checkout, verify, webhook, teacher checkout and admin orders allow up to 60 seconds', async () => {
+  const routes = await Promise.all([
+    import('../app/api/parent/orders/route'),
+    import('../app/api/parent/orders/verify/route'),
+    import('../app/api/webhooks/cashfree/route'),
+    import('../app/api/teacher/orders/route'),
+    import('../app/api/admin/orders/route'),
+  ]);
+  for (const r of routes) assert.equal((r as { maxDuration?: number }).maxDuration, 60);
+});

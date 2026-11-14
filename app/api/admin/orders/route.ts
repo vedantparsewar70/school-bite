@@ -5,6 +5,9 @@ import { db } from '@/lib/firebase-admin';
 import { cancelOrderWithRefund, OrderCancellationError } from '@/lib/order-cancellation';
 import { applyServiceStatus, orderServiceDates, resolveServiceDate, ServiceDateError, serviceStatusFor } from '@/lib/service-dates';
 
+// Rush-hour headroom: the day's order list and cancellation refunds can take several seconds.
+export const maxDuration = 60;
+
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser(req);
