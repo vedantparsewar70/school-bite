@@ -76,10 +76,10 @@ export default function RefundPolicyPage() {
               <div className="p-5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Before Daily Cutoff Time</span>
+                  <span>How to Cancel</span>
                 </div>
                 <p className="text-xs text-emerald-900 leading-relaxed">
-                  You can cancel an order prior to the daily cutoff deadline (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>) directly from your Order History page or by contacting support. A 100% full refund will be initiated back to your original payment method, and the canteen portion quota is restored.
+                  Orders cannot be cancelled online. To cancel an order, please contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a> before the daily cutoff deadline (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>). Approved refunds go back to your original payment method.
                 </p>
               </div>
 
@@ -116,7 +116,7 @@ export default function RefundPolicyPage() {
                 <strong>Payment Debited but Order Not Generated:</strong> If your payment was deducted by the bank/gateway but the order failed to generate on School-Bite due to a connectivity drop, the transaction is automatically reconciled and refunded.
               </li>
               <li>
-                <strong>Timely Cancellation:</strong> Any order successfully cancelled prior to the designated cutoff deadline (08:30 AM on meal date).
+                <strong>Timely Cancellation:</strong> Any order cancelled by the canteen at your request (contact {BUSINESS_CONFIG.cancellationContactPhone}) prior to the designated cutoff deadline (08:30 AM on meal date). Approved refunds go back to your original payment method.
               </li>
             </ul>
           </section>
@@ -206,7 +206,7 @@ export default function RefundPolicyPage() {
               <span>7. How to Contact Support for Cancellation or Refund</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-600">
-              To request assistance regarding a cancellation before cutoff or report a payment discrepancy, please contact our support team with:
+              Cancellations are only possible by contacting the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>; orders cannot be cancelled online. To request assistance regarding a cancellation before cutoff or report a payment discrepancy, please contact us with:
             </p>
 
             <ol className="list-decimal pl-5 space-y-1 text-xs sm:text-sm text-slate-600 font-medium">

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { isDeadlinePassed } from '@/lib/utils';
+import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getStudentCategory } from '@/lib/october-2026-timetable';
 import { CartItem, PaymentMethod } from '@/types';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
@@ -20,7 +20,6 @@ import {
 } from '@/lib/cashfree';
 import { normalizeIndianMobile } from '@/lib/phone';
 import { savePendingParentOrder, fulfillParentOrder, generateParentOrderId } from '@/lib/order-fulfillment';
-import { cancelOrderWithRefund, OrderCancellationError } from '@/lib/order-cancellation';
 import { isAutoRefundReason, listOwnPaymentIssues, refundPaymentException } from '@/lib/payment-exceptions';
 import { serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
@@ -767,100 +766,19 @@ export async function POST(req: Request) {
   }
 }
 
+/**
+ * Parents cannot cancel orders themselves (including retrying a refund). Only an admin can
+ * cancel and refund an order, from Admin > Orders.
+ */
 export async function PATCH(req: Request) {
-  try {
-    const user = await getCurrentUser(req);
-    if (!user || user.role !== 'PARENT' || !user.parentId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { orderId, date } = await req.json().catch(() => ({}));
-    if (!orderId || typeof orderId !== 'string') {
-      return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
-    }
-
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        parentId: user.parentId,
-      },
-      include: {
-        items: true,
-      },
-    });
-
-    if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    }
-
-    // A cancelled order whose refund is still pending or failed may be retried; anything else is final.
-    const isRefundRetry =
-      order.orderStatus === 'CANCELLED' &&
-      (order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REFUND_FAILED');
-
-    if (order.orderStatus === 'CANCELLED' && !isRefundRetry) {
-      return NextResponse.json({ error: 'Order is already cancelled' }, { status: 400 });
-    }
-
-    if (order.orderStatus === 'READY' || order.orderStatus === 'COLLECTED') {
-      return NextResponse.json(
-        { error: 'Cannot cancel order that has already been prepared or collected' },
-        { status: 400 }
-      );
-    }
-
-    // Check deadlines for each item in the order
-    if (!isRefundRetry) {
-      for (const item of order.items || []) {
-        const menu = await prisma.menu.findUnique({
-          where: {
-            mealId_date: {
-              mealId: item.mealId,
-              date: item.date,
-            },
-          },
-        });
-
-        const deadline = menu?.orderingDeadline || '08:30';
-        if (isDeadlinePassed(item.date, deadline)) {
-          return NextResponse.json(
-            {
-              error: `Cannot cancel: Cancellation deadline (${deadline}) for meal date ${item.date} has passed.`,
-            },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
-    // Cancels, restores stock once, and refunds through Cashfree. REFUNDED is only
-    // reported once the gateway confirms the refund.
-    const result = await cancelOrderWithRefund({
-      orderId: order.id,
-      parentId: user.parentId,
-      cancelledBy: user.id,
-      serviceDate: typeof date === 'string' && date ? date : undefined,
-    });
-
-    try {
-      const { notifyOrdersUpdated } = await import('@/lib/sync-events');
-      await notifyOrdersUpdated();
-    } catch {
-      // non-blocking
-    }
-
-    return NextResponse.json({
-      success: true,
-      orderId: result.orderId,
-      paymentStatus: result.paymentStatus,
-      refundAmount: result.refundAmount,
-      message: result.message,
-    });
-  } catch (error: any) {
-    if (error instanceof OrderCancellationError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error('Error cancelling order:', error);
-    return NextResponse.json({ error: 'Failed to cancel order' }, { status: 500 });
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'PARENT' || !user.parentId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  return NextResponse.json(
+    {
+      error: `Orders cannot be cancelled online. To cancel, please contact the canteen at ${BUSINESS_CONFIG.cancellationContactPhone}.`,
+    },
+    { status: 403 }
+  );
 }

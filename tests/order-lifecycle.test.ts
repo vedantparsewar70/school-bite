@@ -43,9 +43,9 @@ test('a handed-over meal can be un-given by staff but never cancelled and refund
   assert.equal(cancel.status, 403);
   assert.equal(fs.getDoc('orders', 'ORD-1')?.paymentStatus, 'PAID', 'no refund started');
 
-  // The parent cannot self-cancel it either.
+  // Parents cannot cancel orders themselves at all.
   const own = await patch(cancelOwnOrder, '/api/parent/orders', { orderId: 'ORD-1', action: 'CANCEL' }, parent);
-  assert.notEqual(own.status, 200);
+  assert.equal(own.status, 403);
   assert.equal(fs.getDoc('orders', 'ORD-1')?.orderStatus, 'CONFIRMED');
 
   // An admin may deliberately cancel it (refund handled by the normal refund flow).

@@ -26,6 +26,15 @@ import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor,
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 
+/** The cancellation result in admin wording (the server's message is written for parents). */
+function adminCancelMessage(paymentStatus: string | undefined, refundAmount: number): string {
+  const amount = formatINR(refundAmount);
+  if (refundAmount <= 0) return 'Order cancelled. No refund was due.';
+  if (paymentStatus === 'REFUNDED') return `Order cancelled. ${amount} refund sent to the parent's original payment method.`;
+  if (paymentStatus === 'REFUND_FAILED') return `Order cancelled, but the ${amount} refund could not be sent. Use "Retry refund" or check Cashfree.`;
+  return `Order cancelled. ${amount} refund started; it will reach the parent's original payment method once Cashfree completes it.`;
+}
+
 function AdminOrdersContent() {
   const searchParams = useSearchParams();
   const initialDate = searchParams.get('date') || '';
@@ -100,7 +109,9 @@ function AdminOrdersContent() {
         // For a cancellation, show the real refund outcome (requested, pending or failed).
         const paymentStatus = data?.order?.paymentStatus;
         showToast(
-          data?.message || `Order status updated to ${newStatus}`,
+          newStatus === 'CANCELLED'
+            ? adminCancelMessage(paymentStatus, Number(data?.refundAmount || 0))
+            : data?.message || `Order status updated to ${newStatus}`,
           paymentStatus === 'REFUND_FAILED' ? 'error' : 'success'
         );
         // Update local state immediately
@@ -119,6 +130,22 @@ function AdminOrdersContent() {
     } finally {
       setUpdatingStatusId(null);
     }
+  };
+
+  // Admin-only cancellation (the server checks the role too). It cancels the whole order and
+  // refunds the full amount through Cashfree; repeating it only retries the same refund.
+  const canCancelOrder = (o: any) => !['CANCELLED', 'COLLECTED'].includes(o.orderStatus);
+  const canRetryRefund = (o: any) =>
+    o.orderStatus === 'CANCELLED' && ['REFUND_PENDING', 'REFUND_FAILED'].includes(o.paymentStatus);
+
+  const handleCancelOrder = async (o: any) => {
+    const retry = o.orderStatus === 'CANCELLED';
+    const days = o.isMultiDate ? ' This cancels every day in this order.' : '';
+    const question = retry
+      ? `Retry the refund of ${formatINR(o.totalAmount)} for order ${o.id}? The same refund is reused, so the parent can never be refunded twice.`
+      : `Cancel order ${o.id} for ${o.items?.[0]?.studentName || 'this student'}?${days} The full ${formatINR(o.totalAmount)} will be refunded to the parent's original payment method through Cashfree. This cannot be undone.`;
+    if (!window.confirm(question)) return;
+    await handleUpdateStatus(o.id, 'CANCELLED');
   };
 
   const handleResetFilters = () => {
@@ -377,6 +404,15 @@ function AdminOrdersContent() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {(canCancelOrder(o) || canRetryRefund(o)) && (
+                        <button
+                          onClick={() => handleCancelOrder(o)}
+                          disabled={updatingStatusId === o.id}
+                          className="px-3 py-1.5 bg-white border border-rose-300 hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs disabled:opacity-60"
+                        >
+                          {updatingStatusId === o.id ? 'Working…' : canRetryRefund(o) ? 'Retry refund' : 'Cancel & refund'}
+                        </button>
+                      )}
                       <button
                         onClick={() => setDetailOrder(o)}
                         className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs"
@@ -567,7 +603,7 @@ function AdminOrdersContent() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <button
                 onClick={() => {
                   setReceiptOrder(detailOrder);
@@ -578,6 +614,15 @@ function AdminOrdersContent() {
                 <Printer className="w-3.5 h-3.5" />
                 Print Voucher
               </button>
+              {(canCancelOrder(detailOrder) || canRetryRefund(detailOrder)) && (
+                <button
+                  onClick={() => handleCancelOrder(detailOrder)}
+                  disabled={updatingStatusId === detailOrder.id}
+                  className="px-4 py-2 bg-white border border-rose-300 hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {updatingStatusId === detailOrder.id ? 'Working…' : canRetryRefund(detailOrder) ? 'Retry refund' : 'Cancel & refund'}
+                </button>
+              )}
               <button
                 onClick={() => setDetailOrder(null)}
                 className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"

@@ -32,6 +32,8 @@ export interface BusinessConfig {
     country: string;
   };
   cancellationCutoffTime: string;
+  /** Parents call this number to cancel an order; they cannot cancel online. */
+  cancellationContactPhone: string;
   refundProcessingDays: string;
   paymentGatewayPartner: string;
 }
@@ -79,6 +81,7 @@ export const BUSINESS_CONFIG: BusinessConfig = {
 
   // Operational cutoff and policy parameters
   cancellationCutoffTime: '08:30 AM on meal date',
+  cancellationContactPhone: '9028977988',
   refundProcessingDays: '5 to 7 business days',
   paymentGatewayPartner: 'Cashfree Payments',
 };

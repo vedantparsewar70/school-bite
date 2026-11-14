@@ -105,11 +105,12 @@ test('kitchen bulk handover for a date changes only that date', async () => {
 
 test('cancelling a single day is refused and changes nothing; no refund is started', async () => {
   seedMultiDateOrder();
+  // Parents cannot cancel at all; an admin asking for a single day is refused.
   const byParent = await patch(cancelOwnOrder, '/api/parent/orders', { orderId: 'ORD-M', date: TUE }, parent);
-  assert.equal(byParent.status, 409);
-  assert.match((await byParent.json()).error, /partial refunds are not supported/);
+  assert.equal(byParent.status, 403);
   const byAdmin = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED', date: TUE }, admin);
   assert.equal(byAdmin.status, 409);
+  assert.match((await byAdmin.json()).error, /partial refunds are not supported/);
 
   const order = fs.getDoc('orders', 'ORD-M')!;
   assert.equal(order.orderStatus, 'CONFIRMED');

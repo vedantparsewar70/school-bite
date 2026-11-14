@@ -14,7 +14,6 @@ import {
   Filter,
   UtensilsCrossed,
 } from 'lucide-react';
-import { useToast } from '@/components/ToastContext';
 import { useAuth } from '@/components/AuthContext';
 import { useSyncWatcher } from '@/lib/client-sync';
 import VegBadge from '@/components/VegBadge';
@@ -25,7 +24,6 @@ import {
   formatDatePretty,
   formatDateTimePretty,
   getOrderStatusColor,
-  isDeadlinePassed,
 } from '@/lib/utils';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
 
@@ -78,7 +76,6 @@ function OrdersPageContent() {
   const highlightedOrderId = searchParams.get('orderId');
 
   const { refreshUser } = useAuth();
-  const { showToast } = useToast();
 
   const [orders, setOrders] = useState<any[]>([]);
   const [paymentIssues, setPaymentIssues] = useState<any[]>([]);
@@ -103,45 +100,6 @@ function OrdersPageContent() {
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-
-  // Mirrors the server rule (the server re-checks): paid, no day prepared or given yet, and before
-  // every meal's cutoff. A multi-day order is cancelled and refunded as a whole.
-  const canCancel = (order: any) =>
-    order.paymentStatus === 'PAID' &&
-    order.orderStatus === 'CONFIRMED' &&
-    (order.items || []).every(
-      (it: { date: string; serviceStatus?: string }) =>
-        (it.serviceStatus || 'CONFIRMED') === 'CONFIRMED' && !isDeadlinePassed(it.date, '08:30')
-    );
-
-  const cancelOrder = async (order: any, mode: 'cancel' | 'retry') => {
-    const days = new Set((order.items || []).map((it: { date?: string }) => it.date)).size;
-    const scope = days > 1 ? ` This cancels all ${days} days in this order.` : '';
-    if (mode === 'cancel' && !window.confirm(`Cancel order ${order.id}?${scope} ${formatINR(order.totalAmount)} will be refunded to your original payment method.`)) {
-      return;
-    }
-    setCancellingId(order.id);
-    try {
-      const res = await fetch('/api/parent/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showToast(data.error || 'This order could not be cancelled.', 'error');
-      } else {
-        showToast(data.message || 'Order cancelled.', data.paymentStatus === 'REFUND_FAILED' ? 'error' : 'success');
-      }
-      await fetchOrders(true);
-    } catch {
-      showToast('Network error. Please check your order status before trying again.', 'error');
-    } finally {
-      setCancellingId(null);
-    }
-  };
 
   // Live real-time synchronization: updates order status immediately when canteen staff marks it as Given/Collected
   useSyncWatcher({
@@ -301,30 +259,14 @@ function OrdersPageContent() {
                   <div className="text-slate-400 text-[11px]">
                     Payment Ref: {order.payments?.[0]?.transactionRef || 'PAID'} • {order.payments?.[0]?.paymentMethod || 'UPI'}
                   </div>
-                  {canCancel(order) && (
-                    <button
-                      onClick={() => cancelOrder(order, 'cancel')}
-                      disabled={cancellingId === order.id}
-                      className="px-4 py-2.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 text-sm font-bold disabled:opacity-60"
-                    >
-                      {cancellingId === order.id ? 'Cancelling…' : 'Cancel order'}
-                    </button>
-                  )}
-                  {order.paymentStatus === 'REFUND_FAILED' && (
-                    <button
-                      onClick={() => cancelOrder(order, 'retry')}
-                      disabled={cancellingId === order.id}
-                      className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-bold disabled:opacity-60"
-                    >
-                      {cancellingId === order.id ? 'Retrying…' : 'Retry refund'}
-                    </button>
-                  )}
                 </div>
-                {order.paymentStatus === 'PAID' && !['CANCELLED', 'COLLECTED'].includes(order.orderStatus) && !canCancel(order) && (
+                {order.paymentStatus === 'PAID' && !['CANCELLED', 'COLLECTED'].includes(order.orderStatus) && (
                   <p className="pt-2 text-[11px] text-slate-500">
-                    {new Set((order.items || []).map((it: { date?: string }) => it.date)).size > 1
-                      ? `This order covers several days and is cancelled and refunded as a whole, only before the ${BUSINESS_CONFIG.cancellationCutoffTime} cutoff of its first day and before any meal is prepared or given. Single days cannot be cancelled separately yet. For help, contact the canteen.`
-                      : `Cancellation closes at the ${BUSINESS_CONFIG.cancellationCutoffTime} cutoff, or once the meal is being prepared.`}
+                    Need to cancel? Please contact the canteen at{' '}
+                    <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold text-slate-700 underline">
+                      {BUSINESS_CONFIG.cancellationContactPhone}
+                    </a>
+                    .
                   </p>
                 )}
               </div>
