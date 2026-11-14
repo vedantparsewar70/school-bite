@@ -209,11 +209,27 @@ test('BUG: a child added by a parent shows as "Class Primary--, Roll #-" on the 
   assert.equal(shown[0], shown[1], 'staff can only tell them apart by the order id');
 });
 
-test("BUG: a parent editing a child's name overwrites the school class ('3') with the category ('Primary')", async () => {
+test("FIXED: a parent editing a child's name keeps the school class, division and roll number", async () => {
+  const before = fs.getDoc('students', 'stu_mine')!;
   const res = await parentChildren.PUT(jsonRequest('/api/parent/children', 'PUT', { id: 'stu_mine', name: 'Riya S', dob: null, category: 'Primary', studentCategory: 'Primary', grade: 'Primary' }, parent));
   assert.equal(res.status, 200);
-  assert.equal(fs.getDoc('students', 'stu_mine')?.grade, 'Primary', 'was "3"');
-  assert.equal(fs.getDoc('students', 'stu_mine')?.division, 'A');
+  const after = fs.getDoc('students', 'stu_mine')!;
+  assert.equal(after.name, 'Riya S');
+  assert.equal(after.grade, '3', 'school class kept');
+  assert.equal(after.division, before.division);
+  assert.equal(after.rollNo, before.rollNo);
+
+  // An explicit class change is still saved.
+  await parentChildren.PUT(jsonRequest('/api/parent/children', 'PUT', { id: 'stu_mine', grade: '4' }, parent));
+  assert.equal(fs.getDoc('students', 'stu_mine')?.grade, '4');
+});
+
+test('FIXED: a child the parent added (grade is just the category) still follows a category change', async () => {
+  const created = await (await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Kabir', category: 'Primary', studentCategory: 'Primary', grade: 'Primary' }, parent))).json();
+  const id = created.student?.id || created.id;
+  await parentChildren.PUT(jsonRequest('/api/parent/children', 'PUT', { id, category: 'Secondary', studentCategory: 'Secondary', grade: 'Secondary' }, parent));
+  assert.equal(fs.getDoc('students', id)?.grade, 'Secondary');
+  assert.equal(fs.getDoc('students', id)?.studentCategory, 'Secondary');
 });
 
 test('BUG (LOW): staff can mark a teacher order for another date as GIVEN (no date check)', async () => {

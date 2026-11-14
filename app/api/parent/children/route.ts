@@ -288,12 +288,24 @@ export async function PUT(req: Request) {
       }
     }
 
+    // The edit form sends the category word ("Primary") as `grade`. That must never overwrite a
+    // real class the school recorded ("3"); it only replaces a grade that is empty or is itself a
+    // category word. A real class value sent explicitly is saved.
+    const isCategoryWord = (v: unknown) => /^(pre-?primary|primary|secondary)$/i.test(String(v ?? '').trim());
+    const sentGrade = grade !== undefined && grade !== null && String(grade).trim() ? String(grade).trim() : '';
+    const nextGrade =
+      sentGrade && !isCategoryWord(sentGrade)
+        ? sentGrade
+        : !student.grade || isCategoryWord(student.grade)
+          ? studentCategory || student.grade
+          : student.grade;
+
     const updated = await prisma.student.update({
       where: { id },
       data: {
         name: name?.trim() ?? student.name,
         dob: dob !== undefined ? (dob ? String(dob).trim() : null) : student.dob,
-        grade: studentCategory || (grade ? String(grade).trim() : student.grade),
+        grade: nextGrade,
         division: division ? String(division).trim().toUpperCase() : student.division,
         rollNo: rollNo ? String(rollNo).trim() : student.rollNo,
         studentCategory: studentCategory || (student as any).studentCategory || 'Primary',
