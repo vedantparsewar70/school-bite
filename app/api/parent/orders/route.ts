@@ -173,6 +173,9 @@ async function openCheckoutForSameCart(
   for (const doc of pending.docs) {
     const data = doc.data();
     if (doc.id === orderId || !data.paymentSessionId || cartSignature(data.cartItems || []) !== signature) continue;
+    // A payment already settled as an exception (sold out, late, refunded) is not an open checkout:
+    // it must not stop the parent from buying the same cart again.
+    if (data.status === 'PAYMENT_EXCEPTION') continue;
     const response = await existingCheckoutResponse(doc.id, parentId, true);
     if (!response) continue;
     if (response.status === 409) {

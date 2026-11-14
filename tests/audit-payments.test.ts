@@ -296,7 +296,7 @@ test('4e: two parents buy the LAST portion: no reservation at checkout; second p
   assert.equal((await parentIssues(loserAuth))[0].state, 'REFUND_PENDING');
 });
 
-test('BUG 4e: after a sold-out payment is refunded, the parent can never re-buy the same cart (blocked with PAYMENT_EXCEPTION) even after restock', async () => {
+test('FIXED 4e: after a sold-out payment is refunded, the parent can buy the same cart again once it is restocked', async () => {
   fs.seed('menus', 'menu_2026-11-02_primary', { ...fs.getDoc('menus', 'menu_2026-11-02_primary'), availableQuantity: 1 });
   at('2026-11-01T10:00');
   const first = await (await startCheckout('CHK-SOLD')).json();
@@ -309,11 +309,14 @@ test('BUG 4e: after a sold-out payment is refunded, the parent can never re-buy 
   // Canteen restocks; parent tries again with a fresh checkout key (as the cart page would after clearing storage).
   fs.seed('menus', 'menu_2026-11-02_primary', { ...fs.getDoc('menus', 'menu_2026-11-02_primary'), availableQuantity: 10 });
   const retry = await startCheckout('CHK-SOLD-FRESH');
-  assert.equal(retry.status, 409);
+  assert.equal(retry.status, 200);
   const body = await retry.json();
-  assert.equal(body.code, 'PAYMENT_EXCEPTION');
-  assert.match(body.error, /being reviewed/);
-  assert.equal(createdOrders.length, 1, 'no new payment possible for this exact cart');
+  assert.ok(body.paymentSessionId, 'a new payment is opened');
+  assert.notEqual(body.orderId, first.orderId);
+  assert.equal(createdOrders.length, 2);
+  // The original key still reports the review, so the refunded payment is never reopened.
+  const same = await startCheckout('CHK-SOLD');
+  assert.equal((await same.json()).code, 'PAYMENT_EXCEPTION');
 });
 
 // ---------------------------------------------------------------- 4f
