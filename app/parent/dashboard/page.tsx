@@ -80,11 +80,9 @@ export default function ParentDashboard() {
     loadDashboardData();
   }, [todayStr, selectedChildId]);
 
-  // Live real-time synchronization for parent dashboard without manual page refresh
+  // Menu changes refresh the dashboard. Order changes do not: the shared "orders changed" signal
+  // fires for every parent's order, which would reload every open dashboard during the rush.
   useSyncWatcher({
-    onOrdersUpdate: () => {
-      loadDashboardData(true);
-    },
     onMenuUpdate: () => {
       loadDashboardData(true);
     },

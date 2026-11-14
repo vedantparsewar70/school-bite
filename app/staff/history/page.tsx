@@ -84,7 +84,8 @@ export default function StaffOrderHistoryPage() {
   }, [selectedDate]);
 
   // Handovers and undos made on another device appear without a manual refresh.
-  useSyncWatcher({ onOrdersUpdate: () => fetchHistory(true), onTeacherOrdersUpdate: () => fetchHistory(true) });
+  // Checked every 30 seconds and loaded quietly, so the rush does not reload it constantly.
+  useSyncWatcher({ pollIntervalMs: 30000, onOrdersUpdate: () => fetchHistory(true), onTeacherOrdersUpdate: () => fetchHistory(true) });
 
   // Revert a given student order back to Active
   const handleRevertStudentOrder = async (orderId: string) => {

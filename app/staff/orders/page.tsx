@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import {
   FileText,
@@ -92,8 +92,12 @@ function StaffOrdersContent() {
 
 
   // Fetch student orders (active non-collected only)
-  const fetchOrders = async () => {
-    setLoading(true);
+  const ordersInFlight = useRef(false);
+  // `silent`: background refresh (no spinner), skipped while another load is still running.
+  const fetchOrders = async (silent = false) => {
+    if (silent && ordersInFlight.current) return;
+    ordersInFlight.current = true;
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
       params.append('date', todayDateStr);
@@ -125,6 +129,7 @@ function StaffOrdersContent() {
       console.error('Failed to load student orders:', err);
       setLoadError('Could not load orders. Check the connection.');
     } finally {
+      ordersInFlight.current = false;
       setLoading(false);
     }
   };
@@ -179,10 +184,12 @@ function StaffOrdersContent() {
     fetchTeacherOrders();
   }, []);
 
-  // Live real-time synchronization across staff and parents without manual refresh
+  // Changes from other devices, checked every 30 seconds (not on every order in the rush) and
+  // loaded quietly in the background.
   useSyncWatcher({
+    pollIntervalMs: 30000,
     onOrdersUpdate: () => {
-      fetchOrders();
+      fetchOrders(true);
       // The production summary is only visible in its modal, which reloads it when opened.
       if (showTotalOrdersModal) fetchKitchenSummary(true);
     },
@@ -290,7 +297,7 @@ function StaffOrdersContent() {
           </Link>
 
           <button
-            onClick={activeTab === 'STUDENTS' ? fetchOrders : fetchTeacherOrders}
+            onClick={() => (activeTab === 'STUDENTS' ? fetchOrders() : fetchTeacherOrders())}
             disabled={activeTab === 'STUDENTS' ? loading : loadingTeachers}
             className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
             title="Refresh Orders"

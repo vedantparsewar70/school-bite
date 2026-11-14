@@ -15,7 +15,6 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
-import { useSyncWatcher } from '@/lib/client-sync';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
@@ -100,13 +99,6 @@ function OrdersPageContent() {
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  // Live real-time synchronization: updates order status immediately when canteen staff marks it as Given/Collected
-  useSyncWatcher({
-    onOrdersUpdate: () => {
-      fetchOrders(true);
-    },
-  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

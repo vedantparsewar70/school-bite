@@ -311,3 +311,15 @@ test('BUG: a price change after the meal was put in the cart charges the new pri
   const v = await (await validateCart(jsonRequest('/api/parent/cart/validate', 'POST', { cartItems: [cartLine()] }, parent))).json();
   assert.equal(v.items[0].serverPrice, 100);
 });
+
+test('FIXED: parent pages no longer reload on every order; staff pages refresh quietly at most every 30 seconds', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  for (const page of ['app/parent/dashboard/page.tsx', 'app/parent/orders/page.tsx']) {
+    assert.ok(!src(page).includes('onOrdersUpdate'), `${page} must not reload on other parents' orders`);
+  }
+  for (const page of ['app/staff/orders/page.tsx', 'app/staff/history/page.tsx']) {
+    assert.match(src(page), /pollIntervalMs: 30000/, `${page} polls every 30 s`);
+  }
+  assert.match(src('app/staff/orders/page.tsx'), /onOrdersUpdate: \(\) => \{\s*fetchOrders\(true\)/, 'background refresh is silent');
+});
