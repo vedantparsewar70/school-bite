@@ -28,7 +28,7 @@ function firstPaidVisit(orderId: string): boolean {
     const seen: string[] = JSON.parse(localStorage.getItem(CLEARED_ORDERS_STORAGE) || '[]');
     if (seen.includes(orderId)) return false;
     localStorage.setItem(CLEARED_ORDERS_STORAGE, JSON.stringify([...seen, orderId].slice(-20)));
-    sessionStorage.removeItem('sb_checkout_key');
+    localStorage.removeItem('sb_checkout_key');
   } catch {
     // storage unavailable: clear as before
   }

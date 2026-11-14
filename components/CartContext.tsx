@@ -74,7 +74,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!checkedOwnerId) return;
     try {
       if (localStorage.getItem(CART_OWNER_STORAGE_KEY) !== checkedOwnerId) {
-        sessionStorage.removeItem('sb_checkout_key');
+        localStorage.removeItem('sb_checkout_key');
         localStorage.setItem(CART_OWNER_STORAGE_KEY, checkedOwnerId);
       }
     } catch {

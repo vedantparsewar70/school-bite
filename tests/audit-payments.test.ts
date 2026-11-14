@@ -477,3 +477,16 @@ test('FIXED: checkout, verify, webhook, teacher checkout and admin orders allow 
   ]);
   for (const r of routes) assert.equal((r as { maxDuration?: number }).maxDuration, 60);
 });
+
+test('FIXED: the shared checkout key is kept and cleared in the same browser storage (localStorage)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  // Stored by the cart page...
+  assert.match(src('app/parent/cart/page.tsx'), /localStorage\.setItem\(CHECKOUT_KEY_STORAGE/);
+  // ...and cleared after a paid order and when another parent signs in, so the next identical
+  // cart starts a new payment instead of reopening the old order.
+  for (const file of ['app/parent/confirmation/[id]/page.tsx', 'components/CartContext.tsx']) {
+    assert.match(src(file), /localStorage\.removeItem\('sb_checkout_key'\)/, file);
+    assert.ok(!src(file).includes('sessionStorage'), `${file} must not use sessionStorage for the key`);
+  }
+});
