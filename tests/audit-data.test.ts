@@ -310,16 +310,21 @@ test('BUG (minor): a removed child still in the cart gives "Unauthorized child s
   assert.match((await res.json()).error, /Unauthorized child selection/);
 });
 
-test('BUG: a price change after the meal was put in the cart charges the new price while the cart showed the old one', async () => {
+test('FIXED: after a price change the cart shows the price checkout will charge', async () => {
+  const { serverPricesFrom, displayCartTotal, displayUnitPrice } = await import('../lib/cart-pricing');
   seedMenu(D);
   fs.seed('meals', 'meal_dal', { ...fs.getDoc('meals', 'meal_dal'), price: 100 });
-  const res = await checkout([cartLine({ mealPrice: 80, quantity: 2 })]); // cart subtotal shown: 160
+  const inCart = cartLine({ mealPrice: 80, quantity: 2 }); // saved in the cart at the old price
+  const v = await (await validateCart(jsonRequest('/api/parent/cart/validate', 'POST', { cartItems: [inCart] }, parent))).json();
+  const prices = serverPricesFrom(v.items);
+  assert.equal(displayUnitPrice(inCart as any, prices), 100);
+  const shown = displayCartTotal([inCart as any], prices);
+
+  const res = await checkout([inCart]);
   assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.totalAmount, 200, 'server charges the current price (correct), but the cart page never shows it');
-  // The cart validate endpoint does return serverPrice, but app/parent/cart/page.tsx ignores it.
-  const v = await (await validateCart(jsonRequest('/api/parent/cart/validate', 'POST', { cartItems: [cartLine()] }, parent))).json();
-  assert.equal(v.items[0].serverPrice, 100);
+  assert.equal((await res.json()).totalAmount, shown, 'the cart total equals the amount charged');
+  // Without a server price (e.g. the check failed), the saved price is still shown.
+  assert.equal(displayUnitPrice(inCart as any, {}), 80);
 });
 
 test('FIXED: parent pages no longer reload on every order; staff pages refresh quietly at most every 30 seconds', async () => {

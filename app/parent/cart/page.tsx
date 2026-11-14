@@ -21,6 +21,7 @@ import {
 import { useCart } from '@/components/CartContext';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
+import { displayCartTotal, displayUnitPrice, serverPricesFrom, type ServerPriceMap } from '@/lib/cart-pricing';
 import VegBadge from '@/components/VegBadge';
 import MealIcon from '@/components/MealIcon';
 import { formatINR, formatDatePretty } from '@/lib/utils';
@@ -64,7 +65,7 @@ function forgetCheckoutKey() {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cartItems, updateQuantity, removeFromCart, clearCart, subtotal, totalItems } = useCart();
+  const { cartItems, updateQuantity, removeFromCart, clearCart, totalItems } = useCart();
   const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
 
@@ -75,6 +76,8 @@ export default function CartPage() {
 
   // Live availability tracking: Map of `${mealId}__${date}` -> reason
   const [unavailableItemsMap, setUnavailableItemsMap] = useState<Record<string, string>>({});
+  // Current prices from the server; checkout charges these, so the cart shows them too.
+  const [serverPrices, setServerPrices] = useState<ServerPriceMap>({});
   const [isValidatingAvailability, setIsValidatingAvailability] = useState(false);
 
   // Group cart items by student and date for clear visual organization
@@ -113,6 +116,7 @@ export default function CartPage() {
             });
           }
           setUnavailableItemsMap(map);
+          setServerPrices(serverPricesFrom(data.items));
         }
       } catch (err) {
         console.error('Failed to validate cart items:', err);
@@ -420,7 +424,7 @@ export default function CartPage() {
                                 </h4>
                               </div>
                               <p className="text-xs font-semibold text-amber-700 mt-0.5">
-                                {formatINR(item.mealPrice)} each
+                                {formatINR(displayUnitPrice(item, serverPrices))} each
                               </p>
 
                               {/* Item Availability Badge */}
@@ -469,7 +473,7 @@ export default function CartPage() {
 
                             <div className="flex items-center gap-3">
                               <span className="font-extrabold text-slate-900 text-sm sm:text-base text-right whitespace-nowrap">
-                                {formatINR(item.mealPrice * item.quantity)}
+                                {formatINR(displayUnitPrice(item, serverPrices) * item.quantity)}
                               </span>
 
                               {/* Desktop-only trash button */}
@@ -506,7 +510,7 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal</span>
-                <span className="font-bold text-slate-800">{formatINR(subtotal)}</span>
+                <span className="font-bold text-slate-800">{formatINR(displayCartTotal(cartItems, serverPrices))}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Taxes & Fees</span>
@@ -515,7 +519,7 @@ export default function CartPage() {
 
               <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                 <span className="text-base font-extrabold text-slate-900">Total Payable</span>
-                <span className="text-2xl font-black text-amber-600">{formatINR(subtotal)}</span>
+                <span className="text-2xl font-black text-amber-600">{formatINR(displayCartTotal(cartItems, serverPrices))}</span>
               </div>
             </div>
 
