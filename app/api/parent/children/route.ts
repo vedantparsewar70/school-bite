@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { db } from '@/lib/firebase-admin';
+import { BUSINESS_CONFIG } from '@/lib/business-config';
+import { getTodayString } from '@/lib/utils';
+import { serviceStatusFor } from '@/lib/service-dates';
+
+/** True when the child has a paid, not-cancelled meal today or later that has not been handed over. */
+async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
+  const today = getTodayString();
+  const itemsSnap = await db.collection('orderItems').where('studentId', '==', studentId).get();
+  const upcoming = itemsSnap.docs.map((d) => d.data()).filter((it) => typeof it.date === 'string' && it.date >= today);
+  const orderIds = Array.from(new Set(upcoming.map((it) => String(it.orderId))));
+  if (orderIds.length === 0) return false;
+  const orders = await db.getAll(...orderIds.map((oid) => db.collection('orders').doc(oid)));
+  const byId = new Map(orders.filter((o) => o.exists).map((o) => [o.id, o.data() || {}]));
+  return upcoming.some((it) => {
+    const order = byId.get(String(it.orderId));
+    if (!order || order.paymentStatus !== 'PAID') return false;
+    const status = serviceStatusFor(order as any, it.date);
+    return status !== 'CANCELLED' && status !== 'COLLECTED';
+  });
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -370,6 +391,15 @@ export async function DELETE(req: Request) {
 
     if (!student) {
       return NextResponse.json({ error: 'Student not found or unauthorized' }, { status: 404 });
+    }
+
+    // A child with meals still to be served cannot be removed here: the canteen would keep
+    // preparing them and nothing would be refunded. Cancellations go through the canteen.
+    if (await hasUpcomingPaidMeals(id)) {
+      return NextResponse.json(
+        { error: `This child has upcoming paid meals. Please contact the canteen at ${BUSINESS_CONFIG.cancellationContactPhone}.`, code: 'HAS_UPCOMING_MEALS' },
+        { status: 409 }
+      );
     }
 
     // Soft delete/deactivate so historical orders are preserved

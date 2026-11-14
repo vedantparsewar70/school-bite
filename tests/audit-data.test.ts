@@ -170,21 +170,25 @@ test('OK: changing the dish of a date that already has orders is refused', async
   assert.equal((await kitchenOn(D)).mealCounts[0].mealName, 'Dal Khichdi');
 });
 
-test('BUG: removing a child with upcoming paid meals succeeds silently; meals stay on the kitchen list, no refund or warning', async () => {
+test('FIXED: a child with upcoming paid meals cannot be removed; the parent is told to contact the canteen', async () => {
   seedMenu(D);
   seedOrder('ORD-A', [{ date: D }]);
   const res = await removeChild(jsonRequest('/api/parent/children?id=stu_1', 'DELETE', undefined, parent));
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error, 'This child has upcoming paid meals. Please contact the canteen at 9028977988.');
+  assert.equal(fs.getDoc('students', 'stu_1')?.isActive, true, 'child kept');
+  assert.equal(fs.getDoc('orders', 'ORD-A')?.paymentStatus, 'PAID');
+});
+
+test('FIXED: a child whose meals are all past, served or cancelled can still be removed, and history is kept', async () => {
+  seedMenu(D);
+  seedOrder('ORD-PAST', [{ date: '2020-01-06' }]);
+  seedOrder('ORD-CANCELLED', [{ date: D }], { orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED' });
+  seedOrder('ORD-UNPAID', [{ date: D }], { paymentStatus: 'PENDING' });
+  const res = await removeChild(jsonRequest('/api/parent/children?id=stu_1', 'DELETE', undefined, parent));
   assert.equal(res.status, 200);
   assert.equal(fs.getDoc('students', 'stu_1')?.isActive, false, 'soft delete only');
-
-  // Order and history survive (good) ...
-  assert.equal((await parentHistory())[0].items[0].studentName, 'Riya');
-  assert.equal((await staffListOn(D))[0].items[0].studentName, 'Riya');
-  const k = await kitchenOn(D);
-  assert.equal(k.totalMeals, 1);
-  assert.equal(k.studentList[0].studentName, 'Riya');
-  // ... but the paid future meal is neither cancelled nor refunded, and the response says nothing about it.
-  assert.equal(fs.getDoc('orders', 'ORD-A')?.paymentStatus, 'PAID');
+  assert.ok((await parentHistory()).some((o: any) => o.items[0].studentName === 'Riya'), 'history still shows the child');
 });
 
 // ---------------------------------------------------------------- 6. Counts and money
