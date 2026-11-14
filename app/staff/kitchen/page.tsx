@@ -379,17 +379,9 @@ function StaffKitchenContent() {
       {/* ========================================================================= */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-xs">
-              Official Timetable
-            </span>
-            <span className="text-xs font-bold text-slate-500">
-              School Brunch Timetable
-            </span>
-          </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 mt-1">
             <CalendarDays className="w-6 h-6 sm:w-7 sm:h-7 text-amber-500 shrink-0" />
-            <span>Canteen Daily Production Schedule</span>
+            <span>Student Menu</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Daily brunch menu from the school&apos;s monthly timetable.
@@ -410,7 +402,7 @@ function StaffKitchenContent() {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-black shadow-sm transition-all cursor-pointer"
           >
             <Calendar className="w-4 h-4" />
-            <span>Full Month Timetable (31 Days)</span>
+            <span>October 2026 timetable (reference)</span>
           </button>
 
           <button
@@ -508,9 +500,6 @@ function StaffKitchenContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200/80">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
-                Official Daily Brunch Schedule
-              </span>
               <span className="text-xs font-extrabold text-slate-600">
                 {new Date(`${selectedDateStr}T12:00:00+05:30`).toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })}
               </span>
@@ -519,7 +508,7 @@ function StaffKitchenContent() {
               <span>{formatDatePretty(selectedDateStr)}</span>
             </h2>
             <p className="text-xs text-slate-600 mt-1">
-              Saved schedule for this date. Active dishes can be ordered by parents until the ordering deadline.
+              Parents can order published dishes until 08:30 AM on the meal day.
             </p>
           </div>
 
@@ -527,17 +516,17 @@ function StaffKitchenContent() {
             {isPastDate ? (
               <span className="px-3.5 py-1.5 bg-slate-100 text-slate-600 border border-slate-300 rounded-xl text-xs font-black inline-flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" />
-                <span>Historical Timetable (Service Closed)</span>
+                <span>Past date</span>
               </span>
             ) : isToday ? (
               <span className="px-3.5 py-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-black inline-flex items-center gap-1.5 animate-pulse">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Today&apos;s Active Service</span>
+                <span>Today</span>
               </span>
             ) : (
               <span className="px-3.5 py-1.5 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-black inline-flex items-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5 text-blue-600" />
-                <span>Upcoming Scheduled Service</span>
+                <span>Upcoming</span>
               </span>
             )}
           </div>
@@ -560,7 +549,7 @@ function StaffKitchenContent() {
             // built-in October 2026 table is only a fallback for dates with no saved menu.
             const isHoliday = dbMenu ? Boolean(dbMenu.isHoliday) : Boolean(officialMenu?.isHoliday);
             const holidayReason =
-              (dbMenu ? dbMenu.holidayReason : officialMenu?.holidayReason) || 'Holiday Today — No Brunch Scheduled';
+              (dbMenu ? dbMenu.holidayReason : officialMenu?.holidayReason) || 'Holiday — no brunch';
 
             const dishName =
               dbMenu?.meal?.name && !dbMenu?.isHoliday
@@ -568,7 +557,7 @@ function StaffKitchenContent() {
                 : !dbMenu && officialMenu?.dish && !officialMenu.isHoliday
                 ? officialMenu.dish
                 : isHoliday
-                ? 'Holiday Today — No Brunch Scheduled'
+                ? 'Holiday — no brunch'
                 : 'No menu published';
             // Parents can only order from a saved, active menu; the October table is reference only.
             const publishState = !dbMenu ? 'NOT_PUBLISHED' : dbMenu.isActive === false ? 'DISABLED' : 'PUBLISHED';
@@ -583,17 +572,17 @@ function StaffKitchenContent() {
               'Pre-primary': {
                 border: 'border-purple-300',
                 badgeBg: 'bg-purple-100 text-purple-900 border-purple-200',
-                label: 'Pre-primary (Nursery & KG)',
+                label: 'Pre-primary',
               },
               Primary: {
                 border: 'border-emerald-300',
                 badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-200',
-                label: 'Primary (Classes 1 - 5)',
+                label: 'Primary',
               },
               Secondary: {
                 border: 'border-amber-300',
                 badgeBg: 'bg-amber-100 text-amber-900 border-amber-200',
-                label: 'Secondary (Classes 6 - 10)',
+                label: 'Secondary',
               },
             }[cat];
 
@@ -622,7 +611,7 @@ function StaffKitchenContent() {
                           {holidayReason}
                         </h3>
                         <p className="text-xs text-slate-600 leading-relaxed">
-                          School is closed for brunch on this date for {cat}. No kitchen food preparation or student ordering is scheduled.
+                          No brunch on this date for {cat}.
                         </p>
                       </div>
                     </div>
@@ -654,16 +643,16 @@ function StaffKitchenContent() {
                     <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
                       {dishName}
                     </h3>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      {catalogMeal?.description || 'Freshly prepared wholesome school brunch.'}
-                    </p>
+                    {catalogMeal?.description && (
+                      <p className="text-xs text-slate-500 leading-relaxed">{catalogMeal.description}</p>
+                    )}
                   </div>
 
                   {/* Scheduled Ingredients */}
                   {catalogMeal?.ingredients && (
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                       <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                        Scheduled Recipe Ingredients:
+                        Ingredients:
                       </div>
                       <p className="text-xs text-slate-700 font-medium leading-relaxed">
                         {catalogMeal.ingredients}
@@ -683,7 +672,7 @@ function StaffKitchenContent() {
                   {isPastDate ? (
                     <span className="text-slate-400 flex items-center gap-1.5">
                       <Clock className="w-4 h-4" />
-                      <span>Past Service (Closed)</span>
+                      <span>Past date</span>
                     </span>
                   ) : publishState === 'PUBLISHED' ? (
                     <span className="text-emerald-700 flex items-center gap-1.5">
@@ -765,7 +754,7 @@ function StaffKitchenContent() {
             </p>
           )}
           <p className="text-slate-500">
-            Publishing only puts the dish on sale for that date. No order is created: parents choose it for their child and pay themselves.
+            This puts the dish on sale for that date. It does not create an order.
           </p>
         </div>
 
@@ -773,7 +762,7 @@ function StaffKitchenContent() {
         <div className="p-3.5 bg-amber-100/70 border border-amber-200/90 rounded-2xl flex items-start gap-3 text-xs text-amber-950 font-medium">
           <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <p>
-            <strong>Canteen Team Notice:</strong> Parents can only order a dish that shows <em>Published</em> above. A dish marked <em>Timetable Reference</em> or <em>Not published</em> is not on sale: import the monthly menu, or publish a catalog recipe for that date above. You do <em>not</em> need to select items from the recipe catalog.
+            Parents can only order dishes marked <em>Published</em>.
           </p>
         </div>
       </section>
@@ -794,14 +783,14 @@ function StaffKitchenContent() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-slate-900">
-                  Master Recipe Catalog & Culinary Reference
+                  Recipe Catalog
                 </h2>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700">
                   {allMeals.length} Recipes
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Kitchen culinary database for reviewing recipe ingredients and prep notes. (Does not override the daily timetable).
+                All recipes. Editing here does not change the published menu.
               </p>
             </div>
           </div>
@@ -879,7 +868,7 @@ function StaffKitchenContent() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                          {meal.category || 'Lunch'}
+                          {!meal.category || meal.category.toUpperCase() === 'LUNCH' ? 'Brunch' : meal.category}
                         </span>
                         <VegBadge isVegetarian={meal.isVegetarian} />
                       </div>
@@ -932,7 +921,7 @@ function StaffKitchenContent() {
                   October 2026 Brunch Timetable (All 31 Dates)
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any date row to load that day&apos;s full schedule on the main kitchen view.
+                  Tap a date to open it.
                 </p>
               </div>
 
@@ -1013,7 +1002,7 @@ function StaffKitchenContent() {
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Click any date to inspect its full production view.</span>
+              <span />
               <button
                 type="button"
                 onClick={() => setIsTimetableModalOpen(false)}
@@ -1090,7 +1079,7 @@ function StaffKitchenContent() {
                     onChange={(e) => setNewMealCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   >
-                    <option value="LUNCH">Lunch</option>
+                    <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
                   </select>
                 </div>
@@ -1197,7 +1186,7 @@ function StaffKitchenContent() {
                     onChange={(e) => setEditMealCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   >
-                    <option value="LUNCH">Lunch</option>
+                    <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
                   </select>
                 </div>

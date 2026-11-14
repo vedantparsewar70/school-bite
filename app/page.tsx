@@ -115,7 +115,7 @@ function HomePageContent() {
         setError(
           data?.error ||
           data?.diagnostic?.details ||
-          `Server error (${res.status}). Please check database connection.`
+          `Something went wrong (error ${res.status}). Please try again.`
         );
         setSubmitting(false);
         return;
@@ -181,7 +181,7 @@ function HomePageContent() {
         setError(
           data?.error ||
           data?.details ||
-          `Server error (${res.status}). Please check database connection.`
+          `Something went wrong (error ${res.status}). Please try again.`
         );
         setSubmitting(false);
         return;
@@ -189,7 +189,7 @@ function HomePageContent() {
 
       setAuthUser(data.user);
       refreshUser().catch(() => {});
-      showToast('Parent account registered successfully!', 'success');
+      showToast('Account created.', 'success');
       router.push('/parent/children');
     } catch (err: any) {
       setError(err?.message || 'Network connection error. Please try again.');
@@ -222,7 +222,7 @@ function HomePageContent() {
             School<span className="text-amber-600">-Bite</span> Parent Portal
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Order fresh, wholesome school canteen meals for your child at S.B. Patil School
+            Pre-order canteen meals for your child at S.B. Patil School, Ravet.
           </p>
         </div>
 

@@ -231,7 +231,7 @@ export default function Navbar() {
                     }`}
                 >
                   <UtensilsCrossed className="w-4 h-4" />
-                  Order Lunch
+                  Order Brunch
                 </Link>
                 <Link
                   href="/parent/orders"
@@ -378,7 +378,7 @@ export default function Navbar() {
                             className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
                           >
                             <UtensilsCrossed className="w-4 h-4 text-slate-400" />
-                            Order Lunch
+                            Order Brunch
                           </Link>
                           <Link
                             href="/parent/children"
@@ -526,7 +526,7 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
-                Order Lunch
+                Order Brunch
               </Link>
               <Link
                 href="/parent/orders"

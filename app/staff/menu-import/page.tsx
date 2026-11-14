@@ -165,7 +165,7 @@ export default function MonthlyMenuImportPage() {
             <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
               <h2 className="font-bold text-slate-900">2. New dishes ({newDishes.length})</h2>
               <p className="text-sm text-slate-600">
-                These dishes are not in the meal list yet. Enter the price and allergen information for each one. Allergens protect children with allergies.
+                New dishes: enter the price and allergens for each one.
               </p>
               <div className="space-y-3">
                 {newDishes.map((d: any) => {

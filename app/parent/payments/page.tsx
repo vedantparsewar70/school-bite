@@ -23,7 +23,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   FAILED: 'Failed',
   REFUNDED: 'Refunded',
   REFUND_PENDING: 'Refund in progress',
-  REFUND_FAILED: 'Refund issue (canteen will contact you)',
+  REFUND_FAILED: 'Refund issue: contact the canteen',
 };
 
 export default function PaymentsPage() {
@@ -83,7 +83,7 @@ export default function PaymentsPage() {
             <span>Payment History</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Audit trail of all online transactions, UPI references, and card payments.
+            Your online payments and refunds.
           </p>
         </div>
 
@@ -153,7 +153,7 @@ export default function PaymentsPage() {
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3 max-w-md mx-auto">
           <CreditCard className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-800">No Payments Recorded</h3>
-          <p className="text-xs text-slate-500">Your transactions and receipts will appear here.</p>
+          <p className="text-xs text-slate-500">Your payments will appear here.</p>
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -196,9 +196,6 @@ export default function PaymentsPage() {
                         {getMethodIcon(p.paymentMethod)}
                         <span className="font-bold text-slate-800">{p.paymentMethod}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {p.upiId || p.cardLastFour ? `Ending in ${p.cardLastFour}` : p.bankName || 'Direct'}
-                      </p>
                     </td>
 
                     <td className="py-4 px-4 text-right font-extrabold text-slate-900 text-sm">

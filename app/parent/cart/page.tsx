@@ -304,7 +304,7 @@ export default function CartPage() {
             <span>Shopping Cart</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Review your selected meals grouped by child and date before proceeding to payment.
+            Check your meals before paying.
           </p>
         </div>
 
@@ -326,7 +326,7 @@ export default function CartPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-800">Your Cart is Empty</h3>
           <p className="text-xs text-slate-500">
-            Browse today&apos;s or the weekly lunch menu, select a child, and add delicious nutritious meals.
+            Choose a child and add meals from the menu.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <Link
@@ -359,7 +359,7 @@ export default function CartPage() {
                       Meal Availability Alert ({unavailableCount} item{unavailableCount > 1 ? 's' : ''} unavailable)
                     </h4>
                     <p className="text-xs text-rose-700 mt-0.5">
-                      Some meals in your cart are no longer available for their selected date (disabled by canteen staff or ordering cutoff passed). Please remove them to proceed.
+                      Some meals are no longer available for their date. Please remove them to continue.
                     </p>
                   </div>
                 </div>
@@ -512,10 +512,6 @@ export default function CartPage() {
                 <span>Subtotal</span>
                 <span className="font-bold text-slate-800">{formatINR(displayCartTotal(cartItems, serverPrices))}</span>
               </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Taxes & Fees</span>
-                <span className="font-bold text-emerald-600">₹0</span>
-              </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                 <span className="text-base font-extrabold text-slate-900">Total Payable</span>
@@ -532,7 +528,7 @@ export default function CartPage() {
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Mild spice, warm packing..."
+                placeholder="e.g. a note for the canteen"
                 rows={2}
                 disabled={processing}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none placeholder:text-slate-400"
@@ -582,21 +578,12 @@ export default function CartPage() {
               )}
             </button>
 
-            {hasUnavailableItems && (
-              <p className="text-[11px] text-rose-600 text-center font-medium">
-                Please remove disabled meals or update your cart above before paying.
-              </p>
-            )}
-
             {/* Security & Gateway Trust Badge */}
             <div className="pt-1 text-center space-y-1">
               <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Secured by Cashfree Payments</span>
               </div>
-              <p className="text-[10px] text-slate-400">
-                Supports UPI, Cards & Net Banking • 256-bit Bank Grade Security
-              </p>
             </div>
           </div>
         </div>

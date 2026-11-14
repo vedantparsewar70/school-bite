@@ -50,7 +50,8 @@ export default function MealCategoryBadge({
       className={`inline-flex items-center gap-1.5 font-extrabold uppercase tracking-wider rounded-md border ${style.bg} ${style.border} ${style.text} ${sizeClasses} ${className}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${style.dot} shrink-0`} />
-      <span>{norm}</span>
+      {/* The stored category LUNCH is shown as Brunch, the school's name for the meal. */}
+      <span>{norm === 'LUNCH' ? 'BRUNCH' : norm}</span>
     </span>
   );
 }

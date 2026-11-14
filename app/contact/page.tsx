@@ -6,7 +6,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  MessageCircle,
   CalendarCheck,
   Send,
   CheckCircle2,
@@ -47,29 +46,29 @@ export default function ContactPage() {
     setSubmitted(true);
   };
 
-  const whatsappNumber = BUSINESS_CONFIG.supportPhone.replace(/\D/g, '');
-
   return (
     <div className="min-h-screen bg-slate-50/50 py-10 sm:py-16">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Header */}
         <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-200/80 rounded-full text-xs font-bold text-amber-800">
-            <Mail className="w-3.5 h-3.5 text-amber-600" />
-            <span>Customer Support</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Contact <span className="text-amber-600">{BUSINESS_CONFIG.brandName}</span>
           </h1>
 
           <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            For assistance with meal orders, payments, account-related questions or general enquiries, contact our support team.
+            Questions about orders, payments or your account? Contact us below.
+          </p>
+          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+            Need to cancel an order? Call the canteen at{' '}
+            <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold text-amber-700 hover:underline">
+              {BUSINESS_CONFIG.cancellationContactPhone}
+            </a>
+            .
           </p>
         </div>
 
         {/* Contact Info Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Card 1: Email Support */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
             <div className="space-y-3">
@@ -98,50 +97,19 @@ export default function ContactPage() {
                 <Phone className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Phone Support</h2>
+                <h2 className="text-base font-bold text-slate-900">Canteen phone</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  Direct phone assistance for parents:
+                  Orders and cancellations:
                 </p>
               </div>
             </div>
             <div className="pt-2 border-t border-slate-100 space-y-1">
               <a
-                href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`}
+                href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`}
                 className="text-xs sm:text-sm font-bold text-emerald-700 hover:underline block"
               >
-                {BUSINESS_CONFIG.supportPhone} / {BUSINESS_CONFIG.supportPhoneRaw}
+                {BUSINESS_CONFIG.cancellationContactPhone}
               </a>
-              <p className="text-[11px] text-slate-500 font-medium">
-                {BUSINESS_CONFIG.supportAvailability}
-              </p>
-            </div>
-          </div>
-
-          {/* Card 3: WhatsApp Support */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center font-bold">
-                <MessageCircle className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">WhatsApp Support</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Quick chat support for parents and orders:
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 space-y-1">
-              <a
-                href={`https://wa.me/${whatsappNumber}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs sm:text-sm font-bold text-green-700 hover:underline block"
-              >
-                {BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhone})
-              </a>
-              <p className="text-[11px] text-slate-500 font-medium">
-                {BUSINESS_CONFIG.supportAvailability}
-              </p>
             </div>
           </div>
 
@@ -173,7 +141,7 @@ export default function ContactPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Send an Inquiry</h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Fill in the form below and our support team will get in touch with you.
+                This opens your email app with your message addressed to us.
               </p>
             </div>
 
@@ -184,7 +152,7 @@ export default function ContactPage() {
                 <p className="text-xs sm:text-sm text-emerald-700 leading-relaxed">
                   Please press <strong>Send</strong> in your email app to deliver your message. If it did not open, email{' '}
                   <a className="underline font-bold" href={`mailto:${BUSINESS_CONFIG.supportEmail}`}>{BUSINESS_CONFIG.supportEmail}</a> or call{' '}
-                  <a className="underline font-bold" href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`}>{BUSINESS_CONFIG.supportPhone}</a>.
+                  <a className="underline font-bold" href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`}>{BUSINESS_CONFIG.cancellationContactPhone}</a>.
                 </p>
                 <button
                   type="button"
@@ -254,7 +222,7 @@ export default function ContactPage() {
                       type="text"
                       value={orderId}
                       onChange={(e) => setOrderId(e.target.value)}
-                      placeholder="e.g. ORD-12345"
+                      placeholder="Order ID from your receipt"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500 transition-all font-mono font-medium"
                     />
                   </div>
@@ -284,7 +252,7 @@ export default function ContactPage() {
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      <span>Submit Inquiry</span>
+                      <span>Open Email App</span>
                     </>
                   )}
                 </button>
@@ -330,30 +298,22 @@ export default function ContactPage() {
                   <span className="font-bold text-slate-800">{BUSINESS_CONFIG.schoolName}</span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Support Hours</span>
-                  <span className="font-bold text-slate-800 text-right text-[11px]">{BUSINESS_CONFIG.supportAvailability}</span>
-                </div>
-                <div className="flex justify-between pb-2 border-b border-slate-100">
                   <span className="font-medium text-slate-500">Support Email</span>
                   <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="font-bold text-amber-700 hover:underline">
                     {BUSINESS_CONFIG.supportEmail}
                   </a>
                 </div>
-                <div className="flex justify-between pb-2 border-b border-slate-100">
-                  <span className="font-medium text-slate-500">Support Phone</span>
-                  <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="font-bold text-slate-800 hover:underline">
-                    {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
-                  </a>
-                </div>
                 <div className="flex justify-between">
-                  <span className="font-medium text-slate-500">WhatsApp</span>
-                  <span className="font-bold text-green-700">{BUSINESS_CONFIG.whatsAppSupport} ({BUSINESS_CONFIG.supportPhoneRaw})</span>
+                  <span className="font-medium text-slate-500">Canteen phone</span>
+                  <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold text-slate-800 hover:underline">
+                    {BUSINESS_CONFIG.cancellationContactPhone}
+                  </a>
                 </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Secure online transactions powered by certified payment partner ({BUSINESS_CONFIG.paymentGatewayPartner}).</span>
+                <span>Online payments are processed by {BUSINESS_CONFIG.paymentGatewayPartner}.</span>
               </div>
             </div>
 
@@ -362,9 +322,6 @@ export default function ContactPage() {
               <p className="font-bold text-slate-900 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-amber-600" />
                 <span>Customer Policies & Information</span>
-              </p>
-              <p className="text-slate-500 text-[11px] leading-relaxed">
-                Review our comprehensive policies regarding pre-ordering, payments, data protection, fulfillment, and cancellations.
               </p>
               <div className="flex flex-col gap-2 pt-1 text-amber-700 font-semibold">
                 <Link href="/terms-and-conditions" className="hover:underline flex items-center justify-between py-1 border-b border-slate-100">

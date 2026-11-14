@@ -208,9 +208,6 @@ export default function StaffOrderHistoryPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-              Canteen Archive
-            </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
             <HistoryIcon className="w-6 h-6 text-emerald-600" />

@@ -66,7 +66,7 @@ function StaffOrAdminLoginForm() {
         setError(
           data?.error ||
           data?.diagnostic?.details ||
-          `Server error (${res.status}). Please verify your database connection.`
+          `Something went wrong (error ${res.status}). Please try again.`
         );
         setLoading(false);
         return;
@@ -140,13 +140,8 @@ function StaffOrAdminLoginForm() {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {isStaff ? 'Canteen Staff Sign In' : 'Canteen & Admin Sign In'}
+            {isStaff ? 'Canteen Staff Sign In' : 'Admin Sign In'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            {isStaff
-              ? 'Access kitchen production summary and daily student meal collection'
-              : 'Access overview dashboard, menu publishing, and student orders'}
-          </p>
         </div>
       </div>
 
@@ -173,7 +168,7 @@ function StaffOrAdminLoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
                   onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
-                  placeholder={isStaff ? 'staff@school.com' : 'admin@school.com'}
+                  placeholder="Enter your email address"
                   className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all font-medium`}
                 />
               </div>
@@ -216,7 +211,7 @@ function StaffOrAdminLoginForm() {
           <div className="pt-4 border-t border-slate-100 text-center">
             {isStaff ? (
               <p className="text-xs text-slate-500">
-                Need full admin privileges?{' '}
+                Admin?{' '}
                 <Link
                   href="/login?role=admin"
                   className="text-purple-600 hover:text-purple-700 font-bold hover:underline"

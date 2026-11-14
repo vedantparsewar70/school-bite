@@ -125,10 +125,10 @@ export default function ParentDashboard() {
               <span>Today: {formatDatePretty(todayStr)}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Welcome back, {user?.name || 'Parent'}! 👋
+              Welcome, {user?.name || 'Parent'}
             </h1>
             <p className="text-amber-100 text-xs sm:text-sm max-w-xl">
-              Plan nutritious school meals for your children, review active orders, and top up meal balances.
+              Order school meals for your children and track your orders.
             </p>
           </div>
 
@@ -138,7 +138,7 @@ export default function ParentDashboard() {
               className="px-5 py-2.5 bg-white text-amber-800 hover:bg-amber-50 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
             >
               <UtensilsCrossed className="w-4 h-4" />
-              <span>Order Lunch</span>
+              <span>Order Brunch</span>
             </Link>
             <Link
               href="/parent/orders"
@@ -200,7 +200,7 @@ export default function ParentDashboard() {
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            {todayOrders.length > 0 ? 'Lunch being prepared' : 'No meals booked today'}
+            {todayOrders.length > 0 ? 'Booked for today' : 'No meals booked today'}
           </p>
         </Link>
 
@@ -221,7 +221,7 @@ export default function ParentDashboard() {
               Schedule <ChevronRight className="w-3 h-3" />
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Lunches pre-booked</p>
+          <p className="text-[11px] text-slate-400 mt-1">Brunches pre-booked</p>
         </Link>
       </div>
 
@@ -230,7 +230,7 @@ export default function ParentDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-extrabold text-slate-900">Your Registered Children</h2>
-            <p className="text-xs text-slate-500">Pick a child to select meals or view their diet profile</p>
+            <p className="text-xs text-slate-500">Choose a child to order meals</p>
           </div>
           <Link
             href="/parent/children"
@@ -245,7 +245,7 @@ export default function ParentDashboard() {
             <Users className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm font-bold text-slate-700">No children registered yet</p>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Add your child with their Class, Division, and dietary requirements to start scheduling lunches.
+              Add your child to start ordering meals.
             </p>
             <Link
               href="/parent/children"
@@ -286,52 +286,22 @@ export default function ParentDashboard() {
         )}
       </div>
 
-      {/* October 2026 Timetable Spotlight Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300/60 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-            <Calendar className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-md">
-                Official Timetable
-              </span>
-              <span className="text-xs font-bold text-slate-500">October 2026</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">
-              October 2026 School Brunch Menu
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
-              Category-tailored nutritious meals for <strong>Pre-primary</strong>, <strong>Primary</strong>, and <strong>Secondary</strong> students across all 31 days.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/parent/menu"
-          className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-        >
-          <span>View October Timetable</span>
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-
       {/* Main Grid: Today's Menu Preview & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left: Today's Menu */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900">Today's Lunch Menu</h2>
+              <h2 className="text-lg font-extrabold text-slate-900">Today's Brunch Menu</h2>
               <p className="text-xs text-slate-500">
-                Fresh timetable items for {formatDatePretty(todayStr)}
+                Menu for {formatDatePretty(todayStr)}
               </p>
             </div>
             <Link
               href="/parent/menu"
               className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"
             >
-              Full October Menu <ArrowRight className="w-3.5 h-3.5" />
+              Full Menu <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -358,7 +328,7 @@ export default function ParentDashboard() {
 
           {todayMenu.length === 0 ? (
             <div className="bg-white rounded-3xl p-8 border border-slate-100 text-center text-xs text-slate-500">
-              No menu items scheduled for today. Check the full October menu calendar.
+              No menu for today. Choose another date on the menu page.
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -457,7 +427,6 @@ export default function ParentDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-extrabold text-slate-900">Recent Orders</h2>
-              <p className="text-xs text-slate-500">Live order status</p>
             </div>
             <Link
               href="/parent/orders"
@@ -502,7 +471,7 @@ export default function ParentDashboard() {
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-slate-500">
-                        Paid: <strong className="text-slate-800">{formatINR(order.totalAmount)}</strong>
+                        Total: <strong className="text-slate-800">{formatINR(order.totalAmount)}</strong>
                       </span>
                       <Link
                         href={`/parent/orders?orderId=${order.id}`}

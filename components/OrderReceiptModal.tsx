@@ -26,7 +26,7 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
         {/* Modal Controls - hidden in print */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Official Meal Voucher</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Order Receipt</span>
             <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded-full">
               PAID & CONFIRMED
             </span>
@@ -75,7 +75,7 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
             <div>
               <p className="text-slate-400 text-[10px] uppercase font-bold">Payment Method</p>
               <p className="font-semibold text-slate-800">
-                {primaryPayment?.paymentMethod || 'UPI'} • {primaryPayment?.transactionRef || 'TXN-CONFIRMED'}
+                {primaryPayment?.paymentMethod || '—'} • {primaryPayment?.transactionRef || '—'}
               </p>
             </div>
             <div>
@@ -120,10 +120,6 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
               <span>Subtotal</span>
               <span>{formatINR(order.totalAmount)}</span>
             </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Taxes & Fees</span>
-              <span className="text-emerald-600 font-medium">₹0</span>
-            </div>
             <div className="flex justify-between text-base font-extrabold text-slate-900 border-t border-slate-200 pt-2">
               <span>Total Paid</span>
               <span className="text-amber-600">{formatINR(order.totalAmount)}</span>
@@ -132,18 +128,12 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
 
           {/* Order ID for canteen lookup */}
           <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-1.5 text-center">
-            <p className="text-xs font-bold text-amber-900">Student Lunch Pickup</p>
+            <p className="text-xs font-bold text-amber-900">Collection</p>
             <p className="text-[11px] text-amber-800/80 leading-snug">
-              Show the student&apos;s name/roll number or this order ID at the canteen lunch counter.
+              At the canteen counter, give the student&apos;s name and roll number, or this order ID.
             </p>
             <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900/70">Order ID</p>
             <p className="text-2xl sm:text-3xl font-mono font-black text-amber-950 break-all select-all">{order.id}</p>
-          </div>
-
-          {/* Footer note */}
-          <div className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-4">
-            <p>Thank you for ordering with us.</p>
-            <p className="mt-0.5">{BUSINESS_CONFIG.brandName} Canteen Portal • Generated automatically</p>
           </div>
         </div>
       </div>

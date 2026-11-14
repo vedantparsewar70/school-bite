@@ -294,7 +294,7 @@ export default function TeacherMenuPage() {
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
                   <GraduationCap className="w-3 h-3" />
-                  <span>Teacher & Staff Direct Order</span>
+                  <span>Teacher Order</span>
                 </span>
               </div>
               <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5 mt-0.5">
@@ -305,9 +305,6 @@ export default function TeacherMenuPage() {
           </div>
 
           <div className="text-right">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Direct Orders
-            </span>
             <span className="text-xs font-black text-amber-600">
               {formatDatePretty(todayDateStr)}
             </span>
@@ -329,10 +326,7 @@ export default function TeacherMenuPage() {
               </span>
             </div>
             <p className="text-sm sm:text-base font-extrabold text-white">
-              Order fresh food & collect at counter with your name
-            </p>
-            <p className="text-xs text-emerald-100/90 font-medium">
-              Direct orders for today. Pay securely online via UPI or card.
+              Order for today, pay online, and collect at the counter with your name.
             </p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-white/10 hidden sm:flex items-center justify-center shrink-0">
@@ -373,7 +367,7 @@ export default function TeacherMenuPage() {
                 : cat === 'BREAKFAST'
                 ? 'Breakfast'
                 : cat === 'LUNCH'
-                ? 'Lunch'
+                ? 'Brunch'
                 : cat === 'BEVERAGE'
                 ? 'Beverages'
                 : cat}
@@ -391,7 +385,7 @@ export default function TeacherMenuPage() {
             <UtensilsCrossed className="w-10 h-10 mx-auto text-slate-300" />
             <h3 className="font-extrabold text-slate-800 text-base">No Items Available Right Now</h3>
             <p className="text-xs text-slate-500">
-              The canteen kitchen has not activated any items in this category today. Please check back shortly.
+              No dishes available in this category today.
             </p>
           </div>
         ) : (
@@ -413,7 +407,7 @@ export default function TeacherMenuPage() {
                       <div className="flex items-center gap-1.5">
                         <VegBadge isVegetarian={meal.isVegetarian} size="sm" />
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                          {meal.category || 'LUNCH'}
+                          {!meal.category || meal.category.toUpperCase() === 'LUNCH' ? 'BRUNCH' : meal.category}
                         </span>
                       </div>
                       <span className="text-base sm:text-lg font-black text-amber-600">
@@ -523,7 +517,7 @@ export default function TeacherMenuPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-base text-slate-900">Teacher Meal Order</h3>
-                  <p className="text-[11px] text-slate-500 font-medium">Direct collection at canteen</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Collect at the canteen counter</p>
                 </div>
               </div>
               <button
@@ -583,7 +577,7 @@ export default function TeacherMenuPage() {
                     type="text"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g. Less spicy, keep ready by 1:15 PM"
+                    placeholder="e.g. Less spicy"
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
@@ -619,7 +613,7 @@ export default function TeacherMenuPage() {
               {/* Secure Payment Note */}
               <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900">
                 <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Secure payment via Cashfree Gateway (UPI, Cards, NetBanking).</span>
+                <span>Pay online through Cashfree.</span>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

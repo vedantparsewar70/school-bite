@@ -166,7 +166,7 @@ function AdminOrdersContent() {
             <span>Student Orders</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Quickly see which student ordered what and track meal deliveries.
+            Who ordered what, by meal date.
           </p>
         </div>
 

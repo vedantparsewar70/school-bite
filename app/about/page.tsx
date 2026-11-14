@@ -2,21 +2,17 @@ import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  UtensilsCrossed,
   Clock,
-  ShieldCheck,
   Leaf,
   CreditCard,
-  ChefHat,
-  ArrowRight,
   GraduationCap,
 } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress } from '@/lib/business-config';
 
 export const metadata: Metadata = {
-  title: 'About Us | School-Bite - School Meal Pre-Ordering Platform',
+  title: 'About Us',
   description:
-    'Learn about School-Bite, the simple and convenient school meal pre-ordering platform connecting parents with the S.B. Patil School canteen.',
+    'About School-Bite, meal pre-ordering for the S.B. Patil School canteen.',
 };
 
 export default function AboutPage() {
@@ -27,33 +23,12 @@ export default function AboutPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Header Breadcrumb & Title */}
         <div className="space-y-4 text-center sm:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-200/80 rounded-full text-xs font-bold text-amber-800">
-            <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />
-            <span>About Our Platform</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             About <span className="text-amber-600">{BUSINESS_CONFIG.brandName}</span>
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl">
-            {BUSINESS_CONFIG.shortDescription}
-          </p>
-        </div>
-
-        {/* Mission & Purpose Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            <span>Our Purpose</span>
-          </h2>
-
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            School-Bite was developed to streamline daily canteen operations for <strong>{BUSINESS_CONFIG.schoolName}</strong>. Traditional school lunch breaks often involve rushed ordering, long queues, cash-handling bottlenecks, and food wastage due to unpredictable demand.
-          </p>
-
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            By enabling pre-orders for the next day, School-Bite allows the school canteen kitchen to know precise portion requirements in advance. Students receive freshly prepared, hot meals without waiting in line, and parents have complete peace of mind regarding the wholesome food choices their children enjoy every school day.
+            School-Bite is the meal pre-ordering website for the {BUSINESS_CONFIG.schoolName} canteen, Ravet, Pune. Parents choose meals and pay online; the school canteen prepares the food.
           </p>
         </div>
 
@@ -65,7 +40,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-base font-bold text-slate-900">100% Pure Vegetarian</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Every meal prepared and scheduled on School-Bite adheres to strict pure vegetarian standards, prepared in hygienic, inspected school kitchen facilities.
+              Every meal on School-Bite is pure vegetarian.
             </p>
           </div>
 
@@ -73,9 +48,9 @@ export default function AboutPage() {
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
               <Clock className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Advance Fresh Pre-Orders</h3>
+            <h3 className="text-base font-bold text-slate-900">Ordering Cutoff</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Orders are placed in advance before the daily kitchen cutoff time ({BUSINESS_CONFIG.cancellationCutoffTime}). This ensures fresh ingredient sourcing and morning batch cooking. Orders cannot be cancelled online; to cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>.
+              Order before 08:30 AM on the meal day. Orders can't be cancelled online; to cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>.
             </p>
           </div>
 
@@ -83,9 +58,9 @@ export default function AboutPage() {
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <CreditCard className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Cashless & Secure Payments</h3>
+            <h3 className="text-base font-bold text-slate-900">Online Payment</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Transactions are processed directly and securely through certified payment partner ({BUSINESS_CONFIG.paymentGatewayPartner}) via UPI, debit/credit cards, and net banking.
+              Pay online through {BUSINESS_CONFIG.paymentGatewayPartner}.
             </p>
           </div>
         </div>
@@ -102,7 +77,7 @@ export default function AboutPage() {
               <span className="text-xs font-black text-amber-600 uppercase tracking-wider">Step 1</span>
               <h4 className="text-sm font-bold text-slate-900">Select Child Profile</h4>
               <p className="text-xs text-slate-500">
-                Register or select your child with their grade, division, and roll number for accurate delivery.
+                Add your child with their class.
               </p>
             </div>
 
@@ -110,23 +85,23 @@ export default function AboutPage() {
               <span className="text-xs font-black text-amber-600 uppercase tracking-wider">Step 2</span>
               <h4 className="text-sm font-bold text-slate-900">Browse Menu</h4>
               <p className="text-xs text-slate-500">
-                Review available meals published by the school canteen, complete with transparent portion pricing.
+                See the meals and prices published by the school canteen.
               </p>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
               <span className="text-xs font-black text-amber-600 uppercase tracking-wider">Step 3</span>
-              <h4 className="text-sm font-bold text-slate-900">Pay Securely Online</h4>
+              <h4 className="text-sm font-bold text-slate-900">Pay Online</h4>
               <p className="text-xs text-slate-500">
-                Complete pre-order payment using UPI, debit/credit card, or net banking prior to the daily cutoff.
+                Pay online through {BUSINESS_CONFIG.paymentGatewayPartner} before 08:30 AM on the meal day.
               </p>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
               <span className="text-xs font-black text-amber-600 uppercase tracking-wider">Step 4</span>
-              <h4 className="text-sm font-bold text-slate-900">Lunch Break Collection</h4>
+              <h4 className="text-sm font-bold text-slate-900">Brunch Break Collection</h4>
               <p className="text-xs text-slate-500">
-                The school canteen prepares fresh meals, and students collect them during the scheduled lunch break.
+                Your child collects the meal at the canteen counter during the brunch break.
               </p>
             </div>
           </div>
@@ -140,7 +115,7 @@ export default function AboutPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-900">{BUSINESS_CONFIG.schoolName} Canteen</h3>
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-            School-Bite is an online school meal pre-ordering platform operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Registered Business / Trade Names: <strong>BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING</strong>; Legal Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>), working hand-in-hand with the on-premise canteen catering team of {BUSINESS_CONFIG.schoolName} in Ravet, Pune. Food is prepared and provided directly by the school canteen. Meal preparations are carried out strictly according to advance verified orders.
+            School-Bite is operated by <strong>{BUSINESS_CONFIG.legalEntityName}</strong> (Proprietor: <strong>{BUSINESS_CONFIG.proprietorName}</strong>). Food is prepared and provided by the {BUSINESS_CONFIG.schoolName} canteen, Ravet, Pune.
           </p>
           <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold text-slate-800">
             <div>
@@ -162,9 +137,9 @@ export default function AboutPage() {
               </a>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Customer Phone</span>
-              <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="text-slate-900 hover:underline">
-                {BUSINESS_CONFIG.supportPhone} ({BUSINESS_CONFIG.supportPhoneRaw})
+              <span className="text-slate-500 block text-[10px] uppercase">Canteen phone</span>
+              <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="text-slate-900 hover:underline">
+                {BUSINESS_CONFIG.cancellationContactPhone}
               </a>
             </div>
             <div>
@@ -185,7 +160,7 @@ export default function AboutPage() {
           <div>
             <h4 className="text-base font-bold">Have questions or need assistance?</h4>
             <p className="text-xs text-slate-400 mt-0.5">
-              Our support team is here to assist parents with meal orders, payments, and account questions.
+              Contact us about orders, payments or your account.
             </p>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">

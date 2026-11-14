@@ -66,11 +66,6 @@ function KitchenPageContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 print:hidden">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 rounded-md">
-              Kitchen Operations
-            </span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
             <ChefHat className="w-7 h-7 text-amber-500" />
             <span>Kitchen Production Summary</span>
@@ -164,7 +159,7 @@ function KitchenPageContent() {
                   {formatDatePretty(date)}
                 </h2>
                 <p className="text-xs text-amber-100 mt-1">
-                  Total food items to prepare: <strong className="text-white text-sm">{kitchenData?.totalMeals || 0}</strong> portions across <strong className="text-white text-sm">{kitchenData?.totalOrders || 0}</strong> confirmed student orders.
+                  Total food items to prepare: <strong className="text-white text-sm">{kitchenData?.totalMeals || 0}</strong> portions across <strong className="text-white text-sm">{kitchenData?.totalOrders || 0}</strong> orders.
                 </p>
               </div>
             </div>
@@ -210,7 +205,7 @@ function KitchenPageContent() {
                         <div className="flex items-center gap-2">
                           <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {mc.category}
+                            {String(mc.category || '').toUpperCase() === 'LUNCH' ? 'BRUNCH' : mc.category}
                           </span>
                         </div>
                         <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
@@ -253,7 +248,7 @@ function KitchenPageContent() {
                           <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
                           <span>{mc.mealName}</span>
                         </td>
-                        <td className="py-2.5 text-slate-500">{mc.category}</td>
+                        <td className="py-2.5 text-slate-500">{String(mc.category || '').toUpperCase() === 'LUNCH' ? 'BRUNCH' : mc.category}</td>
                         <td className="py-2.5 text-right font-black text-base text-amber-600">
                           {mc.count}
                         </td>
@@ -274,9 +269,6 @@ function KitchenPageContent() {
                     <Users className="w-4 h-4 text-amber-500" />
                     <span>Student Distribution Roster ({kitchenData.studentList.length} Students)</span>
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Organized for canteen pickup and classroom meal distribution.
-                  </p>
                 </div>
               </div>
 

@@ -224,11 +224,7 @@ export default function StaffTeacherMenuPage() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 w-fit">
-              <GraduationCap className="w-3 h-3" />
-              <span>Staff Portal</span>
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <UtensilsCrossed className="w-6 h-6 text-emerald-600" />
               <span>Teacher Menu Manager</span>
             </h1>
@@ -260,10 +256,10 @@ export default function StaffTeacherMenuPage() {
       <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between gap-3 text-emerald-950 text-xs">
         <div>
           <span className="font-extrabold block text-sm text-emerald-900">
-            Separate Menu for Teachers & Staff
+            Teacher menu
           </span>
           <span className="text-emerald-800 font-medium">
-            Toggle switches ON or OFF to control which dishes teachers can order today without login.
+            Turn a dish ON to let teachers order it.
           </span>
         </div>
         <span className="px-3 py-1 bg-white border border-emerald-200 rounded-xl font-black text-emerald-800 shrink-0 shadow-2xs">
@@ -301,7 +297,7 @@ export default function StaffTeacherMenuPage() {
                   <div className="flex items-center gap-2">
                     <VegBadge isVegetarian={meal.isVegetarian} size="sm" />
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                      {meal.category || 'LUNCH'}
+                      {!meal.category || meal.category.toUpperCase() === 'LUNCH' ? 'BRUNCH' : meal.category}
                     </span>
                     {!isAvail && (
                       <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
@@ -401,7 +397,7 @@ export default function StaffTeacherMenuPage() {
                   required
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Executive Deluxe Veg Thali"
+                  placeholder="e.g. Veg Thali"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
@@ -432,7 +428,7 @@ export default function StaffTeacherMenuPage() {
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
                   >
-                    <option value="LUNCH">Lunch</option>
+                    <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
                     <option value="BEVERAGE">Beverage</option>
                   </select>
@@ -447,7 +443,7 @@ export default function StaffTeacherMenuPage() {
                   rows={2}
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="e.g. Served with paneer sabzi, dal tadka, jeera rice and 3 rotis"
+                  placeholder="e.g. Dal, rice, 2 rotis"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>

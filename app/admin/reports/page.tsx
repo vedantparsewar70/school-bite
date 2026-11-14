@@ -86,7 +86,7 @@ export default function AdminReportsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Complete school sales report exported to CSV!', 'success');
+    showToast('Report exported.', 'success');
   };
 
   if (loading) {
@@ -110,7 +110,7 @@ export default function AdminReportsPage() {
             <span>Sales & Operations Reports</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Analyze meal sales, popular dishes, revenue by date, and classroom distribution.
+            Sales by dish, class and date.
           </p>
         </div>
 
@@ -130,7 +130,7 @@ export default function AdminReportsPage() {
           <p className="text-3xl font-black text-emerald-700">
             {formatINR(reports?.summary?.totalRevenue || 0)}
           </p>
-          <p className="text-[11px] text-slate-400">Total canteen earnings</p>
+          <p className="text-[11px] text-slate-400">Paid student orders</p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-1">
@@ -167,7 +167,7 @@ export default function AdminReportsPage() {
               <Award className="w-5 h-5 text-amber-500" />
               <span>Most Ordered Meals (Rankings)</span>
             </h3>
-            <p className="text-xs text-slate-500">Student favorite dishes sorted by volume and revenue</p>
+            <p className="text-xs text-slate-500">Sorted by quantity ordered</p>
           </div>
 
           <div className="space-y-4">
@@ -206,7 +206,6 @@ export default function AdminReportsPage() {
               <Layers className="w-5 h-5 text-purple-600" />
               <span>Orders by Grade / Class</span>
             </h3>
-            <p className="text-xs text-slate-500">Classroom participation and meal adoption</p>
           </div>
 
           <div className="space-y-4">
@@ -235,7 +234,6 @@ export default function AdminReportsPage() {
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-4">
         <div>
           <h3 className="text-base font-extrabold text-slate-900">Revenue & Sales by Date</h3>
-          <p className="text-xs text-slate-500">Daily financial reconciliation summary</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -243,7 +241,7 @@ export default function AdminReportsPage() {
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-bold text-[10px]">
               <tr>
                 <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4 text-center">Meals Cooked</th>
+                <th className="py-3 px-4 text-center">Meals Ordered</th>
                 <th className="py-3 px-4 text-center">Unique Orders</th>
                 <th className="py-3 px-4 text-right">Daily Revenue</th>
               </tr>

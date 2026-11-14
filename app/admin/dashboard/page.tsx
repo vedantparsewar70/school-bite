@@ -73,7 +73,7 @@ export default function AdminDashboardPage() {
             <span>Canteen Operations Dashboard</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Real-time meal pre-orders, student counts, and kitchen preparation requirements.
+            Orders and kitchen counts for the next meal date.
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.studentsOrdered || 0}</p>
-          <p className="text-[11px] text-slate-400 font-medium">Unique children receiving lunch</p>
+          <p className="text-[11px] text-slate-400 font-medium">Unique children receiving brunch</p>
         </div>
 
         {/* Card 3: Total Food Items Ordered */}
@@ -180,7 +180,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.totalItems || 0}</p>
-          <p className="text-[11px] text-amber-700 font-medium">Tomorrow: {stats?.tomorrowTotalMeals || 0} portions</p>
+          <p className="text-[11px] text-amber-700 font-medium">Next meal date: {stats?.tomorrowTotalMeals || 0} portions</p>
         </div>
 
         {/* Card 4: Total Order Value */}
@@ -223,10 +223,7 @@ export default function AdminDashboardPage() {
           {tomorrowProduction.length === 0 ? (
             <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
               <UtensilsCrossed className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-600">No Orders Placed for Tomorrow Yet</p>
-              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                Once parents select meals and complete payment for tomorrow, total preparation counts will aggregate here automatically.
-              </p>
+              <p className="text-xs font-bold text-slate-600">No orders for {formatDatePretty(tomorrowStr)} yet</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -245,7 +242,7 @@ export default function AdminDashboardPage() {
                       <VegBadge isVegetarian={item.isVegetarian} size="sm" />
                       <span className="text-sm font-bold text-slate-800">{item.mealName}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-semibold uppercase">
-                        {item.category}
+                        {String(item.category || '').toUpperCase() === 'LUNCH' ? 'BRUNCH' : item.category}
                       </span>
                     </div>
 
@@ -259,7 +256,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="pt-2 flex justify-between items-center text-xs px-2 text-slate-500">
-                <span>Total Items for Tomorrow:</span>
+                <span>Total items:</span>
                 <strong className="text-slate-900 text-sm font-black">{stats?.tomorrowTotalMeals || 0} portions</strong>
               </div>
             </div>
@@ -282,8 +279,8 @@ export default function AdminDashboardPage() {
                     <UtensilsCrossed className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-900">Tomorrow&apos;s Menu</p>
-                    <p className="text-[10px] text-slate-500">Decide available dishes</p>
+                    <p className="text-xs font-bold text-slate-900">Menu</p>
+                    <p className="text-[10px] text-slate-500">Choose dishes for a date</p>
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
@@ -315,7 +312,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-900">Kitchen Summary</p>
-                    <p className="text-[10px] text-slate-500">Total preparation totals</p>
+                    <p className="text-[10px] text-slate-500">Quantities to prepare</p>
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />

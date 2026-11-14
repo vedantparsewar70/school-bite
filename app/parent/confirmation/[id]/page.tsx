@@ -151,7 +151,7 @@ export default function OrderConfirmationPage() {
               Order Confirmed & Paid
             </h1>
             <p className="text-sm text-slate-500 max-w-md mx-auto">
-              Your meal order has been verified via Cashfree and scheduled with the S.B. Patil School canteen.
+              Your payment is confirmed and your meals are booked.
             </p>
           </>
         ) : isPending ? (
@@ -179,7 +179,7 @@ export default function OrderConfirmationPage() {
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Still not confirmed. If your payment failed or you closed the payment page, you can{' '}
                 <Link href="/parent/cart" className="font-bold text-amber-700 underline">go back to the cart and try again</Link>
-                . The same payment is reopened, so you cannot be charged twice for this order.
+                . Retrying reopens the same payment.
               </p>
             )}
           </>
@@ -199,8 +199,8 @@ export default function OrderConfirmationPage() {
             order?.paymentStatus === 'REFUNDED'
               ? 'This order was cancelled and the payment has been refunded.'
               : order?.paymentStatus === 'REFUND_FAILED'
-              ? 'This order was cancelled. The refund could not be completed automatically; the canteen will follow up.'
-              : 'This order was cancelled. The refund is being processed.',
+              ? 'This order was cancelled. The refund could not be completed automatically. Please contact the canteen at 9028977988.'
+              : 'This order was cancelled. The refund to your original payment method is being processed.',
             <Link href="/parent/orders" className="mt-2 inline-block px-5 py-3 bg-slate-800 text-white rounded-xl text-sm font-bold">
               View My Orders
             </Link>)
@@ -211,7 +211,7 @@ export default function OrderConfirmationPage() {
             </Link>)
         ) : (
           statusPanel('rose', 'Payment Not Completed',
-            message || 'This payment was not completed, so no order was created. If money was debited, your bank will reverse it automatically.',
+            message || 'This payment was not completed, so no order was created. If money was debited, contact the canteen at 9028977988.',
             <Link href="/parent/cart" className="mt-2 inline-block px-5 py-3 bg-amber-500 text-white rounded-xl text-sm font-bold shadow-md hover:bg-amber-600">
               Back to Cart
             </Link>)
@@ -222,22 +222,10 @@ export default function OrderConfirmationPage() {
       {isPaid && order ? (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xl space-y-6">
         {/* Order Meta Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 p-3.5 sm:p-4 rounded-2xl bg-amber-50/60 border border-amber-100 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 sm:p-4 rounded-2xl bg-amber-50/60 border border-amber-100 text-xs">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400">Order ID</span>
             <p className="font-mono font-extrabold text-slate-900 text-sm truncate">{orderId}</p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Child Name</span>
-            <p className="font-extrabold text-slate-800 text-xs truncate">
-              {order?.items?.[0]?.studentName || 'Student'}
-            </p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Meal Date</span>
-            <p className="font-extrabold text-slate-800 text-xs truncate">
-              {order?.items?.[0]?.date ? formatDatePretty(order.items[0].date) : 'Tomorrow'}
-            </p>
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400">Total Amount</span>
@@ -267,7 +255,6 @@ export default function OrderConfirmationPage() {
               <span className="font-bold text-slate-700">Cashfree Transaction Ref:</span>
               <span className="font-mono text-slate-900 font-semibold">{primaryPayment.transactionRef}</span>
             </div>
-            <span className="text-[11px] text-slate-400">Secured by Cashfree Payments</span>
           </div>
         )}
 

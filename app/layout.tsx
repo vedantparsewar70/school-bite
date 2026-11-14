@@ -16,14 +16,14 @@ export const metadata: Metadata = {
     template: '%s | School Bite',
   },
   description:
-    'School Bite is a school meal pre-ordering platform that allows parents to select fresh, wholesome canteen meals for their children at S.B. Patil School and make online payments.',
+    'Pre-order S.B. Patil School canteen meals for your child and pay online.',
   keywords: [
     'School Bite',
     'School-Bite',
     'S.B. Patil School',
     'school canteen',
     'school meal pre-ordering',
-    'student lunch order',
+    'student brunch order',
     'pure vegetarian school meal',
     'Ravet Pune',
   ],
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'School Bite - School Meal Pre-Ordering Platform',
     description:
-      'School meal pre-ordering made simple for parents of S.B. Patil School students.',
+      'Meal pre-ordering for the S.B. Patil School canteen, Ravet, Pune.',
     type: 'website',
     images: [
       {

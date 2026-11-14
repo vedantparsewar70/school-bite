@@ -7,7 +7,6 @@ import {
   Phone,
   Mail,
   Users,
-  ShieldCheck,
   ArrowRight,
   FileText,
 } from 'lucide-react';
@@ -58,7 +57,7 @@ export default function ProfilePage() {
           <span>Parent Profile</span>
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Manage your account credentials, emergency phone number, and registered children.
+          Your contact details and children.
         </p>
       </div>
 
@@ -132,7 +131,7 @@ export default function ProfilePage() {
               </form>
             )}
             {phoneError && <p className="text-rose-600 font-medium">{phoneError}</p>}
-            <p className="text-slate-400">Used by the payment gateway for your payment confirmation.</p>
+            <p className="text-slate-400">Required by Cashfree for online payments.</p>
           </div>
 
           <div className="flex items-center justify-between py-3">
@@ -159,16 +158,6 @@ export default function ProfilePage() {
               <span>View Past Orders</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
-          </div>
-        </div>
-
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-slate-600 leading-relaxed">
-            <p className="font-semibold text-slate-800">Account Security</p>
-            <p className="text-slate-500 mt-0.5">
-              Your details are verified with the school administration. Meals ordered are delivered directly to your child's classroom.
-            </p>
           </div>
         </div>
       </div>

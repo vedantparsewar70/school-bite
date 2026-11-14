@@ -281,10 +281,7 @@ function StaffOrdersContent() {
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <div>
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
-            Canteen Roster
-          </span>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <FileText className="w-6 h-6 text-amber-500" />
             <span>Orders</span>
           </h1>
@@ -733,7 +730,7 @@ function StaffOrdersContent() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 leading-tight">
-                    Kitchen Production Dashboard
+                    Kitchen Counts
                   </h3>
                   <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block mt-0.5">
                     Student Meals &bull; Quantity to Prepare
@@ -872,7 +869,7 @@ function StaffOrdersContent() {
                               <div className="flex items-center gap-2">
                                 <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
                                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                                  {mc.category || 'LUNCH'}
+                                  {!mc.category || mc.category.toUpperCase() === 'LUNCH' ? 'BRUNCH' : mc.category}
                                 </span>
                               </div>
                               <h5 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase truncate">
@@ -943,7 +940,7 @@ function StaffOrdersContent() {
                               <div className="flex items-center gap-2">
                                 <VegBadge isVegetarian={mc.isVegetarian} size="sm" />
                                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                                  {mc.category || 'LUNCH'}
+                                  {!mc.category || mc.category.toUpperCase() === 'LUNCH' ? 'BRUNCH' : mc.category}
                                 </span>
                               </div>
                               <h5 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase truncate">

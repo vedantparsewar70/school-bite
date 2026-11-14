@@ -34,9 +34,6 @@ export default function AllergyWarningModal({
               <ShieldAlert className="w-6 h-6 text-white" />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-100">
-                School Safety Protocol
-              </span>
               <h3 className="text-lg font-black tracking-tight leading-tight">⚠ ALLERGY ALERT</h3>
             </div>
           </div>
@@ -77,13 +74,13 @@ export default function AllergyWarningModal({
                 School Policy Restriction
               </p>
               <p className="text-amber-800">
-                The school canteen policy currently disallows ordering meals with conflicting allergens for child safety.
+                This meal can&apos;t be ordered for this child because of the allergy.
               </p>
             </div>
           ) : (
             <div className="space-y-3 pt-1">
               <p className="text-xs text-slate-600">
-                School policy permits proceeding only with explicit parental acknowledgment:
+                To add this meal anyway, confirm below:
               </p>
               <label className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/70 transition-colors">
                 <input

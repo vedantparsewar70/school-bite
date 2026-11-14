@@ -1,12 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
-import { UtensilsCrossed, ShieldCheck, Mail, Phone, MapPin, MessageCircle, Building2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress, getLegalOperatorString } from '@/lib/business-config';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
   const formattedAddress = getFormattedAddress();
-  const whatsappNumber = BUSINESS_CONFIG.supportPhone.replace(/\D/g, '');
 
   return (
     <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 mt-auto">
@@ -25,12 +24,8 @@ export default function Footer() {
               </span>
             </Link>
 
-            <p className="text-xs sm:text-sm text-slate-300 font-medium">
-              School meal pre-ordering made simple for parents.
-            </p>
-
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              School-Bite enables parents to pre-order fresh, hygienic meals for their children. Food is prepared and provided by the {BUSINESS_CONFIG.schoolName} canteen.
+              Meal pre-ordering for the {BUSINESS_CONFIG.schoolName} canteen. Food is prepared and provided by the school canteen.
             </p>
 
             <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1.5 text-xs">
@@ -57,10 +52,6 @@ export default function Footer() {
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>100% Pure Vegetarian</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-slate-300 border border-slate-800 rounded-full">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                <span>Secure Online Payments</span>
               </span>
             </div>
           </div>
@@ -124,24 +115,9 @@ export default function Footer() {
               <div className="flex items-start gap-2.5">
                 <Phone className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-500 block uppercase font-semibold">Phone ({BUSINESS_CONFIG.supportAvailability})</span>
-                  <a href={`tel:${BUSINESS_CONFIG.supportPhoneRaw}`} className="hover:text-amber-400 text-slate-300 font-medium">
-                    {BUSINESS_CONFIG.supportPhone} / {BUSINESS_CONFIG.supportPhoneRaw}
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <MessageCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
-                <div>
-                  <span className="text-[10px] text-slate-500 block uppercase font-semibold">WhatsApp</span>
-                  <a
-                    href={`https://wa.me/${whatsappNumber}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-green-400 text-slate-300 font-medium"
-                  >
-                    WhatsApp Support Available ({BUSINESS_CONFIG.supportPhoneRaw})
+                  <span className="text-[10px] text-slate-500 block uppercase font-semibold">Canteen phone</span>
+                  <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="hover:text-amber-400 text-slate-300 font-medium">
+                    {BUSINESS_CONFIG.cancellationContactPhone}
                   </a>
                 </div>
               </div>
@@ -162,7 +138,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <p>
-            © {currentYear} {BUSINESS_CONFIG.legalEntityName}. All rights reserved. Operated by {BUSINESS_CONFIG.legalEntityName} (Registered Business/Trade Names: BRIGHT DESIGNERS / NEW BRIGHT XEROX / BRIGHT CATERING; Proprietor: {BUSINESS_CONFIG.proprietorName}) for {BUSINESS_CONFIG.schoolName} canteen meal orders.
+            © {currentYear} {BUSINESS_CONFIG.legalEntityName}. School-Bite meal orders for the {BUSINESS_CONFIG.schoolName} canteen.
           </p>
 
           <div className="flex flex-wrap items-center gap-4">

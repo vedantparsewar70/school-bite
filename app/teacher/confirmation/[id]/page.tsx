@@ -84,7 +84,7 @@ export default function TeacherConfirmationPage({ params }: { params: Promise<{ 
     const unresolved = state === 'PENDING' || state === 'UNKNOWN' || (state === 'PAID' && !order);
     const view =
       state === 'NOT_PAID'
-        ? { tone: 'rose', badge: 'Payment Not Completed', title: 'No Order Created', text: message || 'This payment was not completed, so no order was placed. If money was debited, your bank will reverse it automatically.' }
+        ? { tone: 'rose', badge: 'Payment Not Completed', title: 'No Order Created', text: message || 'This payment was not completed, so no order was placed. If money was debited, contact the canteen at 9028977988.' }
         : state === 'EXCEPTION'
         ? { tone: 'sky', badge: 'Payment Received', title: 'Order Needs Canteen Review', text: message || 'The canteen will review this payment.' }
         : state === 'CANCELLED'
@@ -145,7 +145,7 @@ export default function TeacherConfirmationPage({ params }: { params: Promise<{ 
             <span>Payment Received • Order Confirmed</span>
           </span>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Order Placed Successfully!
+            Order placed
           </h1>
           <p className="text-xs text-slate-500 font-medium">
             Order ID: <strong className="text-slate-800 font-bold">{orderId}</strong>

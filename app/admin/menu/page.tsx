@@ -145,7 +145,7 @@ export default function AdminMenuPage() {
         setSelectedMealIds([]);
 
         showToast(
-          'Date changed: All meals unticked for the new day. Please select tomorrow\'s menu.',
+          'New day: selection cleared. Choose the menu again.',
           'info'
         );
 
@@ -270,9 +270,6 @@ export default function AdminMenuPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
-              Daily Menu Availability & Timetable
-            </span>
             <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-purple-600" />
               <span>{formatDatePretty(selectedDate)}</span>
@@ -280,10 +277,10 @@ export default function AdminMenuPage() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <span>Menu & Timetable Manager</span>
+            <span>Menu</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Manage daily dishes and verify October 2026 timetable items across student categories.
+            Choose the dish for each date and class group.
           </p>
         </div>
 
@@ -388,7 +385,7 @@ export default function AdminMenuPage() {
         <div className="bg-purple-100/80 border border-purple-300 rounded-2xl p-4 flex items-center gap-3 text-purple-950">
           <AlertCircle className="w-5 h-5 text-purple-600 shrink-0" />
           <div>
-            <h4 className="font-extrabold text-sm">Holiday Today — No Brunch Scheduled</h4>
+            <h4 className="font-extrabold text-sm">Holiday — no brunch</h4>
             <p className="text-xs text-purple-800 mt-0.5">
               {holidayItem.holidayReason || 'School Holiday'} is recorded for {formatDatePretty(selectedDate)}.
             </p>
@@ -452,7 +449,7 @@ export default function AdminMenuPage() {
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              {cat === 'ALL' ? 'All Dishes' : cat.charAt(0) + cat.slice(1).toLowerCase()}
+              {cat === 'ALL' ? 'All Dishes' : cat === 'LUNCH' ? 'Brunch' : cat.charAt(0) + cat.slice(1).toLowerCase()}
             </button>
           ))}
         </div>
@@ -500,7 +497,7 @@ export default function AdminMenuPage() {
                         {formatINR(meal.price || 0)}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        • {meal.category}
+                        • {String(meal.category || '').toUpperCase() === 'LUNCH' ? 'BRUNCH' : meal.category}
                       </span>
                     </div>
                   </div>
@@ -540,7 +537,7 @@ export default function AdminMenuPage() {
           ) : (
             <>
               <Save className="w-4 h-4" />
-              <span>Save & Publish Tomorrow&apos;s Menu ({selectedMealIds.length})</span>
+              <span>Save Menu ({selectedMealIds.length})</span>
             </>
           )}
         </button>
@@ -586,7 +583,7 @@ export default function AdminMenuPage() {
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
                   >
                     <option value="BREAKFAST">Breakfast</option>
-                    <option value="LUNCH">Lunch</option>
+                    <option value="LUNCH">Brunch</option>
                     <option value="SNACK">Snack</option>
                   </select>
                 </div>
@@ -636,7 +633,7 @@ export default function AdminMenuPage() {
                   rows={2}
                   value={newMealDesc}
                   onChange={(e) => setNewMealDesc(e.target.value)}
-                  placeholder="e.g. Served hot with fresh coconut chutney and sambar"
+                  placeholder="e.g. With chutney and sambar"
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900"
                 />
               </div>

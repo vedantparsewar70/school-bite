@@ -13,7 +13,7 @@ export default function ParentMobileBottomNav() {
   const links = [
     {
       href: '/parent/menu',
-      label: 'Order Lunch',
+      label: 'Order Brunch',
       icon: UtensilsCrossed,
       active: pathname.startsWith('/parent/menu'),
     },

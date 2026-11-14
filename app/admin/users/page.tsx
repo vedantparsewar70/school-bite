@@ -120,17 +120,12 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
-              Student Directory & Health Registry
-            </span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
             <Users className="w-7 h-7 text-purple-600" />
-            <span>Students & Dietary Management</span>
+            <span>Students & Parents</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Monitor registered student allergies, conflict warnings, parent meal accounts, and classroom rosters.
+            Student details, allergies and parent contacts.
           </p>
         </div>
 
@@ -437,10 +432,6 @@ export default function AdminUsersPage() {
                         </span>
                       )}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Active</span>
                   </div>
                 </div>
 

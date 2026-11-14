@@ -52,7 +52,7 @@ const ISSUE_STATE: Record<string, { label: string; text: string; tone: string }>
   },
   REFUND_FAILED: {
     label: 'Refund issue',
-    text: 'The refund could not be completed automatically. Please contact the school canteen.',
+    text: 'The refund could not be completed automatically. Please contact the canteen at 9028977988.',
     tone: 'bg-rose-50 border-rose-200 text-rose-900',
   },
 };
@@ -110,7 +110,7 @@ function OrdersPageContent() {
             <span>Order History</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            All your placed school lunch orders and payments.
+            All your school brunch orders and payments.
           </p>
         </div>
 
@@ -119,7 +119,7 @@ function OrdersPageContent() {
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto cursor-pointer"
         >
           <UtensilsCrossed className="w-4 h-4" />
-          <span>Order Lunch</span>
+          <span>Order Brunch</span>
         </Link>
       </div>
 
@@ -154,14 +154,14 @@ function OrdersPageContent() {
           <FileText className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-800">No Orders Placed Yet</h3>
           <p className="text-xs text-slate-500">
-            You have not placed any meal orders yet. Choose from our fresh lunch menu!
+            Choose meals from the menu to place your first order.
           </p>
           <Link
             href="/parent/menu"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all"
           >
             <UtensilsCrossed className="w-4 h-4" />
-            <span>Order Lunch Now</span>
+            <span>Order Brunch Now</span>
           </Link>
         </div>
       ) : (
@@ -249,7 +249,7 @@ function OrdersPageContent() {
                 {/* Footer Info */}
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="text-slate-400 text-[11px]">
-                    Payment Ref: {order.payments?.[0]?.transactionRef || 'PAID'} • {order.payments?.[0]?.paymentMethod || 'UPI'}
+                    Payment Ref: {order.payments?.[0]?.transactionRef || '—'} • {order.payments?.[0]?.paymentMethod || '—'}
                   </div>
                 </div>
                 {order.paymentStatus === 'PAID' && !['CANCELLED', 'COLLECTED'].includes(order.orderStatus) && (

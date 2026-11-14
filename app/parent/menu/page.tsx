@@ -281,20 +281,15 @@ function MenuPageContent() {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white uppercase tracking-wider">
-              Monthly Timetable
-            </span>
-            <span className="text-xs font-semibold text-slate-500">
-              School Brunch Schedule
-            </span>
-          </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2 mt-1">
             <CalendarDays className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500 shrink-0" />
             <span>School Brunch Menu</span>
           </h1>
           <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-            Viewing menu for <strong className="text-slate-800 font-bold">{formatDatePretty(selectedDate)}</strong> • Nutritious meals for S.B. Patil School students.
+            Viewing menu for <strong className="text-slate-800 font-bold">{formatDatePretty(selectedDate)}</strong>
+          </p>
+          <p className="text-[11px] sm:text-xs font-semibold text-amber-700 mt-0.5">
+            Order before 08:30 AM on the meal day.
           </p>
         </div>
 
@@ -305,7 +300,7 @@ function MenuPageContent() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>October Timetable</span>
+            <span>Upcoming Menu</span>
           </button>
 
           <Link
@@ -322,11 +317,8 @@ function MenuPageContent() {
       <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-200 p-3 sm:p-4 rounded-2xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="space-y-0.5">
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-              ORDER RECIPIENT
-            </span>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-              Select child to view category-specific menu
+              Select child
             </h3>
           </div>
 
@@ -379,20 +371,6 @@ function MenuPageContent() {
           )}
         </div>
 
-        {selectedChild && (
-          <div className="pt-2 border-t border-amber-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600">
-            <div>
-              <span className="font-semibold text-slate-700">Active Student: </span>
-              <strong className="text-slate-900">{selectedChild.name}</strong> • Class {selectedChild.grade}-{selectedChild.division}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500">Student Category:</span>
-              <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] uppercase border ${categoryBadgeStyles[activeStudentCategory]}`}>
-                {activeStudentCategory}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Date Navigator Bar: upcoming dates from the published schedule */}
@@ -512,7 +490,7 @@ function MenuPageContent() {
 
                     <div className="space-y-1.5">
                       <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
-                        Holiday Today — No Brunch Scheduled
+                        Holiday — no brunch
                       </span>
                       <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900">
                         {holidayReason}
@@ -530,7 +508,7 @@ function MenuPageContent() {
                         className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
                       >
                         <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Switch to Next School Day</span>
+                        <span>Go to Tomorrow</span>
                       </button>
                     </div>
                   </div>
@@ -595,7 +573,7 @@ function MenuPageContent() {
                     <div className="bg-slate-50 rounded-2xl p-3 sm:p-4 text-xs space-y-1.5 border border-slate-100">
                       <div className="flex items-center gap-1.5 font-bold text-slate-700">
                         <Info className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span>Ingredients & Nutrition:</span>
+                        <span>Ingredients:</span>
                       </div>
                       <p className="text-slate-600 leading-relaxed text-[11px]">
                         {menuItem.meal.ingredients}
@@ -633,7 +611,7 @@ function MenuPageContent() {
                       ) : (
                         <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          Freshly prepared • {menuItem.availableQuantity} portions available
+                          {menuItem.availableQuantity} portions available
                         </span>
                       )}
                     </div>
@@ -721,14 +699,11 @@ function MenuPageContent() {
             {/* Modal Header */}
             <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
-                  Official Timetable
-                </span>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-1">
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
                   Upcoming Brunch Schedule
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any upcoming date to quickly select and order that day&apos;s meal.
+                  Select a date to order.
                 </p>
               </div>
 
@@ -800,7 +775,7 @@ function MenuPageContent() {
                         {isHol ? (
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-rose-100 text-rose-800">
-                              Holiday Today — No Brunch Scheduled
+                              Holiday — no brunch
                             </span>
                             <span className="text-xs font-bold text-slate-700">
                               {catMenu.holidayReason || catMenu.dish}

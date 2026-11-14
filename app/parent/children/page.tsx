@@ -169,10 +169,10 @@ export default function ChildrenPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
             <Users className="w-7 h-7 text-amber-500" />
-            <span>Select Child</span>
+            <span>My Children</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Select a child below to view and order Tomorrow&apos;s Meal, or add a new child.
+            Add a child or choose one to order meals.
           </p>
         </div>
 
@@ -204,7 +204,7 @@ export default function ChildrenPage() {
           <ChildAvatar size="xl" className="mx-auto" />
           <h3 className="text-lg font-bold text-slate-800">No Children Added Yet</h3>
           <p className="text-xs text-slate-500">
-            Please add your child&apos;s details to start ordering nutritious school meals.
+            Add your child&apos;s details to start ordering meals.
           </p>
           <button
             onClick={openAddModal}
@@ -294,7 +294,7 @@ export default function ChildrenPage() {
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
                   >
                     <UtensilsCrossed className="w-3.5 h-3.5" />
-                    <span>Select & Order Tomorrow&apos;s Meal →</span>
+                    <span>Order Meals</span>
                   </Link>
                 </div>
               </div>
@@ -314,7 +314,6 @@ export default function ChildrenPage() {
                   <h3 className="text-lg font-extrabold text-slate-900">
                     {editingChild ? `Edit Child: ${editingChild.name}` : 'Register a Child'}
                   </h3>
-                  <p className="text-xs text-slate-500">Provide student details to personalize meal plans</p>
                 </div>
               </div>
               <button
@@ -400,7 +399,7 @@ export default function ChildrenPage() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 space-y-5 text-center">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Student Profile Card
+                Child Details
               </span>
               <button
                 onClick={() => setViewingChild(null)}
