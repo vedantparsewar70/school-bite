@@ -98,7 +98,7 @@ export async function GET(req: Request) {
         if (it.orderId) orderIds.add(it.orderId);
         mealCountsMap.set(it.mealId, {
           mealId: it.mealId,
-          mealName: it.meal.name,
+          mealName: it.mealName || it.meal?.name || 'Meal',
           category: it.meal.category,
           count: it.quantity,
           quantityToPrepare: it.quantity,
@@ -162,7 +162,7 @@ export async function GET(req: Request) {
         allergies: studentAllergies.join(', ') || it.student.allergies || null,
         hasAllergyAlert: it.hasAllergyAlert,
         conflictAllergens: it.conflictAllergens || it.student.allergies || null,
-        mealName: it.meal.name,
+        mealName: it.mealName || it.meal?.name || 'Meal',
         category: it.meal.category,
         isVegetarian: it.meal.isVegetarian,
         quantity: it.quantity,

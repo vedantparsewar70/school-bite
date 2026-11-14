@@ -86,19 +86,28 @@ const reportSummary = async () => (await (await get(reports, '/api/admin/reports
 
 // ---------------------------------------------------------------- 5. Menu / dish / child changes
 
-test('BUG: renaming a dish rewrites the meal name on orders that were already paid (no name snapshot on orderItems)', async () => {
+test('FIXED: renaming a dish never changes the meal name on orders that were already paid', async () => {
   seedMenu(D);
-  seedOrder('ORD-A', [{ date: D }]);
+  const placed = await checkout([cartLine()]);
+  assert.equal(placed.status, 200);
+  const line = fs.list('orderItems')[0];
+  assert.equal(line.mealName, 'Dal Khichdi', 'the name is saved on the order line when it is paid');
 
   const res = await editMeal(jsonRequest('/api/admin/meals', 'PUT', { id: 'meal_dal', name: 'Paneer Biryani' }, staff));
   assert.equal(res.status, 200);
 
-  // The parent paid for "Dal Khichdi", but every screen now shows the new name.
-  assert.equal((await parentHistory())[0].items[0].mealName, 'Paneer Biryani');
-  assert.equal((await staffListOn(D))[0].items[0].mealName, 'Paneer Biryani');
-  assert.equal((await kitchenOn(D)).mealCounts[0].mealName, 'Paneer Biryani');
-  assert.equal((await reportSummary()).exportRows[0].mealName, 'Paneer Biryani');
-  assert.equal(fs.getDoc('orderItems', 'oit_ORD-A_0')?.mealName, undefined, 'order items carry no meal name of their own');
+  assert.equal((await parentHistory())[0].items[0].mealName, 'Dal Khichdi');
+  assert.equal((await staffListOn(D))[0].items[0].mealName, 'Dal Khichdi');
+  assert.equal((await kitchenOn(D)).mealCounts[0].mealName, 'Dal Khichdi');
+  assert.equal((await reportSummary()).exportRows[0].mealName, 'Dal Khichdi');
+});
+
+test('FIXED: older orders saved without a meal name still show the current dish name', async () => {
+  seedMenu(D);
+  seedOrder('ORD-A', [{ date: D }]);
+  assert.equal(fs.getDoc('orderItems', 'oit_ORD-A_0')?.mealName, undefined);
+  assert.equal((await parentHistory())[0].items[0].mealName, 'Dal Khichdi');
+  assert.equal((await kitchenOn(D)).mealCounts[0].mealName, 'Dal Khichdi');
 });
 
 test('OK: a price change does not change what already-paid orders cost or report', async () => {

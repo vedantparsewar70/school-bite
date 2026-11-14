@@ -208,6 +208,8 @@ function writeParentOrder(
       studentId: item.studentId,
       studentCategory: item.studentCategory || null,
       mealId: item.mealId,
+      // The dish name as bought, so renaming the dish later never changes a paid order.
+      mealName: typeof item.mealName === 'string' && item.mealName ? item.mealName : null,
       menuId: menuStock.lineMenuIds[index],
       date: item.date,
       quantity: item.quantity,

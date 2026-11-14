@@ -114,7 +114,7 @@ export async function GET(req: Request) {
         existing.count += it.quantity;
       } else {
         tomorrowMealCountsMap.set(it.mealId, {
-          mealName: it.meal?.name || 'Meal',
+          mealName: it.mealName || it.meal?.name || 'Meal',
           count: it.quantity,
           category: it.meal?.category || 'General',
           isVegetarian: Boolean(it.meal?.isVegetarian),
@@ -139,7 +139,7 @@ export async function GET(req: Request) {
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),
       items: (o.items || []).map((it: any) => ({
-        mealName: it.meal?.name || 'Meal',
+        mealName: it.mealName || it.meal?.name || 'Meal',
         studentName: it.student?.name || 'Student',
         grade: it.student?.grade || '',
         division: it.student?.division || '',

@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       if (!mealMap.has(it.mealId)) {
         mealMap.set(it.mealId, {
           mealId: it.mealId,
-          mealName: it.meal.name,
+          mealName: it.mealName || it.meal?.name || 'Meal',
           count: 0,
           revenue: 0,
           category: it.meal.category,
@@ -111,7 +111,7 @@ export async function GET(req: Request) {
       studentId: it.student.studentId,
       classDivision: `${it.student.grade}-${it.student.division}`,
       rollNo: it.student.rollNo,
-      mealName: it.meal.name,
+      mealName: it.mealName || it.meal?.name || 'Meal',
       quantity: it.quantity,
       unitPrice: it.unitPrice,
       totalPrice: it.totalPrice,

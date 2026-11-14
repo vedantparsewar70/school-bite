@@ -282,7 +282,7 @@ export async function GET(req: Request) {
         studentDivision: item.student?.division || '',
         studentRollNo: item.student?.rollNo || '',
         mealId: item.mealId,
-        mealName: item.meal?.name || 'Meal',
+        mealName: item.mealName || item.meal?.name || 'Meal',
         mealCategory: item.meal?.category || 'General',
         mealImage: item.meal?.imageUrl || null,
         isVegetarian: Boolean(item.meal?.isVegetarian),

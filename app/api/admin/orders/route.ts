@@ -134,7 +134,7 @@ export async function GET(req: Request) {
           (it: any) =>
             it.student?.name?.toLowerCase().includes(search) ||
             it.student?.studentId?.toLowerCase().includes(search) ||
-            it.meal?.name?.toLowerCase().includes(search)
+            (it.mealName || it.meal?.name)?.toLowerCase().includes(search)
         );
         return matchOrderId || matchParent || matchStudent;
       });
@@ -171,7 +171,7 @@ export async function GET(req: Request) {
           hasAllergyAlert: Boolean(item.hasAllergyAlert),
           conflictAllergens: item.conflictAllergens || item.student?.allergies || null,
           mealId: item.mealId,
-          mealName: item.meal?.name || 'Meal',
+          mealName: item.mealName || item.meal?.name || 'Meal',
           mealCategory: item.meal?.category || 'General',
           isVegetarian: Boolean(item.meal?.isVegetarian),
           date: item.date,

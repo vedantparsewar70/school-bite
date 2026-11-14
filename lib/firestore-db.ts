@@ -115,6 +115,8 @@ export interface DbOrderItem {
   orderId: string;
   studentId: string;
   mealId: string;
+  /** Dish name saved when the order was paid (missing on older orders). */
+  mealName?: string | null;
   date: string;
   quantity: number;
   unitPrice: number;
