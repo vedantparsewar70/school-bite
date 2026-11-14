@@ -284,3 +284,10 @@ test('the sync endpoint reports shared versions and never invents new ones on fa
   assert.equal(body.menuVersion, 111);
   assert.equal(body.ordersVersion, 222);
 });
+
+test('many parents behind one shared IP (school Wi-Fi) can all sign in within a minute', async () => {
+  const sharedIp = `${net}.200`;
+  for (let i = 0; i < 60; i++) {
+    assert.equal((await attempt('parent@example.com', 'right-password-1', sharedIp)).status, 200, `login ${i + 1}`);
+  }
+});

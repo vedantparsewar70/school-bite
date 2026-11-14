@@ -38,7 +38,9 @@ export async function POST(req: Request) {
 
   try {
     const clientIp = getClientIp(req);
-    const rateLimit = checkRateLimit(`auth_login_${clientIp}`, { windowMs: 60000, maxRequests: 25 });
+    // Many parents share one IP (school Wi-Fi, mobile carrier NAT). Wrong passwords are limited
+    // separately per email + IP (lib/login-throttle.ts), so this only stops floods.
+    const rateLimit = checkRateLimit(`auth_login_${clientIp}`, { windowMs: 60000, maxRequests: 200 });
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many login attempts. Please wait a minute and try again.' },
