@@ -223,28 +223,28 @@ test('OK: staff order list shows only paid, active orders; refunds only when ask
   assert.deepEqual(cancelled.map((o: any) => o.id).sort(), ['ORD-REFFAIL', 'ORD-REFPEND', 'ORD-REFUNDED']);
 });
 
-test('BUG: admin reports count any non-cancelled order as revenue (an unpaid order is included); teacher sales are left out', async () => {
+test('FIXED: admin reports count only paid orders as revenue (teacher sales are still reported separately elsewhere)', async () => {
   seedMix(D, D2);
   const r = await reportSummary();
-  // Correct paid student revenue is 240 + 160 = 400 over 5 meals in 2 orders.
-  assert.equal(r.summary.totalRevenue, 480, 'includes the 80 of the unpaid ORD-UNPAID');
-  assert.equal(r.summary.totalMealsSold, 6);
-  assert.equal(r.summary.totalOrders, 3);
-  assert.ok(r.exportRows.some((row: any) => row.orderId === 'ORD-UNPAID'), 'unpaid order is in the CSV export');
+  // Paid student revenue is 240 + 160 = 400 over 5 meals in 2 orders.
+  assert.equal(r.summary.totalRevenue, 400);
+  assert.equal(r.summary.totalMealsSold, 5);
+  assert.equal(r.summary.totalOrders, 2);
+  assert.ok(!r.exportRows.some((row: any) => row.orderId === 'ORD-UNPAID'), 'unpaid order is not in the CSV export');
   assert.ok(!r.exportRows.some((row: any) => String(row.orderId).startsWith('ORD-REF')), 'cancelled/refunded are excluded');
   assert.ok(!r.exportRows.some((row: any) => String(row.orderId).startsWith('TO-')), 'teacher orders (240 paid) are not in reports at all');
 });
 
-test('BUG: admin dashboard stats count unpaid orders in orders/value/meal totals; teacher orders are left out', async () => {
+test('FIXED: admin dashboard stats count only paid orders in orders/value/meal totals', async () => {
   // The dashboard's "tomorrow" is the next meal date (never a Sunday).
   const tomorrow = nextNonSundayDateString(APP_TIMEZONE);
   seedMix(tomorrow, getOffsetDateString(tomorrow === getOffsetDateString(1, APP_TIMEZONE) ? 2 : 3, APP_TIMEZONE));
   const s = await (await get(stats, '/api/admin/stats', admin)).json();
   // Correct: 2 paid orders worth 400, 4 student meals tomorrow.
-  assert.equal(s.stats.totalOrders, 3);
-  assert.equal(s.stats.totalOrderValue, 480);
-  assert.equal(s.stats.tomorrowTotalMeals, 5);
-  assert.equal(s.tomorrowProduction[0].count, 5, 'production list for tomorrow over-counts by the unpaid meal');
+  assert.equal(s.stats.totalOrders, 2);
+  assert.equal(s.stats.totalOrderValue, 400);
+  assert.equal(s.stats.tomorrowTotalMeals, 4);
+  assert.equal(s.tomorrowProduction[0].count, 4, 'production list matches the kitchen');
   assert.ok(getTodayString(APP_TIMEZONE) < tomorrow);
 });
 

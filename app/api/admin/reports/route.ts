@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const range = searchParams.get('range') || 'all'; // 7days, 30days, all
 
     // Fetch all active order items with meals and students
-    const items = await prisma.orderItem.findMany({
+    const loadedItems = await prisma.orderItem.findMany({
       where: {
         order: { orderStatus: { not: 'CANCELLED' } },
       },
@@ -30,6 +30,8 @@ export async function GET(req: Request) {
       },
       orderBy: { date: 'asc' },
     });
+    // Only paid orders count as sales (like the kitchen): unpaid or test orders are never revenue.
+    const items = loadedItems.filter((it: any) => it.order?.paymentStatus === 'PAID');
 
     // 1. Revenue and sales by date
     const dateMap = new Map<string, { date: string; revenue: number; mealsCount: number; ordersSet: Set<string> }>();

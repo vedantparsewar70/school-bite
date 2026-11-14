@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     const tomorrowStr = await nextMealDate();
 
     // Run all dashboard queries in parallel with Promise.all for sub-second responses
-    const [tomorrowMenus, tomorrowItems, todayItems, allActiveOrders, recentOrders] = await Promise.all([
+    const [tomorrowMenus, loadedTomorrowItems, loadedTodayItems, allActiveOrders, recentOrders] = await Promise.all([
       // 1. Tomorrow's menu
       prisma.menu.findMany({
         where: {
@@ -73,10 +73,11 @@ export async function GET(req: Request) {
         include: { meal: true },
       }),
 
-      // 4. All active orders for totals
+      // 4. All paid, active orders for totals
       prisma.order.findMany({
         where: {
           orderStatus: { not: 'CANCELLED' },
+          paymentStatus: 'PAID',
         },
       }),
 
@@ -97,6 +98,11 @@ export async function GET(req: Request) {
         },
       }),
     ]);
+
+    // Only paid orders count (like the kitchen): unpaid or test orders are never meals to cook or revenue.
+    const isPaid = (it: any) => it.order?.paymentStatus === 'PAID';
+    const tomorrowItems = loadedTomorrowItems.filter(isPaid);
+    const todayItems = loadedTodayItems.filter(isPaid);
 
     const isTomorrowMenuPublished = tomorrowMenus.length > 0;
     const tomorrowPublishedCount = tomorrowMenus.length;
