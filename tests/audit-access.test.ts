@@ -307,13 +307,19 @@ test('BUG: children list and checkout disagree on category for a grade like "Cla
   assert.equal(res.status, 400);
 });
 
-test('BUG: admin Users shows "Meal conflict detected" for every child who has any order (filter ignored)', async () => {
+test('FIXED: admin Users shows "Meal conflict detected" only for a child with an allergy-flagged meal', async () => {
   seedPaidOrder('ORD-PLAIN', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON, hasAllergyAlert: false }]);
   const { students } = await (await adminUsers(jsonRequest('/api/admin/users', 'GET', undefined, admin))).json();
   const riya = students.find((s: any) => s.id === 'stu_mine');
-  assert.equal(riya.allergyAlertState, 'CONFLICT_DETECTED', 'Riya has no allergy and no flagged item');
-  assert.equal(riya.conflictOrdersCount, 1);
-  // same adapter bug in the parent children API
+  assert.equal(riya.allergyAlertState, 'NO_ALLERGY', 'Riya has no allergy and no flagged item');
+  assert.equal(riya.conflictOrdersCount, 0);
   const mine = await (await parentChildren.GET(jsonRequest('/api/parent/children', 'GET', undefined, parent))).json();
-  assert.equal(mine.students.find((s: any) => s.id === 'stu_mine').allergyAlertStatus, 'CONFLICT_DETECTED');
+  assert.equal(mine.students.find((s: any) => s.id === 'stu_mine').allergyAlertStatus, 'NO_ALLERGY');
+
+  // A meal that was flagged at checkout is still reported.
+  seedPaidOrder('ORD-FLAGGED', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON, hasAllergyAlert: true }]);
+  const again = await (await adminUsers(jsonRequest('/api/admin/users', 'GET', undefined, admin))).json();
+  const flagged = again.students.find((s: any) => s.id === 'stu_mine');
+  assert.equal(flagged.allergyAlertState, 'CONFLICT_DETECTED');
+  assert.equal(flagged.conflictOrdersCount, 1);
 });

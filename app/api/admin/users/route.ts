@@ -61,7 +61,10 @@ export async function GET(req: Request) {
         });
       }
 
-      const hasConflict = s.orderItems && s.orderItems.length > 0;
+      // The database adapter does not apply the include's `where`, so filter here: only lines that
+      // were flagged with an allergy alert are conflicts.
+      const conflictItems = (s.orderItems || []).filter((it: any) => it.hasAllergyAlert === true);
+      const hasConflict = conflictItems.length > 0;
       const hasAllergies = allergiesList.length > 0 && !allergiesList.includes('None');
 
       let allergyAlertState: 'NO_ALLERGY' | 'ALLERGY_RECORDED' | 'CONFLICT_DETECTED' = 'NO_ALLERGY';
@@ -86,7 +89,7 @@ export async function GET(req: Request) {
         notes: s.notes || null,
         isActive: s.isActive,
         allergyAlertState,
-        conflictOrdersCount: s.orderItems.length,
+        conflictOrdersCount: conflictItems.length,
         parentName: s.parent?.user?.name || 'N/A',
         parentEmail: s.parent?.user?.email || 'N/A',
         parentPhone: s.parent?.user?.phone || 'N/A',

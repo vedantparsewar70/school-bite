@@ -41,7 +41,8 @@ export async function GET(req: Request) {
       }
 
       let allergyAlertStatus: 'NO_ALLERGY' | 'ALLERGY_RECORDED' | 'CONFLICT_DETECTED' = 'NO_ALLERGY';
-      if (s.orderItems && s.orderItems.length > 0) {
+      // Only lines flagged with an allergy alert are conflicts (the adapter ignores the include's `where`).
+      if ((s.orderItems || []).some((it: any) => it.hasAllergyAlert === true)) {
         allergyAlertStatus = 'CONFLICT_DETECTED';
       } else if (allergiesList.length > 0 && !allergiesList.includes('None')) {
         allergyAlertStatus = 'ALLERGY_RECORDED';
