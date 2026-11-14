@@ -253,19 +253,29 @@ test('OK 4d: double-click Pay (same key, concurrent requests) creates one Cashfr
   assert.equal(ja.orderId, jb.orderId);
 });
 
-test('BUG 4d: two tabs (different sessionStorage keys) pressing Pay at the same moment open two Cashfree orders for the same cart; both can be paid', async () => {
+test('FIXED 4d: two tabs with different checkout keys pressing Pay at the same moment share ONE Cashfree order', async () => {
   at('2026-11-01T10:00');
-  createDelayMs = 50; // the gateway call takes time, so neither request has saved its pending checkout yet
+  createDelayMs = 50; // the gateway call takes time; the per-parent lock makes the second tab wait
   const [a, b] = await Promise.all([startCheckout('CHK-TAB-1'), startCheckout('CHK-TAB-2')]);
   const [ja, jb] = [await a.json(), await b.json()];
-  assert.equal(createdOrders.length, 2, 'two Cashfree orders');
-  assert.notEqual(ja.orderId, jb.orderId);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal(createdOrders.length, 1, 'one Cashfree order');
+  assert.equal(ja.orderId, jb.orderId, 'the second tab reopens the first payment');
   pay(ja.orderId, '2026-11-01T10:01:00+05:30');
-  pay(jb.orderId, '2026-11-01T10:01:30+05:30');
   await paymentWebhook(ja.orderId);
-  await paymentWebhook(jb.orderId);
-  assert.equal(fs.list('orders').length, 2, 'charged twice, two orders for the same child/meal/date');
-  assert.equal(stock(), 48);
+  assert.equal(fs.list('orders').length, 1);
+  assert.equal(stock(), 49);
+  assert.equal(fs.getDoc('idempotency_locks', 'gateway_par_1'), undefined, 'lock released');
+});
+
+test('FIXED 4d: two different parents are never blocked by each other', async () => {
+  at('2026-11-01T10:00');
+  createDelayMs = 50;
+  const [a, b] = await Promise.all([startCheckout('CHK-A'), startCheckout('CHK-B', [line({ studentId: 'stu_2' })], parent2Auth)]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal(createdOrders.length, 2);
 });
 
 // ---------------------------------------------------------------- 4e

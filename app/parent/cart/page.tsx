@@ -32,10 +32,14 @@ function checkoutSignature(items: Array<{ studentId: string; mealId: string; dat
   return `${lines.join(';')}#${notes.trim()}`;
 }
 
-/** Same cart -> same key (so retries never create a second payment); `fresh` starts a new checkout. */
+/**
+ * Same cart -> same key (so retries never create a second payment); `fresh` starts a new checkout.
+ * Kept in localStorage so every tab of this browser shares it. The server ties the key to the
+ * signed-in parent, so another account on the same phone can never reuse it.
+ */
 function checkoutKeyFor(signature: string, fresh = false): string {
   try {
-    const stored = JSON.parse(sessionStorage.getItem(CHECKOUT_KEY_STORAGE) || 'null');
+    const stored = JSON.parse(localStorage.getItem(CHECKOUT_KEY_STORAGE) || 'null');
     if (!fresh && stored?.signature === signature && typeof stored.key === 'string') return stored.key;
   } catch {
     // storage unavailable: fall through to a new key
@@ -43,7 +47,7 @@ function checkoutKeyFor(signature: string, fresh = false): string {
   const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Math.random()}`.slice(2);
   const key = `CHK-${Date.now()}-${random}`;
   try {
-    sessionStorage.setItem(CHECKOUT_KEY_STORAGE, JSON.stringify({ signature, key }));
+    localStorage.setItem(CHECKOUT_KEY_STORAGE, JSON.stringify({ signature, key }));
   } catch {
     // ignore
   }
@@ -52,7 +56,7 @@ function checkoutKeyFor(signature: string, fresh = false): string {
 
 function forgetCheckoutKey() {
   try {
-    sessionStorage.removeItem(CHECKOUT_KEY_STORAGE);
+    localStorage.removeItem(CHECKOUT_KEY_STORAGE);
   } catch {
     // ignore
   }

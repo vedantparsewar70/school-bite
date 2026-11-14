@@ -187,6 +187,44 @@ async function openCheckoutForSameCart(
   return null;
 }
 
+const GATEWAY_LOCK_TTL_MS = 30000;
+const GATEWAY_LOCK_WAIT_MS = 8000;
+
+/**
+ * One payment window is opened at a time per parent (e.g. two tabs pressing Pay together). The
+ * second request waits until the first has saved its pending checkout, so it can reuse that
+ * payment instead of opening a second Cashfree order. Returns a token to release, or null.
+ */
+async function acquireParentGatewayLock(parentId: string): Promise<string | null> {
+  const ref = db.collection('idempotency_locks').doc(`gateway_${parentId}`);
+  const token = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const deadline = Date.now() + GATEWAY_LOCK_WAIT_MS;
+  for (;;) {
+    const acquired = await db.runTransaction(async (t) => {
+      const snap = await t.get(ref);
+      const age = snap.exists ? Date.now() - Number(snap.data()?.createdAtMs || 0) : Infinity;
+      if (snap.exists && age <= GATEWAY_LOCK_TTL_MS) return false;
+      t.set(ref, { id: ref.id, parentId, lockToken: token, createdAtMs: Date.now(), createdAt: new Date().toISOString() });
+      return true;
+    });
+    if (acquired) return token;
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
+async function releaseParentGatewayLock(parentId: string, token: string): Promise<void> {
+  const ref = db.collection('idempotency_locks').doc(`gateway_${parentId}`);
+  try {
+    await db.runTransaction(async (t) => {
+      const snap = await t.get(ref);
+      if (snap.exists && snap.data()?.lockToken === token) t.delete(ref);
+    });
+  } catch (err: any) {
+    console.error('Failed to release parent payment lock:', err?.message);
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser(req);
@@ -282,6 +320,7 @@ export async function POST(req: Request) {
   let lockAcquired = false;
   let requestKey: string | undefined = undefined;
   let lockToken: string | undefined = undefined;
+  let gatewayLock: { parentId: string; token: string } | null = null;
   try {
     const user = await getCurrentUser(req);
     if (!user || user.role !== 'PARENT' || !user.parentId) {
@@ -639,6 +678,14 @@ export async function POST(req: Request) {
     };
 
     if (isCashfreeEnabled) {
+      const gatewayToken = await acquireParentGatewayLock(parentRecord.id);
+      if (!gatewayToken) {
+        return NextResponse.json(
+          { error: 'Another payment is being opened for your account. Please wait a moment and try again.', code: 'CHECKOUT_IN_PROGRESS' },
+          { status: 409 }
+        );
+      }
+      gatewayLock = { parentId: parentRecord.id, token: gatewayToken };
       const sameCart = await openCheckoutForSameCart(parentRecord.id, orderId, evaluatedCartItems);
       if (sameCart) return sameCart;
     }
@@ -761,6 +808,9 @@ export async function POST(req: Request) {
     const userMessage = error?.message || 'Failed to process order';
     return NextResponse.json({ error: userMessage }, { status: 400 });
   } finally {
+    if (gatewayLock) {
+      await releaseParentGatewayLock(gatewayLock.parentId, gatewayLock.token);
+    }
     if (lockAcquired && requestKey && lockToken) {
       try {
         const lockRef = db.collection('idempotency_locks').doc(requestKey);
