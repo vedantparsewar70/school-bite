@@ -26,6 +26,15 @@ import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor,
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 
+/** The cancellation result in admin wording (the server's message is written for parents). */
+function adminCancelMessage(paymentStatus: string | undefined, refundAmount: number): string {
+  const amount = formatINR(refundAmount);
+  if (refundAmount <= 0) return 'Order cancelled. No refund was due.';
+  if (paymentStatus === 'REFUNDED') return `Order cancelled. ${amount} refund sent to the parent's original payment method.`;
+  if (paymentStatus === 'REFUND_FAILED') return `Order cancelled, but the ${amount} refund could not be sent. Use "Retry refund" or check Cashfree.`;
+  return `Order cancelled. ${amount} refund started; it will reach the parent's original payment method once Cashfree completes it.`;
+}
+
 function AdminOrdersContent() {
   const searchParams = useSearchParams();
   const initialDate = searchParams.get('date') || '';
@@ -100,7 +109,9 @@ function AdminOrdersContent() {
         // For a cancellation, show the real refund outcome (requested, pending or failed).
         const paymentStatus = data?.order?.paymentStatus;
         showToast(
-          data?.message || `Order status updated to ${newStatus}`,
+          newStatus === 'CANCELLED'
+            ? adminCancelMessage(paymentStatus, Number(data?.refundAmount || 0))
+            : data?.message || `Order status updated to ${newStatus}`,
           paymentStatus === 'REFUND_FAILED' ? 'error' : 'success'
         );
         // Update local state immediately

@@ -135,7 +135,7 @@ export default function DeliveryPolicyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-slate-600">
               <li>
-                If you notify and cancel prior to the <strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong> cutoff, the order is cancelled and a 100% refund is initiated per our Refund &amp; Cancellation Policy.
+                Orders cannot be cancelled online. To cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a> prior to the <strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong> cutoff. Approved refunds go back to the original payment method per our Refund &amp; Cancellation Policy.
               </li>
               <li>
                 If cancellation is not requested prior to cutoff, food preparation is executed and the portion cannot be repurposed or refunded due to health and safety regulations governing perishable food items.

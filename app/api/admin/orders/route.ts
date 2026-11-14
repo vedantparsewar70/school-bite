@@ -246,6 +246,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({
         success: true,
         order: { id: orderId, orderStatus: 'CANCELLED', paymentStatus: result.paymentStatus },
+        refundAmount: result.refundAmount,
         message: result.message,
       });
     }

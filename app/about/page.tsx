@@ -75,7 +75,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-base font-bold text-slate-900">Advance Fresh Pre-Orders</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Orders are placed in advance before the daily kitchen cutoff time ({BUSINESS_CONFIG.cancellationCutoffTime}). This ensures fresh ingredient sourcing and morning batch cooking.
+              Orders are placed in advance before the daily kitchen cutoff time ({BUSINESS_CONFIG.cancellationCutoffTime}). This ensures fresh ingredient sourcing and morning batch cooking. Orders cannot be cancelled online; to cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>.
             </p>
           </div>
 

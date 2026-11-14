@@ -115,6 +115,7 @@ test('an admin cancel refunds the full amount through Cashfree exactly once, how
   const body = await first.json();
   assert.equal(body.order.orderStatus, 'CANCELLED');
   assert.equal(body.order.paymentStatus, 'REFUND_PENDING');
+  assert.equal(body.refundAmount, 80, 'amount shown in the admin toast');
   assert.equal(refundsCreated.length, 1);
   assert.equal(refundsCreated[0].refund_amount, 80, 'full amount');
   assert.equal(refundsCreated[0].refund_id, refundIdForOrder('ORD-1'));
