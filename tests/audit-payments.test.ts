@@ -225,20 +225,23 @@ test('OK 4c: paid 08:29 but webhook and verify only arrive at 08:45: order confi
   assert.equal((await verifyOrder(orderId)).state, 'PAID');
 });
 
-test('BUG 4c: pressing Pay again after the cutoff, while Cashfree payments lookup fails, marks an ON-TIME payment as PAID_AFTER_CUTOFF', async () => {
+test('FIXED 4c: pressing Pay again after the cutoff while Cashfree payments lookup fails waits (503) and never marks an on-time payment late', async () => {
   at('2026-11-02T08:20');
   const { orderId } = await (await startCheckout('CHK-RETRY-LATE')).json();
   pay(orderId, '2026-11-02T08:25:00+05:30');
   at('2026-11-02T08:40');
   paymentsDown = true; // verify and webhook answer 503 in this situation; the checkout retry does not
-  const res = await (await startCheckout('CHK-RETRY-LATE')).json();
-  assert.equal(res.alreadyPaid, true);
-  assert.equal(fs.list('orders').length, 0, 'no order although paid at 08:25');
-  assert.equal(fs.getDoc('payment_exceptions', orderId)?.reason, 'PAID_AFTER_CUTOFF', 'paidAt fell back to "now"');
-  // And it is final: once Cashfree recovers, the webhook can no longer create the order.
-  paymentsDown = false;
-  await paymentWebhook(orderId);
+  const retry = await startCheckout('CHK-RETRY-LATE');
+  assert.equal(retry.status, 503);
+  assert.equal((await retry.json()).code, 'PAYMENT_CHECK_FAILED');
   assert.equal(fs.list('orders').length, 0);
+  assert.equal(fs.getDoc('payment_exceptions', orderId), undefined, 'not judged against "now"');
+  assert.equal(createdOrders.length, 1, 'no second payment opened');
+  // Once Cashfree recovers, the webhook confirms the 08:25 payment as an order.
+  paymentsDown = false;
+  assert.equal((await paymentWebhook(orderId)).status, 200);
+  assert.equal(fs.list('orders').length, 1);
+  assert.equal(fs.getDoc('payment_exceptions', orderId), undefined);
 });
 
 // ---------------------------------------------------------------- 4d

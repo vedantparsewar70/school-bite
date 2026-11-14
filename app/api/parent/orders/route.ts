@@ -66,6 +66,14 @@ async function revalidatePendingCheckout(orderId: string, pendingData: any): Pro
       );
     }
     if (verified.paid) {
+      // Paid, but Cashfree's payment details (and so the payment time) could not be read. Never
+      // judge the cutoff against "now": ask the parent to wait; verify or the webhook will confirm it.
+      if (!verified.payment) {
+        return NextResponse.json(
+          { error: 'We could not confirm your previous payment attempt. Please wait a moment and try again.', code: 'PAYMENT_CHECK_FAILED' },
+          { status: 503 }
+        );
+      }
       const result = await fulfillParentOrder(orderId, paymentDetailsFromCashfree(verified));
       if (!result.success && isAutoRefundReason(result.reason) && result.exceptionRecorded) {
         await refundPaymentException(orderId).catch((err) => console.error('[Checkout Retry] Refund request failed:', err?.message));
