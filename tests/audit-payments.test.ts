@@ -383,19 +383,43 @@ test('BUG 4g: changing the cart after a failed/abandoned attempt opens a second 
   assert.equal(nov2Items.length, 2, 'same child, same meal, same day booked and charged twice');
 });
 
-test('BUG 4g (teacher): retrying after closing the popup always creates a NEW Cashfree order; the old one stays payable, so both can be charged', async () => {
+const teacherOrder = (headers: Record<string, string> = {}, items = [{ mealId: 'TM-001', quantity: 1 }], teacherPhone = '9876543210') =>
+  teacherCheckout(jsonRequest('/api/teacher/orders', 'POST', { teacherName: 'Asha Rao', teacherPhone, items }, { 'x-forwarded-for': '10.8.0.1', ...headers }));
+const guestCookie = (res: Response) => (res.headers.get('set-cookie') || '').split(';')[0];
+
+test('FIXED 4g (teacher): retrying in the same browser reuses the open payment, so the teacher can never be charged twice', async () => {
   at('2026-11-01T10:00');
-  const order = () => teacherCheckout(jsonRequest('/api/teacher/orders', 'POST', {
-    teacherName: 'Asha Rao', teacherPhone: '9876543210', items: [{ mealId: 'TM-001', quantity: 1 }],
-  }, { 'x-forwarded-for': '10.8.0.1' }));
-  const a = await (await order()).json();
-  const b = await (await order()).json();
-  assert.equal(createdOrders.length, 2);
+  const first = await teacherOrder();
+  const a = await first.json();
+  const cookie = guestCookie(first);
+  const b = await (await teacherOrder({ cookie })).json();
+  assert.equal(createdOrders.length, 1, 'one Cashfree order');
+  assert.equal(b.orderId, a.orderId);
+  assert.equal(b.paymentSessionId, a.paymentSessionId);
+
+  // Paid but not yet confirmed: Pay again opens nothing new and points to the confirmation.
   pay(a.orderId, '2026-11-01T10:01:00+05:30');
-  pay(b.orderId, '2026-11-01T10:02:00+05:30');
+  const c = await (await teacherOrder({ cookie })).json();
+  assert.equal(c.alreadyPaid, true);
+  assert.equal(c.paymentSessionId, undefined);
+  assert.equal(createdOrders.length, 1);
   await paymentWebhook(a.orderId);
-  await paymentWebhook(b.orderId);
-  assert.equal(fs.list('teacher_orders').length, 2, 'teacher charged twice for one meal');
+  assert.equal(fs.list('teacher_orders').length, 1);
+});
+
+test('FIXED 4g (teacher): a different order, a different browser, or an expired payment still gets a new payment', async () => {
+  at('2026-11-01T10:00');
+  const first = await teacherOrder();
+  const a = await first.json();
+  const cookie = guestCookie(first);
+  // Another browser (no cookie for that order) never receives someone else's payment session.
+  assert.notEqual((await (await teacherOrder()).json()).orderId, a.orderId);
+  // Different items from the same browser: a new payment.
+  assert.notEqual((await (await teacherOrder({ cookie }, [{ mealId: 'TM-001', quantity: 2 }])).json()).orderId, a.orderId);
+  // The earlier payment window expired: a new payment.
+  cfOrders.get(a.orderId)!.status = 'EXPIRED';
+  assert.notEqual((await (await teacherOrder({ cookie })).json()).orderId, a.orderId);
+  assert.equal(createdOrders.length, 4);
 });
 
 // ---------------------------------------------------------------- 11

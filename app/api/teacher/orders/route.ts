@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   createCashfreeOrder,
+  getCashfreeOrder,
   getAppBaseUrl,
   getCashfreeMode,
   isCashfreeConfigured,
@@ -9,6 +10,7 @@ import {
 } from '@/lib/cashfree';
 import { savePendingTeacherOrder } from '@/lib/order-fulfillment';
 import {
+  canAccessTeacherOrderRequest,
   createGuestAccessToken,
   generateTeacherOrderId,
   normalizeTeacherName,
@@ -24,6 +26,57 @@ import { getCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const teacherCartSignature = (items: Array<{ mealId?: string; quantity?: number }>) =>
+  items.map((i) => `${i.mealId}|${i.quantity}`).sort().join(';');
+
+/**
+ * A retry from the same browser (it holds this order's guest cookie, or is the staff owner) for
+ * the same phone, items and day while the earlier payment window is still open: hand back that
+ * payment instead of opening a second Cashfree order, so the teacher can never pay twice.
+ */
+async function openTeacherCheckoutForSameCart(
+  req: Request,
+  user: { id: string; role: string } | null,
+  phone: string,
+  date: string,
+  items: Array<{ mealId?: string; quantity?: number }>,
+  totalAmount: number,
+  cashfreeMode: string | null
+): Promise<NextResponse | null> {
+  const signature = teacherCartSignature(items);
+  const pending = await db.collection('pending_teacher_orders').where('teacherPhone', '==', phone).get();
+  for (const doc of pending.docs) {
+    const data = doc.data();
+    if (
+      data.status !== 'PENDING_PAYMENT' ||
+      data.date !== date ||
+      !data.paymentSessionId ||
+      Math.abs(Number(data.totalAmount) - totalAmount) >= 0.01 ||
+      teacherCartSignature(data.items || []) !== signature ||
+      !(await canAccessTeacherOrderRequest(user, data, doc.id, req))
+    ) {
+      continue;
+    }
+    let cfOrder: any;
+    try {
+      cfOrder = await getCashfreeOrder(doc.id);
+    } catch {
+      return NextResponse.json(
+        { error: 'We could not confirm your previous payment attempt. Please wait a moment and try again.', code: 'PAYMENT_CHECK_FAILED' },
+        { status: 503 }
+      );
+    }
+    if (cfOrder?.order_status === 'ACTIVE') {
+      return NextResponse.json({ success: true, orderId: doc.id, paymentSessionId: data.paymentSessionId, cashfreeMode, totalAmount, isDuplicateSubmission: true });
+    }
+    if (cfOrder?.order_status === 'PAID') {
+      // Already paid: no new payment; the client opens the confirmation page, which confirms it.
+      return NextResponse.json({ success: true, orderId: doc.id, alreadyPaid: true, totalAmount });
+    }
+  }
+  return null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -103,6 +156,9 @@ export async function POST(req: Request) {
         }
         throw configErr;
       }
+
+      const sameCart = await openTeacherCheckoutForSameCart(req, user, phone, todayStr, orderItems, totalAmount, cashfreeMode);
+      if (sameCart) return sameCart;
 
       try {
         const cfResponse = await createCashfreeOrder({
