@@ -17,7 +17,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       } else if (user.role === 'ADMIN') {
         router.replace('/admin/dashboard');
       } else if (user.role === 'STAFF') {
-        router.replace('/staff/kitchen');
+        router.replace('/staff/orders');
       }
     }
   }, [user, isLoading, router]);

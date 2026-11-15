@@ -244,7 +244,7 @@ export async function POST(req: Request) {
       user.role === 'ADMIN'
         ? '/admin/dashboard'
         : user.role === 'STAFF'
-        ? '/staff/kitchen'
+        ? '/staff/orders'
         : '/parent/children';
 
     const response = NextResponse.json(

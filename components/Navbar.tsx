@@ -43,7 +43,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo */}
-          <Link href={isAdmin ? '/admin/dashboard' : isStaff ? '/staff/kitchen' : isParent ? '/parent/children' : '/'} className="flex items-center gap-2.5 group">
+          <Link href={isAdmin ? '/admin/dashboard' : isStaff ? '/staff/orders' : isParent ? '/parent/children' : '/'} className="flex items-center gap-2.5 group">
             <img
               src="/logo.png"
               alt="School Bite"
@@ -114,7 +114,18 @@ export default function Navbar() {
                   }`}
                 >
                   <FileText className="w-4 h-4" />
-                  Orders
+                  Serve
+                </Link>
+                <Link
+                  href="/staff/prepare"
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                    isActive('/staff/prepare')
+                      ? 'bg-amber-100 text-amber-900 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <ChefHat className="w-4 h-4" />
+                  Prepare
                 </Link>
                 <Link
                   href="/staff/history"
@@ -581,7 +592,19 @@ export default function Navbar() {
                 }`}
               >
                 <FileText className={`w-4 h-4 ${isActive('/staff/orders') ? 'text-amber-600' : 'text-slate-400'}`} />
-                Orders
+                Serve
+              </Link>
+              <Link
+                href="/staff/prepare"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${
+                  isActive('/staff/prepare')
+                    ? 'font-bold text-amber-800 bg-amber-100'
+                    : 'font-medium text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <ChefHat className={`w-4 h-4 ${isActive('/staff/prepare') ? 'text-amber-600' : 'text-slate-400'}`} />
+                Prepare
               </Link>
               <Link
                 href="/staff/history"

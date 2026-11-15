@@ -340,5 +340,9 @@ test('FIXED: parent pages no longer reload on every order; staff pages refresh q
   for (const page of ['app/staff/orders/page.tsx', 'app/staff/history/page.tsx']) {
     assert.match(src(page), /pollIntervalMs: 30000/, `${page} polls every 30 s`);
   }
-  assert.match(src('app/staff/orders/page.tsx'), /onOrdersUpdate: \(\) => \{\s*fetchOrders\(true\)/, 'background refresh is silent');
+  // Background refresh never shows the loading placeholder: it is shown only before the first load.
+  const serve = src('app/staff/orders/page.tsx');
+  assert.match(serve, /onOrdersUpdate: \(\) => load\(\)/, 'refresh on other phones\' changes');
+  assert.match(serve, /!loaded \?/, 'placeholder only until the first load');
+  assert.ok(!/setLoaded\(false\)/.test(serve), 'a refresh never hides the list');
 });

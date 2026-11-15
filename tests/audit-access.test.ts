@@ -178,7 +178,7 @@ test('OK: staff cannot mark Collected an unpaid, cancelled, wrong-date or alread
   assert.equal((await give('NOPE')).status, 404);
 });
 
-test('BUG: one "Mark Given" collects every child in a multi-child order; there is no per-child handover', async () => {
+test('the admin whole-order "Collected" button still gives every child on that date (staff use per-child Serve)', async () => {
   // Riya (3-A) and her brother Arjun (8-B) paid in one checkout for Monday.
   seedPaidOrder('ORD-SIBS', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }, { studentId: 'stu_sib', date: MON }]);
   // Only Riya comes to the counter; the staff screen sends exactly this.
@@ -186,8 +186,6 @@ test('BUG: one "Mark Given" collects every child in a multi-child order; there i
   assert.equal(res.status, 200);
   const order = fs.getDoc('orders', 'ORD-SIBS');
   assert.equal(order?.serviceDates?.[MON]?.status, 'COLLECTED', "Arjun's meal is now also marked given");
-  // the API has no studentId / orderItemId field: the state lives on the whole order per date
-  assert.equal(order?.serviceDates?.[MON]?.studentId, undefined);
 });
 
 test('BUG: a child added by a parent shows as "Class Primary--, Roll #-" on the staff screen (no class/div/roll)', async () => {
@@ -232,12 +230,17 @@ test('FIXED: a child the parent added (grade is just the category) still follows
   assert.equal(fs.getDoc('students', id)?.studentCategory, 'Secondary');
 });
 
-test('BUG (LOW): staff can mark a teacher order for another date as GIVEN (no date check)', async () => {
+test('FIXED: staff can serve a teacher order only on its own day, and who served it is recorded', async () => {
   fs.seed('teacher_orders', 'TCH-TUE', { id: 'TCH-TUE', date: TUE, paymentStatus: 'PAID', orderStatus: 'CONFIRMED', items: [] });
   const res = await staffTeacherOrders.PATCH(jsonRequest('/api/staff/teacher-orders', 'PATCH', { orderId: 'TCH-TUE', orderStatus: 'GIVEN' }, staff));
-  assert.equal(res.status, 200);
-  assert.equal(fs.getDoc('teacher_orders', 'TCH-TUE')?.orderStatus, 'GIVEN');
-  assert.equal(fs.getDoc('teacher_orders', 'TCH-TUE')?.collectedBy, undefined, 'who handed it over is not recorded');
+  assert.equal(res.status, 403);
+  assert.equal(fs.getDoc('teacher_orders', 'TCH-TUE')?.orderStatus, 'CONFIRMED');
+  // An administrator can correct another day; the handover records who did it.
+  assert.equal((await staffTeacherOrders.PATCH(jsonRequest('/api/staff/teacher-orders', 'PATCH', { orderId: 'TCH-TUE', orderStatus: 'GIVEN' }, admin))).status, 200);
+  assert.equal(fs.getDoc('teacher_orders', 'TCH-TUE')?.collectedBy, 'usr_admin');
+  const again = await staffTeacherOrders.PATCH(jsonRequest('/api/staff/teacher-orders', 'PATCH', { orderId: 'TCH-TUE', orderStatus: 'GIVEN' }, admin));
+  assert.equal(again.status, 409);
+  assert.match((await again.json()).error, /^Already served at \d\d:\d\d$/);
 });
 
 test('OK: kitchen bulk PATCH skips unpaid/cancelled/other-date orders', async () => {
@@ -342,18 +345,10 @@ test('FIXED: admin Users shows "Meal conflict detected" only for a child with an
   assert.equal(flagged.conflictOrdersCount, 1);
 });
 
-test('FIXED (stop-gap): staff confirm each child by name and class before "Mark Given" on a multi-child order', async () => {
-  const { handoverConfirmText } = await import('../lib/handover-confirm');
-  assert.equal(handoverConfirmText([{ name: 'Riya', grade: '3', division: 'A', rollNo: '7' }]), null, 'one child: no extra step');
-  const text = handoverConfirmText([
-    { name: 'Riya', grade: '3', division: 'A', rollNo: '7' },
-    { name: 'Arjun', grade: 'Primary', division: '-', rollNo: '-' },
-  ])!;
-  assert.match(text, /all 2 children/);
-  assert.match(text, /Riya \(Class 3-A, Roll 7\)/);
-  assert.match(text, /Arjun \(Class Primary\)/, 'placeholder division/roll are not shown');
+test('FIXED: the Serve screen ticks one child at a time (per order item), not the whole order', async () => {
   const { readFileSync } = await import('node:fs');
   const page = readFileSync(new URL('../app/staff/orders/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /handleMarkCollected\(o\.id, students\)/, 'the counter button passes every child');
-  assert.match(page, /window\.confirm\(question\)/);
+  assert.match(page, /\/api\/staff\/serve/, 'uses the per-child serve API');
+  assert.match(page, /orderItemIds: ids/, 'sends only that child\'s order items');
+  assert.ok(!page.includes("orderStatus: 'COLLECTED'"), 'never marks a whole order as collected');
 });

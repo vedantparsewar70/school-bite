@@ -86,9 +86,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      const role = user?.role;
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
-      router.push('/login');
+      // Staff sign in again on the staff login page, not the parent portal.
+      router.push(role === 'STAFF' ? '/login?role=staff' : '/login');
     } catch (err) {
       console.error('Logout error:', err);
     }

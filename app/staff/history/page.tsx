@@ -1,552 +1,265 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import {
-  History as HistoryIcon,
-  Search,
-  CheckCircle2,
-  RefreshCw,
-  Users,
-  GraduationCap,
-  Calendar,
-  RotateCcw,
-  Clock,
-  ArrowLeft,
-  ChefHat,
-  Filter,
-} from 'lucide-react';
-import VegBadge from '@/components/VegBadge';
-import { formatDatePretty, getTodayString, formatINR, formatDateTimePretty } from '@/lib/utils';
-import { useToast } from '@/components/ToastContext';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Undo2, X, Phone } from 'lucide-react';
+import { formatDatePretty, getTodayString } from '@/lib/utils';
+import { formatServeTime } from '@/lib/service-dates';
+import { filterServeRows } from '@/lib/serve-filter';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 
-/** The fields used to show one day of an order (the API returns more). */
-type DayOrder = { serviceStatus?: string | null; orderStatus?: string; items?: Array<{ date?: string }> };
+type ServeRow = {
+  key: string;
+  studentName: string;
+  grade: string;
+  division: string;
+  rollNo: string;
+  studentCategory: string;
+  meals: Array<{ orderItemId: string; mealName: string; quantity: number }>;
+  served: boolean;
+  servedAt: string | null;
+};
+type TeacherOrder = {
+  id: string;
+  teacherName: string | null;
+  teacherPhone: string | null;
+  orderStatus: string;
+  collectedAt: string | null;
+  items: Array<{ mealName: string; quantity: number }>;
+};
 
-export default function StaffOrderHistoryPage() {
-  const { showToast } = useToast();
-  const todayStr = getTodayString();
+const given = (t: TeacherOrder) => t.orderStatus === 'GIVEN' || t.orderStatus === 'COLLECTED';
+const meals = (list: Array<{ mealName: string; quantity: number }>) =>
+  list.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}`).join(', ');
 
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [historyTab, setHistoryTab] = useState<'ALL' | 'STUDENTS' | 'TEACHERS'>('ALL');
+/** Who was served on a date, one row per child (and teachers). Undo only for today. */
+export default function StaffHistoryPage() {
+  const today = getTodayString();
+  const [date, setDate] = useState(today);
+  const [tab, setTab] = useState<'STUDENTS' | 'TEACHERS'>('STUDENTS');
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [revertingId, setRevertingId] = useState<string | null>(null);
+  const [rows, setRows] = useState<ServeRow[]>([]);
+  const [teachers, setTeachers] = useState<TeacherOrder[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const seq = useRef(0);
 
-  const [studentOrders, setStudentOrders] = useState<any[]>([]);
-  const [teacherOrders, setTeacherOrders] = useState<any[]>([]);
-
-  const fetchHistory = async (silent = false) => {
-    if (!silent) setLoading(true);
+  const load = useCallback(async () => {
+    const mine = ++seq.current;
     try {
-      const [studentRes, teacherRes] = await Promise.all([
-        fetch(`/api/admin/orders?date=${selectedDate}`),
-        fetch(`/api/staff/teacher-orders?date=${selectedDate}`),
+      const [s, t] = await Promise.all([
+        fetchWithTimeout(`/api/staff/serve?date=${date}`),
+        fetchWithTimeout(`/api/staff/teacher-orders?date=${date}`),
       ]);
-
-      if (studentRes.ok) {
-        const studentData = await studentRes.json();
-        // Only include orders whose meal for this date was marked COLLECTED / GIVEN
-        // (a multi-day order appears only on the days actually handed over).
-        const givenStudents = (studentData.orders || [])
-          .map((o: DayOrder) => ({
-            ...o,
-            orderStatus: o.serviceStatus || o.orderStatus,
-            items: (o.items || []).filter((it) => !it.date || it.date === selectedDate),
-          }))
-          .filter((o: DayOrder) => o.orderStatus === 'COLLECTED');
-        setStudentOrders(givenStudents);
-      } else {
-        showToast('Could not load student history. Pull to refresh or try again.', 'error');
+      const sd = await s.json().catch(() => ({}));
+      const td = t.ok ? await t.json().catch(() => ({ orders: [] })) : { orders: [] };
+      if (mine !== seq.current) return;
+      if (!s.ok) {
+        setError(sd.error || `Could not load history (error ${s.status}).`);
+        return;
       }
-
-      if (teacherRes.ok) {
-        const teacherData = await teacherRes.json();
-        // Only include teacher orders that have been marked GIVEN / COLLECTED
-        const givenTeachers = (teacherData.orders || []).filter(
-          (o: any) => o.orderStatus === 'GIVEN' || o.orderStatus === 'COLLECTED'
-        );
-        setTeacherOrders(givenTeachers);
-      } else {
-        showToast('Could not load teacher history. Please try again.', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to load history:', err);
-      showToast('Error loading order history', 'error');
+      setRows(sd.rows || []);
+      setTeachers(td.orders || []);
+      setError('');
+    } catch {
+      if (mine === seq.current) setError('Could not load history. Check the connection.');
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoaded(true);
     }
-  };
+  }, [date]);
 
   useEffect(() => {
-    fetchHistory();
-  }, [selectedDate]);
+    setLoaded(false);
+    load();
+  }, [load]);
 
-  // Handovers and undos made on another device appear without a manual refresh.
-  // Checked every 30 seconds and loaded quietly, so the rush does not reload it constantly.
-  useSyncWatcher({ pollIntervalMs: 30000, onOrdersUpdate: () => fetchHistory(true), onTeacherOrdersUpdate: () => fetchHistory(true) });
+  useSyncWatcher({ pollIntervalMs: 30000, onOrdersUpdate: () => load(), onTeacherOrdersUpdate: () => load() });
 
-  // Revert a given student order back to Active
-  const handleRevertStudentOrder = async (orderId: string) => {
-    if (!confirm('Revert this order back to Active Orders?')) return;
-    setRevertingId(orderId);
+  const served = useMemo(() => filterServeRows(rows, { status: 'SERVED', category: 'ALL', search }), [rows, search]);
+  const servedTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return teachers.filter((t) => given(t) && (!q || (t.teacherName || '').toLowerCase().includes(q) || (t.teacherPhone || '').includes(q)));
+  }, [teachers, search]);
+  const canUndo = date === today;
+
+  const undoChild = async (r: ServeRow) => {
+    if (busy) return;
+    setBusy(r.key);
     try {
-      const res = await fetch('/api/admin/orders', {
-        method: 'PATCH',
+      const res = await fetchWithTimeout('/api/staff/serve', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, orderStatus: 'CONFIRMED', date: selectedDate }),
+        body: JSON.stringify({ date, orderItemIds: r.meals.map((m) => m.orderItemId), action: 'undo' }),
       });
-
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast('Order reverted back to Active Orders', 'success');
-        setStudentOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setRows((prev) => prev.map((x) => (x.key === r.key ? { ...x, served: false, servedAt: null } : x)));
         broadcastSyncEvent('ORDERS_UPDATED');
+        setError('');
       } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to revert order', 'error');
-        fetchHistory(true);
+        setError(`${r.studentName}: ${data.error || 'Not saved. Please try again.'}`);
       }
     } catch {
-      showToast('Network error reverting order', 'error');
+      setError(`${r.studentName}: not saved — no connection. Please try again.`);
     } finally {
-      setRevertingId(null);
+      setBusy(null);
     }
   };
 
-  // Revert a given teacher order back to Active
-  const handleRevertTeacherOrder = async (orderId: string) => {
-    if (!confirm('Revert this teacher order back to Active Orders?')) return;
-    setRevertingId(orderId);
+  const undoTeacher = async (t: TeacherOrder) => {
+    if (busy) return;
+    setBusy(t.id);
     try {
-      const res = await fetch('/api/staff/teacher-orders', {
+      const res = await fetchWithTimeout('/api/staff/teacher-orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, orderStatus: 'CONFIRMED' }),
+        body: JSON.stringify({ orderId: t.id, orderStatus: 'CONFIRMED' }),
       });
-
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast('Teacher order reverted back to Active Orders', 'success');
-        setTeacherOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setTeachers((prev) => prev.map((x) => (x.id === t.id ? { ...x, orderStatus: 'CONFIRMED' } : x)));
         broadcastSyncEvent('TEACHER_ORDERS_UPDATED');
+        setError('');
       } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to revert teacher order', 'error');
-        fetchHistory(true);
+        setError(`${t.teacherName || 'Teacher'}: ${data.error || 'Not saved. Please try again.'}`);
       }
     } catch {
-      showToast('Network error reverting teacher order', 'error');
+      setError(`${t.teacherName || 'Teacher'}: not saved — no connection. Please try again.`);
     } finally {
-      setRevertingId(null);
-    }
-  };
-
-  // Filter student items by search
-  const filteredStudents = useMemo(() => {
-    if (!search.trim()) return studentOrders;
-    const q = search.toLowerCase().trim();
-    return studentOrders.filter((o) => {
-      const studentName = (o.items?.[0]?.studentName || '').toLowerCase();
-      const rollNo = (o.items?.[0]?.studentRollNo || '').toLowerCase();
-      const grade = (o.items?.[0]?.studentGrade || '').toLowerCase();
-      const orderId = (o.id || '').toLowerCase();
-      const hasMealMatch = (o.items || []).some((it: any) =>
-        (it.mealName || '').toLowerCase().includes(q)
-      );
-      return (
-        studentName.includes(q) ||
-        rollNo.includes(q) ||
-        grade.includes(q) ||
-        orderId.includes(q) ||
-        hasMealMatch
-      );
-    });
-  }, [studentOrders, search]);
-
-  // Filter teacher items by search
-  const filteredTeachers = useMemo(() => {
-    if (!search.trim()) return teacherOrders;
-    const q = search.toLowerCase().trim();
-    return teacherOrders.filter((o) => {
-      const teacherName = (o.teacherName || '').toLowerCase();
-      const orderId = (o.id || '').toLowerCase();
-      const hasMealMatch = (o.items || []).some((it: any) =>
-        (it.mealName || '').toLowerCase().includes(q)
-      );
-      return teacherName.includes(q) || orderId.includes(q) || hasMealMatch;
-    });
-  }, [teacherOrders, search]);
-
-  const totalGivenStudentsCount = studentOrders.length;
-  const totalGivenTeachersCount = teacherOrders.length;
-  const totalGivenCombinedCount = totalGivenStudentsCount + totalGivenTeachersCount;
-
-  const formatGivenTime = (timestamp?: string) => {
-    if (!timestamp) return 'Given today';
-    try {
-      const d = new Date(timestamp);
-      return `Given at ${d.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      })}`;
-    } catch {
-      return 'Given';
+      setBusy(null);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28 sm:pb-12">
-      {/* Top Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/staff/orders"
-              className="p-1 -ml-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-              title="Back to Active Orders"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
+    <div className="max-w-2xl mx-auto pb-32">
+      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-black text-slate-900">History</h1>
+            <p className="text-sm text-slate-600">{formatDatePretty(date)}</p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
-            <HistoryIcon className="w-6 h-6 text-emerald-600" />
-            <span>Order History</span>
-          </h1>
+          <p className="text-right">
+            <span className="block text-2xl font-black text-slate-900 tabular-nums">
+              {tab === 'STUDENTS' ? `${rows.filter((r) => r.served).length} / ${rows.length}` : `${teachers.filter(given).length} / ${teachers.length}`}
+            </span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Served</span>
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/staff/orders"
-            className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
-          >
-            Active Orders →
-          </Link>
-
+        <div className="flex gap-2">
           <button
-            onClick={() => fetchHistory()}
-            disabled={loading}
-            className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
-            title="Refresh History"
+            type="button"
+            onClick={() => setDate(today)}
+            className={`min-h-[44px] px-4 rounded-xl text-sm font-bold border ${date === today ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+            Today
           </button>
-        </div>
-      </div>
-
-      {/* Date Filter Bar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-emerald-600" />
-          <span className="text-xs font-bold text-slate-700">Date:</span>
           <input
             type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-emerald-500 cursor-pointer"
+            value={date}
+            max={today}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            aria-label="Date"
+            className="flex-1 min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-base"
           />
         </div>
-
-        <div className="flex items-center gap-1.5">
-          {selectedDate !== todayStr && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer border border-emerald-200"
-            >
-              Today
+        <div className="relative">
+          <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={tab === 'STUDENTS' ? 'Child name or roll no.' : 'Teacher name or phone'}
+            className="w-full min-h-[48px] pl-10 pr-11 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-slate-500">
+              <X className="w-5 h-5" />
             </button>
           )}
-          <span className="text-xs text-slate-500 font-semibold">
-            {formatDatePretty(selectedDate)}
-          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(['STUDENTS', 'TEACHERS'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`min-h-[44px] rounded-xl text-sm font-bold border ${tab === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}
+            >
+              {t === 'STUDENTS' ? 'Students' : 'Teachers'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs text-center">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Total Given
-          </span>
-          <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 block">
-            {totalGivenCombinedCount}
-          </span>
-        </div>
+      <div className="px-4 pt-3 space-y-3">
+        {error && <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold">{error}</div>}
+        {!canUndo && <p className="text-sm text-slate-600">Past days can only be corrected by an administrator.</p>}
 
-        <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-200/80 shadow-2xs text-center">
-          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
-            Students Given
-          </span>
-          <span className="text-xl sm:text-2xl font-black text-amber-900 mt-0.5 block">
-            {totalGivenStudentsCount}
-          </span>
-        </div>
-
-        <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200/80 shadow-2xs text-center">
-          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
-            Teachers Given
-          </span>
-          <span className="text-xl sm:text-2xl font-black text-emerald-900 mt-0.5 block">
-            {totalGivenTeachersCount}
-          </span>
-        </div>
-      </div>
-
-      {/* Segmented Tab Bar: ALL | STUDENTS | TEACHERS */}
-      <div className="grid grid-cols-3 gap-1.5 bg-slate-200/70 p-1 rounded-2xl text-xs font-bold">
-        <button
-          type="button"
-          onClick={() => setHistoryTab('ALL')}
-          className={`py-2 px-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            historyTab === 'ALL'
-              ? 'bg-slate-900 text-white shadow-sm font-black'
-              : 'text-slate-700 hover:text-slate-900'
-          }`}
-        >
-          <span>All ({totalGivenCombinedCount})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setHistoryTab('STUDENTS')}
-          className={`py-2 px-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            historyTab === 'STUDENTS'
-              ? 'bg-amber-500 text-white shadow-sm font-black'
-              : 'text-slate-700 hover:text-slate-900'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>Students ({totalGivenStudentsCount})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setHistoryTab('TEACHERS')}
-          className={`py-2 px-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            historyTab === 'TEACHERS'
-              ? 'bg-emerald-600 text-white shadow-sm font-black'
-              : 'text-slate-700 hover:text-slate-900'
-          }`}
-        >
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Teachers ({totalGivenTeachersCount})</span>
-        </button>
-      </div>
-
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by student, roll number, teacher, or meal name..."
-          className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm font-medium text-slate-900 focus:outline-hidden focus:border-emerald-500 shadow-2xs"
-        />
-      </div>
-
-      {/* Loading Spinner */}
-      {loading ? (
-        <div className="min-h-[35vh] flex items-center justify-center">
-          <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : null}
-
-      {/* Empty State */}
-      {!loading &&
-        ((historyTab === 'ALL' && filteredStudents.length === 0 && filteredTeachers.length === 0) ||
-          (historyTab === 'STUDENTS' && filteredStudents.length === 0) ||
-          (historyTab === 'TEACHERS' && filteredTeachers.length === 0)) && (
-          <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-10 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-              <HistoryIcon className="w-6 h-6" />
-            </div>
-            <h3 className="font-extrabold text-slate-800 text-base">No Given Meals Found</h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              {search
-                ? `No given meals matched "${search}".`
-                : `No meals have been marked as given yet for ${formatDatePretty(selectedDate)}.`}
-            </p>
-            <div className="pt-1">
-              <Link
-                href="/staff/orders"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-xs font-black shadow-sm"
-              >
-                <span>View Active Orders</span>
-                <span>→</span>
-              </Link>
-            </div>
-          </div>
-        )}
-
-      {/* History Lists */}
-      {!loading && (
-        <div className="space-y-4">
-          {/* STUDENT HISTORY CARDS */}
-          {(historyTab === 'ALL' || historyTab === 'STUDENTS') && filteredStudents.length > 0 && (
-            <div className="space-y-2.5">
-              {historyTab === 'ALL' && (
-                <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 uppercase tracking-wider px-1 pt-1">
-                  <Users className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Student Meals ({filteredStudents.length})</span>
-                </div>
-              )}
-
-              {filteredStudents.map((o) => {
-                const firstItem = o.items?.[0];
-                return (
-                  <div
-                    key={o.id}
-                    className="p-4 sm:p-5 rounded-2xl border-2 border-slate-200 bg-white hover:border-slate-300 transition-all shadow-2xs space-y-3"
-                  >
-                    {/* Header: Student Name & Given Badge */}
-                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                      <div>
-                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-                          Student
-                        </span>
-                        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight mt-0.5">
-                          {firstItem?.studentName || 'Student'}
-                        </h2>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-slate-500 font-semibold">
-                          <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[11px] font-bold text-slate-700">
-                            Class {firstItem?.studentGrade || '-'}-{firstItem?.studentDivision || '-'}
-                          </span>
-                          <span>•</span>
-                          <span>Roll: {firstItem?.studentRollNo || '-'}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>GIVEN</span>
-                        </span>
-                        <span className="block text-[10px] font-semibold text-slate-400 mt-1">
-                          {formatGivenTime(o.collectedAt || o.updatedAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Meal Items */}
-                    <div className="space-y-1">
-                      {(o.items || []).map((it: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                          <div className="flex items-center gap-2 font-bold text-slate-800">
-                            <VegBadge isVegetarian={it.isVegetarian !== false} size="sm" />
-                            <span>{it.mealName}</span>
-                          </div>
-                          <span className="font-extrabold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-xs">
-                            Qty: {it.quantity}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Footer: Order ID and Revert Button */}
-                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="font-mono text-[11px] text-slate-400 truncate max-w-[150px] sm:max-w-none">
-                        {o.id}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRevertStudentOrder(o.id)}
-                        disabled={revertingId === o.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition-colors cursor-pointer disabled:opacity-50"
-                        title="Move back to Active Orders"
-                      >
-                        <RotateCcw className="w-3 h-3 text-slate-500" />
-                        <span>Revert to Active</span>
-                      </button>
-                    </div>
+        {!loaded ? (
+          <div className="h-32 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
+        ) : tab === 'STUDENTS' ? (
+          served.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">Nobody served yet.</div>
+          ) : (
+            <ul className="space-y-3">
+              {served.map((r) => (
+                <li key={r.key} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-lg font-black text-slate-900 leading-tight break-words">{r.studentName}</p>
+                    <p className="text-sm text-slate-600">
+                      {[r.grade && r.division ? `${r.grade}-${r.division}` : r.grade, r.rollNo ? `Roll ${r.rollNo}` : '', r.studentCategory].filter(Boolean).join(' · ')}
+                    </p>
+                    <p className="text-base font-semibold text-slate-800 break-words">{meals(r.meals)}</p>
+                    {r.servedAt && <p className="text-sm font-bold text-emerald-700">Served {formatServeTime(r.servedAt)}</p>}
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* TEACHER HISTORY CARDS */}
-          {(historyTab === 'ALL' || historyTab === 'TEACHERS') && filteredTeachers.length > 0 && (
-            <div className="space-y-2.5">
-              {historyTab === 'ALL' && (
-                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900 uppercase tracking-wider px-1 pt-2">
-                  <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Teacher Meals ({filteredTeachers.length})</span>
-                </div>
-              )}
-
-              {filteredTeachers.map((to) => (
-                <div
-                  key={to.id}
-                  className="p-4 sm:p-5 rounded-2xl border-2 border-slate-200 bg-white hover:border-slate-300 transition-all shadow-2xs space-y-3"
-                >
-                  {/* Header: Teacher Name & Given Badge */}
-                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        Teacher
-                      </span>
-                      <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight mt-0.5">
-                        {to.teacherName}
-                      </h2>
-                      {to.teacherPhone && to.teacherPhone !== '9999999999' && (
-                        <span className="text-xs text-slate-500 font-medium">
-                          Phone: {to.teacherPhone}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>GIVEN</span>
-                      </span>
-                      <span className="block text-[10px] font-semibold text-slate-400 mt-1">
-                        {formatGivenTime(to.collectedAt || to.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Meal Items */}
-                  <div className="space-y-1">
-                    {(to.items || []).map((it: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                        <div className="flex items-center gap-2 font-bold text-slate-800">
-                          <VegBadge isVegetarian={it.isVegetarian !== false} size="sm" />
-                          <span>{it.mealName}</span>
-                        </div>
-                        <span className="font-extrabold text-emerald-900 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs">
-                          x {it.quantity}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer: Order ID and Revert Button */}
-                  <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-mono text-[11px] text-slate-400 truncate max-w-[150px] sm:max-w-none">
-                      {to.id}
-                    </span>
-
+                  {canUndo && (
                     <button
                       type="button"
-                      onClick={() => handleRevertTeacherOrder(to.id)}
-                      disabled={revertingId === to.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition-colors cursor-pointer disabled:opacity-50"
-                      title="Move back to Active Orders"
+                      onClick={() => undoChild(r)}
+                      disabled={busy === r.key}
+                      className="shrink-0 min-h-[48px] min-w-[72px] px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-bold inline-flex flex-col items-center justify-center disabled:opacity-50"
                     >
-                      <RotateCcw className="w-3 h-3 text-slate-500" />
-                      <span>Revert to Active</span>
+                      <Undo2 className="w-5 h-5" />
+                      {busy === r.key ? 'Saving…' : 'Undo'}
                     </button>
-                  </div>
-                </div>
+                  )}
+                </li>
               ))}
-            </div>
-          )}
-        </div>
-      )}
+            </ul>
+          )
+        ) : servedTeachers.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">No teacher meals served yet.</div>
+        ) : (
+          <ul className="space-y-3">
+            {servedTeachers.map((t) => (
+              <li key={t.id} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-lg font-black text-slate-900 leading-tight break-words">{t.teacherName || 'Teacher'}</p>
+                  {t.teacherPhone && (
+                    <a href={`tel:${t.teacherPhone}`} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 min-h-[32px]">
+                      <Phone className="w-4 h-4" /> {t.teacherPhone}
+                    </a>
+                  )}
+                  <p className="text-base font-semibold text-slate-800 break-words">{meals(t.items)}</p>
+                  {t.collectedAt && <p className="text-sm font-bold text-emerald-700">Served {formatServeTime(t.collectedAt)}</p>}
+                </div>
+                {canUndo && (
+                  <button
+                    type="button"
+                    onClick={() => undoTeacher(t)}
+                    disabled={busy === t.id}
+                    className="shrink-0 min-h-[48px] min-w-[72px] px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-bold inline-flex flex-col items-center justify-center disabled:opacity-50"
+                  >
+                    <Undo2 className="w-5 h-5" />
+                    {busy === t.id ? 'Saving…' : 'Undo'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

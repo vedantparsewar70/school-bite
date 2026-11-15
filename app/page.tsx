@@ -67,6 +67,8 @@ function HomePageContent() {
     if (!authLoading && user) {
       if (user.role === 'ADMIN') {
         router.replace('/admin/orders');
+      } else if (user.role === 'STAFF') {
+        router.replace('/staff/orders');
       } else {
         router.replace('/parent/children');
       }
@@ -127,6 +129,8 @@ function HomePageContent() {
 
       if (data.user.role === 'ADMIN') {
         router.push('/admin/orders');
+      } else if (data.user.role === 'STAFF') {
+        router.push('/staff/orders');
       } else {
         router.push('/parent/children');
       }

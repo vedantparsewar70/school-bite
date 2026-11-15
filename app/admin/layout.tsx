@@ -14,7 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!user) {
         router.replace('/login?role=admin');
       } else if (user.role === 'STAFF') {
-        router.replace('/staff/kitchen');
+        router.replace('/staff/orders');
       } else if (user.role === 'PARENT') {
         router.replace('/parent/children');
       }

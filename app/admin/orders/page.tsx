@@ -23,6 +23,7 @@ import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
 import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor, getTodayString, getOffsetDateString } from '@/lib/utils';
+import { formatServeTime } from '@/lib/service-dates';
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 
@@ -318,7 +319,8 @@ function AdminOrdersContent() {
           {orders.map((o) => {
             const statusStyle = getOrderStatusColor(o.orderStatus);
             const firstItem = o.items?.[0];
-            const studentName = firstItem?.studentName || 'Student';
+            // Every child in the order (each is handed over separately).
+            const studentName = Array.from(new Set((o.items || []).map((it: any) => it.studentName))).join(', ') || 'Student';
             const studentGrade = firstItem?.studentGrade || '-';
             const studentDivision = firstItem?.studentDivision || '-';
             const studentRollNo = firstItem?.studentRollNo || '-';
@@ -532,9 +534,10 @@ function AdminOrdersContent() {
                       <div className="flex items-center gap-2 min-w-0">
                         <VegBadge isVegetarian={it.isVegetarian} size="sm" />
                         <span className="font-bold text-slate-900">{it.mealName}</span>
+                        <span className="text-[11px] text-slate-600 truncate">{it.studentName}</span>
                         {it.date && (
-                          <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                            {formatDatePretty(it.date)} · {it.serviceStatus === 'COLLECTED' ? 'Given' : it.serviceStatus || ''}
+                          <span className={`text-[11px] whitespace-nowrap ${it.servedAt ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                            {formatDatePretty(it.date)} · {it.servedAt ? `Given ${formatServeTime(it.servedAt)}` : 'Not given'}
                           </span>
                         )}
                       </div>

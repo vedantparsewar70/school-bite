@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
+import { formatServeTime } from '@/lib/service-dates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,10 +92,21 @@ export async function PATCH(req: Request) {
       const now = new Date().toISOString();
       if (orderStatus === 'GIVEN') {
         if (orderData.orderStatus === 'GIVEN' || orderData.orderStatus === 'COLLECTED') {
-          return { status: 409, error: 'This order has already been given.' };
+          return {
+            status: 409,
+            error: orderData.collectedAt ? `Already served at ${formatServeTime(orderData.collectedAt)}` : 'This order has already been given.',
+          };
         }
-        transaction.update(ref, { orderStatus: 'GIVEN', collectedAt: now, updatedAt: now });
+        // Staff serve only today's meals; an administrator can correct another day.
+        if (user.role === 'STAFF' && orderData.date && orderData.date !== getTodayString()) {
+          return { status: 403, error: 'Only today’s meals can be served.' };
+        }
+        transaction.update(ref, { orderStatus: 'GIVEN', collectedAt: now, collectedBy: user.id, updatedAt: now });
       } else {
+        // Staff may undo only on the day itself; older corrections are for an administrator.
+        if (user.role === 'STAFF' && orderData.date && orderData.date !== getTodayString()) {
+          return { status: 403, error: 'Only today’s handovers can be undone. Ask an administrator.' };
+        }
         // Undo keeps the original collectedAt as an audit trail.
         transaction.update(ref, { orderStatus: 'CONFIRMED', updatedAt: now, revertedAt: now, revertedBy: user.id });
       }

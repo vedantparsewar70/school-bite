@@ -79,7 +79,7 @@ function StaffOrAdminLoginForm() {
       if (data.redirectUrl) {
         router.push(data.redirectUrl);
       } else if (data.user.role === 'STAFF') {
-        router.push('/staff/kitchen');
+        router.push('/staff/orders');
       } else if (data.user.role === 'ADMIN') {
         router.push('/admin/dashboard');
       } else {

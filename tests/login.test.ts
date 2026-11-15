@@ -107,7 +107,7 @@ test('STAFF_EMAIL/STAFF_PASS provision a STAFF account on first login; a wrong p
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.user.role, 'STAFF');
-  assert.equal(body.redirectUrl, '/staff/kitchen');
+  assert.equal(body.redirectUrl, '/staff/orders');
   assert.deepEqual(writes, ['create:usr_canteen_staff_01']);
   assert.notEqual(users.usr_canteen_staff_01.passwordHash, 'test-only-staff-pass', 'only a hash is stored');
   sessionToken(res);
