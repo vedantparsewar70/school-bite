@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
 import { db } from '@/lib/firebase-admin';
-import { applyServiceStatus, orderServiceDates, serviceStatusFor } from '@/lib/service-dates';
+import { applyServiceStatus, itemServedAt, orderServiceDates, serviceStatusFor } from '@/lib/service-dates';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -166,7 +166,14 @@ export async function GET(req: Request) {
         category: it.meal.category,
         isVegetarian: it.meal.isVegetarian,
         quantity: it.quantity,
-        orderStatus: it.order ? serviceStatusFor(it.order, date) : 'CONFIRMED',
+        // Per child: COLLECTED once this child's meal was handed over.
+        orderStatus: it.order
+          ? itemServedAt(it.order, date, it.id)
+            ? 'COLLECTED'
+            : serviceStatusFor(it.order, date) === 'COLLECTED'
+              ? 'CONFIRMED'
+              : serviceStatusFor(it.order, date)
+          : 'CONFIRMED',
       };
     });
 
@@ -225,8 +232,9 @@ export async function PATCH(req: Request) {
   try {
     kitchenCache.clear();
     const user = await getCurrentUser(req);
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
-      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
+    // Bulk "mark all given" for a whole date is an administrator action; staff tick each child.
+    if (!user || user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
     }
 
     const body = await req.json();

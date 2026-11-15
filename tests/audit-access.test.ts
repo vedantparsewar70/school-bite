@@ -244,7 +244,9 @@ test('OK: kitchen bulk PATCH skips unpaid/cancelled/other-date orders', async ()
   seedPaidOrder('ORD-OK', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }]);
   seedPaidOrder('ORD-UNPAID', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }], { paymentStatus: 'PENDING' });
   seedPaidOrder('ORD-TUE', 'par_usr_parent', [{ studentId: 'stu_mine', date: TUE }]);
-  const res = await adminKitchen.PATCH(jsonRequest('/api/admin/kitchen', 'PATCH', { date: MON, status: 'COLLECTED', orderIds: ['ORD-OK', 'ORD-UNPAID', 'ORD-TUE'] }, staff));
+  // Bulk handover is admin-only (staff tick each child on the Serve screen).
+  assert.equal((await adminKitchen.PATCH(jsonRequest('/api/admin/kitchen', 'PATCH', { date: MON, status: 'COLLECTED', orderIds: ['ORD-OK'] }, staff))).status, 403);
+  const res = await adminKitchen.PATCH(jsonRequest('/api/admin/kitchen', 'PATCH', { date: MON, status: 'COLLECTED', orderIds: ['ORD-OK', 'ORD-UNPAID', 'ORD-TUE'] }, admin));
   const body = await res.json();
   assert.equal(body.skipped, 2);
   assert.equal(fs.getDoc('orders', 'ORD-UNPAID')?.serviceDates, undefined);

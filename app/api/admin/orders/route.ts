@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/firebase-admin';
 import { cancelOrderWithRefund, OrderCancellationError } from '@/lib/order-cancellation';
-import { applyServiceStatus, orderServiceDates, resolveServiceDate, ServiceDateError, serviceStatusFor } from '@/lib/service-dates';
+import { applyServiceStatus, itemServedAt, orderServiceDates, resolveServiceDate, ServiceDateError, serviceStatusFor } from '@/lib/service-dates';
+import { getTodayString } from '@/lib/utils';
 
 // Rush-hour headroom: the day's order list and cancellation refunds can take several seconds.
 export const maxDuration = 60;
@@ -133,6 +134,7 @@ export async function GET(req: Request) {
         const matchStudent = (o.items || []).some(
           (it: any) =>
             it.student?.name?.toLowerCase().includes(search) ||
+            String(it.student?.rollNo || '').toLowerCase() === search ||
             it.student?.studentId?.toLowerCase().includes(search) ||
             (it.mealName || it.meal?.name)?.toLowerCase().includes(search)
         );
@@ -176,6 +178,8 @@ export async function GET(req: Request) {
           isVegetarian: Boolean(item.meal?.isVegetarian),
           date: item.date,
           serviceStatus: serviceStatusFor(order, item.date),
+          // Per-child handover on the item's date (null when not yet given).
+          servedAt: itemServedAt(order, item.date, item.id),
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
@@ -192,6 +196,14 @@ export async function GET(req: Request) {
       };
     });
 
+    // Staff see who ordered what and its handover state, never amounts, payments or parent contacts.
+    if (user.role === 'STAFF') {
+      const trimmed = formattedOrders.map(({ parentEmail, parentPhone, totalAmount, payments, ...o }: any) => ({
+        ...o,
+        items: o.items.map(({ unitPrice, totalPrice, ...it }: any) => it),
+      }));
+      return NextResponse.json({ orders: trimmed });
+    }
     return NextResponse.json({ orders: formattedOrders });
   } catch (error) {
     console.error('Error fetching admin orders:', error);
@@ -267,6 +279,10 @@ export async function PATCH(req: Request) {
       const orderData = orderSnap.data() || {};
       const dates = orderServiceDates(itemsSnap.docs.map((d) => d.data()));
       const serviceDate = resolveServiceDate(dates, date);
+      // Staff may undo a handover only on the day itself; older corrections are for an administrator.
+      if (user.role === 'STAFF' && orderStatus === 'CONFIRMED' && serviceDate !== getTodayString() && serviceStatusFor(orderData, serviceDate) === 'COLLECTED') {
+        throw new ServiceDateError('Only today’s handovers can be undone. Ask an administrator.', 403);
+      }
       const update = applyServiceStatus(orderData, dates, serviceDate, orderStatus, user.id, new Date().toISOString());
 
       transaction.update(orderRef, { ...update });
@@ -280,6 +296,10 @@ export async function PATCH(req: Request) {
       // non-blocking
     }
 
+    if (user.role === 'STAFF') {
+      const { id, serviceDate, serviceStatus, orderStatus: newStatus } = updated as any;
+      return NextResponse.json({ success: true, order: { id, serviceDate, serviceStatus, orderStatus: newStatus } });
+    }
     return NextResponse.json({ success: true, order: updated });
   } catch (error: any) {
     if (error instanceof OrderCancellationError || error instanceof ServiceDateError) {

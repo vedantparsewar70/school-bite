@@ -182,6 +182,32 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Menu ID is required' }, { status: 400 });
     }
 
+    // A menu entry that paid, active orders were placed for cannot be deleted (withdraw it instead).
+    const { db } = await import('@/lib/firebase-admin');
+    const menuSnap = await db.collection('menus').doc(id).get();
+    if (menuSnap.exists) {
+      const menu = menuSnap.data() || {};
+      const [byMenuId, byDate] = await Promise.all([
+        db.collection('orderItems').where('menuId', '==', id).get(),
+        menu.date ? db.collection('orderItems').where('date', '==', menu.date).get() : Promise.resolve({ docs: [] as any[] }),
+      ]);
+      const lines = [
+        ...byMenuId.docs.map((d: any) => d.data()),
+        ...byDate.docs.map((d: any) => d.data()).filter((it: any) => !it.menuId && it.mealId === menu.mealId),
+      ];
+      const orderIds = Array.from(new Set(lines.map((it: any) => String(it.orderId))));
+      if (orderIds.length > 0) {
+        const orders = await db.getAll(...orderIds.map((oid) => db.collection('orders').doc(oid)));
+        const active = orders.some((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED');
+        if (active) {
+          return NextResponse.json(
+            { error: 'This menu entry already has orders, so it cannot be deleted. Switch it off instead to stop new orders.', code: 'HAS_ORDERS' },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     await prisma.menu.delete({ where: { id } });
 
     try {

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { FakeFirestore } from './helpers/fake-firestore';
 import { jsonRequest, signedInAs, useFakeFirestore } from './helpers/session';
 import { setFirestoreForTesting } from '../lib/firebase-admin';
+import { getTodayString } from '../lib/utils';
 import { PATCH as updateOrder } from '../app/api/admin/orders/route';
 import { PATCH as kitchenUpdate } from '../app/api/admin/kitchen/route';
 import { PATCH as teacherOrderUpdate } from '../app/api/staff/teacher-orders/route';
@@ -32,8 +33,8 @@ afterEach(() => setFirestoreForTesting(null));
 const patch = (handler: (req: Request) => Promise<Response>, url: string, body: unknown, headers: Record<string, string>) =>
   handler(jsonRequest(url, 'PATCH', body, headers));
 
-test('a handed-over meal can be un-given by staff but never cancelled and refunded by staff', async () => {
-  seedOrder('ORD-1', {});
+test('a handed-over meal can be un-given by staff (on the day) but never cancelled and refunded by staff', async () => {
+  seedOrder('ORD-1', {}, getTodayString());
   assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, staff)).status, 200);
   assert.ok(fs.getDoc('orders', 'ORD-1')?.collectedAt);
   assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, staff)).status, 409, 'no double handover');
@@ -73,7 +74,8 @@ test('kitchen bulk updates only move paid, active orders and never resurrect can
   seedOrder('ORD-U', { paymentStatus: 'PENDING' });
   seedOrder('ORD-G', { orderStatus: 'COLLECTED', collectedAt: '2099-01-05T03:00:00Z' });
 
-  const res = await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'COLLECTED' }, staff);
+  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'COLLECTED' }, staff)).status, 403, 'bulk handover is admin-only');
+  const res = await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'COLLECTED' }, admin);
   assert.equal(res.status, 200);
   assert.equal(fs.getDoc('orders', 'ORD-A')?.orderStatus, 'COLLECTED');
   assert.ok(fs.getDoc('orders', 'ORD-A')?.collectedAt);
@@ -81,9 +83,9 @@ test('kitchen bulk updates only move paid, active orders and never resurrect can
   assert.equal(fs.getDoc('orders', 'ORD-U')?.orderStatus, 'CONFIRMED');
   assert.equal(fs.getDoc('orders', 'ORD-G')?.collectedAt, '2099-01-05T03:00:00Z', 'existing handover untouched');
 
-  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { orderIds: ['ORD-X'], status: 'READY' }, staff)).status, 200);
+  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { orderIds: ['ORD-X'], status: 'READY' }, admin)).status, 200);
   assert.equal(fs.getDoc('orders', 'ORD-X')?.orderStatus, 'CANCELLED');
-  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'CANCELLED' }, staff)).status, 400);
+  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'CANCELLED' }, admin)).status, 400);
   assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { date: '2099-01-05', status: 'READY' }, parent)).status, 403);
 });
 

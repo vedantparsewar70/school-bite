@@ -39,6 +39,21 @@ export async function GET(req: Request) {
       });
     }
 
+    if (user.role === 'STAFF') {
+      const trimmed = orders.map((o: any) => ({
+        id: o.id,
+        teacherName: o.teacherName || null,
+        teacherPhone: o.teacherPhone || null,
+        date: o.date,
+        orderStatus: o.orderStatus,
+        paymentStatus: o.paymentStatus,
+        collectedAt: o.collectedAt || null,
+        notes: o.notes || null,
+        createdAt: o.createdAt,
+        items: (o.items || []).map((it: any) => ({ mealId: it.mealId, mealName: it.mealName, quantity: it.quantity })),
+      }));
+      return NextResponse.json({ orders: trimmed });
+    }
     return NextResponse.json({ orders });
   } catch (error) {
     console.error('Error fetching teacher orders for staff:', error);

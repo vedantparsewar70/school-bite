@@ -78,7 +78,11 @@ test("undoing one day's handover leaves the other day given and keeps the audit 
   await give(TUE);
   const givenAt = dateState(MON)?.collectedAt;
 
-  const undo = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, staff);
+  // Staff may undo only today's handovers; an administrator corrects other days.
+  const byStaff = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, staff);
+  assert.equal(byStaff.status, 403);
+  assert.equal(dateState(MON)?.status, 'COLLECTED');
+  const undo = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, admin);
   assert.equal(undo.status, 200);
   assert.equal(dateState(MON)?.status, 'CONFIRMED');
   assert.equal(dateState(MON)?.collectedAt, givenAt);
@@ -89,13 +93,14 @@ test("undoing one day's handover leaves the other day given and keeps the audit 
 
 test('kitchen bulk handover for a date changes only that date', async () => {
   seedMultiDateOrder();
-  const res = await patch(kitchenUpdate, '/api/admin/kitchen', { date: MON, status: 'COLLECTED' }, staff);
+  assert.equal((await patch(kitchenUpdate, '/api/admin/kitchen', { date: MON, status: 'COLLECTED' }, staff)).status, 403, 'bulk handover is admin-only');
+  const res = await patch(kitchenUpdate, '/api/admin/kitchen', { date: MON, status: 'COLLECTED' }, admin);
   assert.equal(res.status, 200);
   assert.equal(dateState(MON)?.status, 'COLLECTED');
   assert.equal(dateState(TUE)?.status ?? 'CONFIRMED', 'CONFIRMED');
 
   // By order ID without a date, a multi-day order is skipped rather than given for every day.
-  const byId = await (await patch(kitchenUpdate, '/api/admin/kitchen', { orderIds: ['ORD-M'], status: 'READY' }, staff)).json();
+  const byId = await (await patch(kitchenUpdate, '/api/admin/kitchen', { orderIds: ['ORD-M'], status: 'READY' }, admin)).json();
   assert.equal(byId.skipped, 1);
   assert.equal(dateState(TUE)?.status, 'CONFIRMED');
 
@@ -122,7 +127,7 @@ test('cancelling a single day is refused and changes nothing; no refund is start
 test('once one day was handed over, the whole order cannot be cancelled and refunded, even by an admin', async () => {
   seedMultiDateOrder();
   await give(MON);
-  await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, staff);
+  await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, admin);
 
   const byAdmin = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, admin);
   assert.equal(byAdmin.status, 409);
@@ -160,7 +165,7 @@ test('orders saved before per-day tracking keep their meaning: a collected order
   assert.equal((await staffView(MON))[0].serviceStatus, 'COLLECTED');
   assert.equal((await staffView(TUE))[0].serviceStatus, 'COLLECTED');
 
-  await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, staff);
+  await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, admin);
   assert.equal(dateState(MON)?.status, 'CONFIRMED');
   assert.equal(dateState(TUE)?.status, 'COLLECTED', 'the other day is not silently un-given');
 });

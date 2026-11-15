@@ -21,7 +21,7 @@ import {
 import { normalizeIndianMobile } from '@/lib/phone';
 import { savePendingParentOrder, fulfillParentOrder, generateParentOrderId } from '@/lib/order-fulfillment';
 import { isAutoRefundReason, listOwnPaymentIssues, refundPaymentException } from '@/lib/payment-exceptions';
-import { serviceStatusFor } from '@/lib/service-dates';
+import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
 
 export const runtime = 'nodejs';
@@ -287,7 +287,11 @@ export async function GET(req: Request) {
         mealImage: item.meal?.imageUrl || null,
         isVegetarian: Boolean(item.meal?.isVegetarian),
         date: item.date,
-        serviceStatus: serviceStatusFor(order, item.date),
+        serviceStatus: itemServedAt(order, item.date, item.id)
+          ? 'COLLECTED'
+          : serviceStatusFor(order, item.date) === 'COLLECTED'
+            ? 'CONFIRMED'
+            : serviceStatusFor(order, item.date),
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,

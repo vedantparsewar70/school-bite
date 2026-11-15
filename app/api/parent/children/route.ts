@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/firebase-admin';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getTodayString } from '@/lib/utils';
-import { serviceStatusFor } from '@/lib/service-dates';
+import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 
 /** True when the child has a paid, not-cancelled meal today or later that has not been handed over. */
 async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
@@ -18,8 +18,8 @@ async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
   return upcoming.some((it) => {
     const order = byId.get(String(it.orderId));
     if (!order || order.paymentStatus !== 'PAID') return false;
-    const status = serviceStatusFor(order as any, it.date);
-    return status !== 'CANCELLED' && status !== 'COLLECTED';
+    if (serviceStatusFor(order as any, it.date) === 'CANCELLED') return false;
+    return !itemServedAt(order as any, it.date, String(it.id));
   });
 }
 

@@ -26,8 +26,9 @@ const CACHE_TTL_MS = 15000;
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser(req);
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
-      return NextResponse.json({ error: 'Unauthorized: Admin or Staff access required' }, { status: 403 });
+    // Revenue and order totals: administrators only.
+    if (!user || user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
     }
 
     if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL_MS) {

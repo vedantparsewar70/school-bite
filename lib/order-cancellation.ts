@@ -8,7 +8,7 @@ import {
   isMockPaymentAllowed,
 } from './cashfree';
 import { collectMenuStockInTransaction } from './menu-stock';
-import { orderServiceDates, serviceStatesFor } from './service-dates';
+import { isPartlyServed, orderServiceDates, serviceStatesFor } from './service-dates';
 
 export type RefundPaymentStatus = 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED';
 
@@ -198,6 +198,15 @@ export async function cancelOrderWithRefund(
     }
     if (blockedStatuses.includes(order.orderStatus) || dates.some((d) => blockedStatuses.includes(states[d].status))) {
       throw new OrderCancellationError('Cannot cancel order that has already been prepared or collected');
+    }
+    // Some children on a date were served and others not: a full refund would also refund the
+    // meals already handed over, and partial refunds are not supported yet.
+    const partlyServed = dates.filter((d) => isPartlyServed(order, d));
+    if (partlyServed.length > 0) {
+      throw new OrderCancellationError(
+        `Some children in this order were already served (${partlyServed.join(', ')}). Cancelling it would refund those meals too, and partial refunds are not supported yet. Nothing was changed.`,
+        409
+      );
     }
     if (order.collectedAt && !options.allowPreviouslyCollected) {
       throw new OrderCancellationError('This meal was already handed over. Only an administrator can cancel and refund it.', 403);
