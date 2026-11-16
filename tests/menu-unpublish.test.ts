@@ -169,15 +169,28 @@ test('only staff and admin can unpublish, for one valid category', async () => {
   assert.equal(fs.getDoc('menus', PRIMARY)?.isActive, true);
 });
 
-test('a dish shared by all categories cannot be unpublished for one category', async () => {
+test('CHANGED: a dish shared by all categories is split per class, then one class is unpublished; refused if anyone ordered it', async () => {
   fs.seed('menus', PRIMARY, { ...fs.getDoc('menus', PRIMARY), isActive: false });
   fs.seed('menus', SECONDARY, { ...fs.getDoc('menus', SECONDARY), isActive: false });
-  fs.seed('menus', `meal_dal_${DATE}`, {
-    id: `meal_dal_${DATE}`, date: DATE, studentCategory: 'ALL', mealId: 'meal_dal', isHoliday: false,
-    availableQuantity: 50, orderingDeadline: '08:30', isActive: true,
+  const SHARED = `meal_dal_${DATE}`;
+  fs.seed('menus', SHARED, {
+    id: SHARED, date: DATE, studentCategory: 'ALL', mealId: 'meal_dal', isHoliday: false,
+    availableQuantity: 40, maxQuantity: 40, orderingDeadline: '08:30', isActive: true,
   });
+
+  // Someone (any class) ordered from the shared entry: nothing changes.
+  order('ORD-S', [{ item: 'oit_s', studentId: 'stu_s', menuId: SHARED, studentCategory: 'Secondary' }]);
+  const refused = await unpublishAs(staff);
+  assert.equal(refused.status, 409);
+  assert.match((await refused.json()).error, /shared by all 3 classes\. 1 child has already ordered this/);
+  assert.equal(fs.getDoc('menus', SHARED)?.isActive, true);
+
+  fs.seed('orders', 'ORD-S', { ...fs.getDoc('orders', 'ORD-S'), orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED' });
   const res = await unpublishAs(staff);
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).code, 'SHARED_ENTRY');
-  assert.equal(fs.getDoc('menus', `meal_dal_${DATE}`)?.isActive, true);
+  assert.equal(res.status, 200);
+  assert.equal(fs.getDoc('menus', SHARED)?.isActive, false);
+  assert.equal(fs.getDoc('menus', PRIMARY)?.isActive, false, 'Primary is off sale');
+  assert.equal(fs.getDoc('menus', SECONDARY)?.isActive, true, 'Secondary keeps the dish on its own entry');
+  assert.equal(fs.getDoc('menus', SECONDARY)?.maxQuantity, 40);
+  assert.equal(fs.getDoc('menus', `menu_${DATE}_pre_primary`)?.mealId, 'meal_dal');
 });

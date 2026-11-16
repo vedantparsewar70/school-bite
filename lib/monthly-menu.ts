@@ -344,7 +344,14 @@ export async function applyMonthlyMenu(
   const orderItemsOn = async (date: string) => {
     if (!orderItemsByDate.has(date)) {
       const snap = await firestore.collection('orderItems').where('date', '==', date).get();
-      orderItemsByDate.set(date, snap.docs.map((d) => d.data() as StoredOrderItem));
+      const lines = snap.docs.map((d) => d.data() as StoredOrderItem & { orderId?: string });
+      // Only paid, not-cancelled orders count: once the admin cancels and refunds, the day can change.
+      const orderIds = Array.from(new Set(lines.map((it) => String(it.orderId || '')).filter(Boolean)));
+      const orders = orderIds.length ? await firestore.getAll(...orderIds.map((id) => firestore.collection('orders').doc(id))) : [];
+      const active = new Set(
+        orders.filter((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED').map((o) => o.id)
+      );
+      orderItemsByDate.set(date, lines.filter((it) => active.has(String(it.orderId || ''))));
     }
     return orderItemsByDate.get(date)!;
   };

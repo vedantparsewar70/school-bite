@@ -22,6 +22,7 @@ beforeEach(async () => {
     id: `menu_${DAY}_secondary`, date: DAY, studentCategory: 'Secondary', mealId: 'meal_dal', isHoliday: false,
     availableQuantity: 39, maxQuantity: 50, orderingDeadline: '08:30', isActive: true,
   });
+  fs.seed('orders', 'ORD-1', { id: 'ORD-1', parentId: 'par_x', paymentStatus: 'PAID', orderStatus: 'CONFIRMED' });
   fs.seed('orderItems', 'oit_1', { id: 'oit_1', orderId: 'ORD-1', mealId: 'meal_dal', menuId: `menu_${DAY}_secondary`, date: DAY, quantity: 1, studentCategory: 'Secondary' });
 });
 
@@ -135,7 +136,7 @@ test('publishing for a chosen date affects only that date; it creates no order, 
   assert.deepEqual(await parentSees('Primary'), [], `${DAY} is unchanged`);
   for (const m of menusBefore) assert.deepEqual(fs.getDoc('menus', m.id), m, 'existing entries untouched');
 
-  assert.equal(fs.list('orders').length, 0, 'no order is created');
+  assert.equal(fs.list('orders').length, 1, 'no order is created (only the one that already existed)');
   assert.equal(fs.list('payments').length, 0);
   assert.equal(fs.list('orderItems').length, 1, 'only the order that already existed');
   assert.equal(fs.getDoc('menus', `menu_${LATER}_primary`)?.availableQuantity, 50);

@@ -80,6 +80,7 @@ test('staff publishing over an entry left by the old admin tool asks first, then
 
 test('an entry with orders is never replaced, from any tool', async () => {
   const old = legacy('meal_dal', 'Primary', { availableQuantity: 29 });
+  fs.seed('orders', 'ORD-1', { id: 'ORD-1', parentId: 'par_x', paymentStatus: 'PAID', orderStatus: 'CONFIRMED' });
   fs.seed('orderItems', 'oit_1', { id: 'oit_1', orderId: 'ORD-1', mealId: 'meal_dal', menuId: old, date: DAY, quantity: 1, studentCategory: 'Primary' });
   const before = menu(old);
 
@@ -105,15 +106,20 @@ test("publishing the dish that is already on the menu keeps the existing entry's
   assert.equal((await viaImport({ Primary: 'Dal Khichdi' })).days[0].cells.Primary.outcome, 'unchanged');
 });
 
-test('a dish shared by all categories can only be replaced for all categories at once', async () => {
+test('CHANGED: a dish shared by all categories is split per class (no orders), so one class can change on its own', async () => {
   const shared = legacy('meal_dal', null);
   for (const cat of ['Pre-primary', 'Primary', 'Secondary']) assert.deepEqual(await parentSees(cat), ['meal_dal']);
 
   const one = await viaStaff('Primary', 'meal_pulao', true);
-  assert.equal(one.status, 409);
-  assert.equal((await one.json()).code, 'SHARED_ENTRY');
-  assert.equal(menu(shared)?.isActive, true);
+  assert.equal(one.status, 200);
+  assert.equal(menu(shared)?.isActive, false, 'the shared entry is retired');
+  assert.deepEqual(await parentSees('Primary'), ['meal_pulao']);
+  assert.deepEqual(await parentSees('Pre-primary'), ['meal_dal'], 'the other classes keep the same dish');
+  assert.deepEqual(await parentSees('Secondary'), ['meal_dal']);
+});
 
+test('a dish shared by all categories is replaced for all categories at once after confirmation', async () => {
+  const shared = legacy('meal_dal', null);
   assert.equal((await viaStaff('ALL', 'meal_pulao')).status, 409, 'still asks before replacing');
   assert.equal((await viaStaff('ALL', 'meal_pulao', true)).status, 200);
   assert.equal(menu(shared)?.isActive, false);

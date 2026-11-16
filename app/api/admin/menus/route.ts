@@ -7,6 +7,35 @@ import { effectiveEntries, hasOrdersMessage, paidChildrenFor, publishDish, withd
 import { normalizeStudentCategory } from '@/lib/menu-stock';
 import { STUDENT_CATEGORIES } from '@/lib/monthly-menu';
 
+/**
+ * Portion edits on an existing entry follow the Student Menu rules: not once ordering for the day
+ * has closed, and the total never below what is already ordered (paid, not cancelled).
+ */
+async function portionEditRefusal(id: string, maxQuantity: unknown): Promise<NextResponse | null> {
+  const { db } = await import('@/lib/firebase-admin');
+  const { menuEntriesFor, orderingClosed, closedMessage, paidOrdersFor } = await import('@/lib/menu-orders');
+  const snap = await db.collection('menus').doc(id).get();
+  const entry = snap.exists ? (snap.data() as any) : null;
+  if (!entry?.date) return null;
+  const entries = await menuEntriesFor((t) => t.get(), db, String(entry.date));
+  const cat = normalizeStudentCategory(entry.studentCategory);
+  const cats = cat === 'ALL' ? [...STUDENT_CATEGORIES] : [cat];
+  const closedCat = cats.find((c) => orderingClosed(entries, String(entry.date), c));
+  if (closedCat) {
+    return NextResponse.json({ error: closedMessage(entries, String(entry.date), closedCat), code: 'ORDERING_CLOSED' }, { status: 400 });
+  }
+  if (maxQuantity !== undefined) {
+    const { portions } = await paidOrdersFor((t) => t.get(), db, String(entry.date), [{ ...entry, id: snap.id }], cats);
+    if (Number(maxQuantity) < portions) {
+      return NextResponse.json(
+        { error: `${portions} ${portions === 1 ? 'portion is' : 'portions are'} already ordered. Portions can't be set lower than that.`, code: 'BELOW_ORDERED' },
+        { status: 409 }
+      );
+    }
+  }
+  return null;
+}
+
 /** Portions must be whole numbers from 0 to 10,000; anything else is rejected, never stored as NaN. */
 function invalidQuantity(...values: unknown[]): boolean {
   return values.some((v) => {
@@ -78,6 +107,12 @@ export async function POST(req: Request) {
       ...(body.orderingDeadline !== undefined ? { orderingDeadline: orderingDeadline || '08:30' } : {}),
     };
     let menu = null;
+    if (availableQuantity !== undefined || maxQuantity !== undefined) {
+      for (const id of entryIds) {
+        const refused = await portionEditRefusal(id, maxQuantity);
+        if (refused) return refused;
+      }
+    }
     for (const id of entryIds) {
       menu = Object.keys(edits).length
         ? await prisma.menu.update({ where: { id }, data: edits, include: { meal: true } })
@@ -143,6 +178,11 @@ export async function PUT(req: Request) {
     }
     if (invalidQuantity(availableQuantity, maxQuantity)) {
       return NextResponse.json({ error: 'Quantity must be a whole number between 0 and 10000' }, { status: 400 });
+    }
+
+    if (availableQuantity !== undefined || maxQuantity !== undefined || orderingDeadline !== undefined) {
+      const refused = await portionEditRefusal(String(id), maxQuantity);
+      if (refused) return refused;
     }
 
     // Switching an entry off is unpublishing it: the same rule as the Unpublish button applies.

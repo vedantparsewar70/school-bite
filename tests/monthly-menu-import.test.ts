@@ -118,6 +118,7 @@ test('existing menus are never overwritten silently, and never at all once they 
   fs.seed('meals', 'meal_old', { id: 'meal_old', name: 'Old Dish', price: 70 });
   fs.seed('menus', 'menu_2026-11-02_primary', { id: 'menu_2026-11-02_primary', date: '2026-11-02', studentCategory: 'Primary', mealId: 'meal_old', isActive: true, availableQuantity: 40 });
   fs.seed('menus', 'menu_2026-11-03_primary', { id: 'menu_2026-11-03_primary', date: '2026-11-03', studentCategory: 'Primary', mealId: 'meal_old', isActive: true, availableQuantity: 50 });
+  fs.seed('orders', 'ORD-1', { id: 'ORD-1', parentId: 'par_x', paymentStatus: 'PAID', orderStatus: 'CONFIRMED' });
   fs.seed('orderItems', 'oit_1', { id: 'oit_1', orderId: 'ORD-1', mealId: 'meal_old', date: '2026-11-02', menuId: 'menu_2026-11-02_primary', studentCategory: 'Primary' });
 
   const safe = await (await upload('publish', { dishes: allDishDecisions() })).json();

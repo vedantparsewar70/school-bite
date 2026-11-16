@@ -4,6 +4,18 @@ import { applyMonthlyMenu, dishKey, STUDENT_CATEGORIES, type MonthlyMenuPlan, ty
 import { rankMenuEntries, type MenuEntryLike } from './menu-entries';
 import { normalizeStudentCategory } from './menu-stock';
 import { isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import {
+  closedMessage,
+  hasOrdersMessage,
+  menuEntriesFor,
+  orderingClosed,
+  paidChildrenFor,
+  paidOrdersFor,
+  splitSharedEntry,
+  usesSharedEntry,
+} from './menu-orders';
+
+export { hasOrdersMessage, paidChildrenFor, paidOrdersFor };
 
 /**
  * The single way to put a catalog dish on the menu for one date: Staff → Kitchen, Admin → Menu and
@@ -49,6 +61,18 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
     return { status: 400, body: { error: 'Please choose a recipe from the catalog.' } };
   }
 
+  // Past days, and today after its ordering deadline, can no longer be added to or changed.
+  const current = await menuEntriesFor((t) => t.get(), firestore, date);
+  const closed = categories.find((cat) => orderingClosed(current, date, cat));
+  if (closed) {
+    return { status: 400, body: { error: closedMessage(current, date, closed), code: 'ORDERING_CLOSED' } };
+  }
+  // One class of a day that still uses an older "all classes" entry: give each class its own entry first.
+  if (categories.length < STUDENT_CATEGORIES.length && categories.some((cat) => usesSharedEntry(current, date, cat))) {
+    const split = await splitSharedEntry(date, actorId, firestore);
+    if (split.status !== 200) return split;
+  }
+
   const mealSnap = await firestore.collection('meals').doc(mealId).get();
   const meal = mealSnap.data();
   if (!mealSnap.exists || !meal?.name) {
@@ -84,10 +108,7 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
 
   if (where('skip-past').length) return { status: 400, body: { error: 'This date has already passed.' } };
   if (where('conflict-has-orders').length) {
-    return {
-      status: 409,
-      body: { error: `Already ordered, so it cannot be changed: ${list(where('conflict-has-orders'))} on ${date}.`, code: 'HAS_ORDERS' },
-    };
+    return hasOrdersRefusal(firestore, date, where('conflict-has-orders').map((c) => c.cat), categories);
   }
   if (where('conflict-shared').length) {
     return {
@@ -119,6 +140,9 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
   // The write re-checks everything (an order may have arrived since the check above).
   const result = await applyMonthlyMenu(plan, options, firestore);
   const final = cellsOf(result);
+  if (final.some((c) => c.outcome === 'conflict-has-orders')) {
+    return hasOrdersRefusal(firestore, date, final.filter((c) => c.outcome === 'conflict-has-orders').map((c) => c.cat), categories);
+  }
   if (!result.written || !final.every((c) => ['create', 'replace', 'unchanged'].includes(c.outcome))) {
     return { status: 409, body: { error: 'This menu changed meanwhile and was not fully updated. Please refresh and try again.' } };
   }
@@ -136,44 +160,6 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
     body: { success: true, outcome, message: `${name} is now on the menu for ${CATEGORY_LABEL(categories)} on ${date}. Parents can order it.` },
   };
 }
-
-/**
- * Children with a paid, active order for these menu entries on this date. An order line counts when
- * it was bought from one of the entries, or (older lines without an entry ID) is the same dish for one
- * of the categories. A line with no category is counted, to be safe.
- */
-export async function paidChildrenFor(
-  read: (target: any) => Promise<any>,
-  firestore: Firestore,
-  date: string,
-  entries: Array<MenuEntryLike & { id: string }>,
-  categories: string[]
-): Promise<number> {
-  if (entries.length === 0) return 0;
-  const ids = new Set(entries.map((m) => m.id));
-  const mealIds = new Set(entries.map((m) => m.mealId).filter(Boolean) as string[]);
-  const cats = new Set(categories.map((c) => normalizeStudentCategory(c)));
-  const itemsSnap = await read(firestore.collection('orderItems').where('date', '==', date));
-  const lines = (itemsSnap.docs as Array<{ id: string; data: () => any }>)
-    .map((d) => ({ ...d.data(), id: d.id }))
-    .filter((it: any) => {
-      if (it.menuId) return ids.has(String(it.menuId));
-      if (!it.mealId || !mealIds.has(String(it.mealId))) return false;
-      const itemCat = normalizeStudentCategory(it.studentCategory);
-      return itemCat === 'ALL' || cats.has(itemCat);
-    });
-  const orderIds = Array.from(new Set(lines.map((it: any) => String(it.orderId))));
-  const paid = new Set<string>();
-  for (const orderId of orderIds) {
-    const snap = await read(firestore.collection('orders').doc(orderId));
-    const o = snap.exists ? snap.data() : null;
-    if (o && o.paymentStatus === 'PAID' && o.orderStatus !== 'CANCELLED') paid.add(orderId);
-  }
-  return new Set(lines.filter((it: any) => paid.has(String(it.orderId))).map((it: any) => String(it.studentId || it.id))).size;
-}
-
-export const hasOrdersMessage = (n: number) =>
-  `${n} ${n === 1 ? 'child has' : 'children have'} already ordered this. Ask the admin to cancel and refund those orders first.`;
 
 /**
  * Takes the dish off sale for one date (one category, or 'ALL'): the live entries are switched off,
@@ -196,6 +182,13 @@ export async function withdrawDish(
     : STUDENT_CATEGORIES.includes(studentCategory as StudentCategory) ? [studentCategory as StudentCategory] : [];
   if (categories.length === 0) {
     return { status: 400, body: { error: 'Please choose Pre-primary, Primary, Secondary or all categories.' } };
+  }
+  if (!all) {
+    const current = await menuEntriesFor((t) => t.get(), firestore, date);
+    if (categories.some((cat) => usesSharedEntry(current, date, cat))) {
+      const split = await splitSharedEntry(date, actorId, firestore);
+      if (split.status !== 200) return split;
+    }
   }
 
   const result = await firestore.runTransaction(async (tx): Promise<PublishDishResult & { switchedOff?: number }> => {
@@ -262,4 +255,31 @@ export async function effectiveEntries(date: string, studentCategory: unknown, f
     if (entry && !entry.isHoliday) ids.add(entry.id);
   }
   return Array.from(ids);
+}
+
+/**
+ * The refusal when classes already have paid orders: "N children have already ordered this…",
+ * naming the blocked classes when several were chosen, so the editor can offer "Save for the other
+ * classes only".
+ */
+async function hasOrdersRefusal(
+  firestore: Firestore,
+  date: string,
+  blocked: StudentCategory[],
+  requested: StudentCategory[]
+): Promise<PublishDishResult> {
+  const entries = await menuEntriesFor((t) => t.get(), firestore, date);
+  const live = new Map<string, MenuEntryLike & { id: string }>();
+  for (const cat of blocked) for (const m of rankMenuEntries(entries, date, cat)) live.set(m.id, m);
+  const children = await paidChildrenFor((t) => t.get(), firestore, date, Array.from(live.values()), blocked);
+  const message = hasOrdersMessage(Math.max(children, 1));
+  return {
+    status: 409,
+    body: {
+      error: requested.length > 1 ? `${blocked.join(', ')}: ${message}` : message,
+      code: 'HAS_ORDERS',
+      children,
+      blockedCategories: blocked,
+    },
+  };
 }
