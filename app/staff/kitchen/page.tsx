@@ -301,6 +301,37 @@ function StaffKitchenContent() {
     }
   };
 
+  // Unpublish one category's dish for the selected date (refused by the server if children ordered it).
+  const [unpublishTarget, setUnpublishTarget] = useState<{ cat: StudentCategory; dish: string; date: string } | null>(null);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishMessage, setUnpublishMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleUnpublish = async () => {
+    if (!unpublishTarget || unpublishing) return;
+    const { cat, dish, date } = unpublishTarget;
+    setUnpublishing(true);
+    try {
+      const res = await fetch('/api/admin/menus/unpublish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, studentCategory: cat }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setUnpublishMessage({ ok: true, text: `${dish} removed from ${formatDatePretty(date)}, ${cat}. Parents can no longer order it.` });
+        broadcastSyncEvent('MENU_UPDATED');
+        fetchMenuData();
+      } else {
+        setUnpublishMessage({ ok: false, text: data.error || `The menu could not be unpublished (error ${res.status}).` });
+      }
+    } catch {
+      setUnpublishMessage({ ok: false, text: 'Could not reach the server. Check the connection and try again.' });
+    } finally {
+      setUnpublishing(false);
+      setUnpublishTarget(null);
+    }
+  };
+
   // Open Edit Modal
   const handleOpenEdit = (meal: MealData, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -532,6 +563,25 @@ function StaffKitchenContent() {
           </div>
         </div>
 
+        {unpublishMessage && (
+          <div
+            role="status"
+            className={`flex items-start justify-between gap-3 p-3.5 rounded-2xl border text-sm font-bold ${
+              unpublishMessage.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            <span>{unpublishMessage.text}</span>
+            <button
+              type="button"
+              onClick={() => setUnpublishMessage(null)}
+              aria-label="Close message"
+              className="w-11 h-11 -m-2 shrink-0 flex items-center justify-center"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Category Cards Grid */}
         <div
           className={`grid gap-5 ${
@@ -551,8 +601,10 @@ function StaffKitchenContent() {
             const holidayReason =
               (dbMenu ? dbMenu.holidayReason : officialMenu?.holidayReason) || 'Holiday — no brunch';
 
+            // A switched-off (unpublished) entry is shown as "No menu published", like no entry at all.
+            const unpublished = Boolean(dbMenu && !dbMenu.isHoliday && dbMenu.isActive === false);
             const dishName =
-              dbMenu?.meal?.name && !dbMenu?.isHoliday
+              dbMenu?.meal?.name && !dbMenu?.isHoliday && !unpublished
                 ? dbMenu.meal.name
                 : !dbMenu && officialMenu?.dish && !officialMenu.isHoliday
                 ? officialMenu.dish
@@ -563,9 +615,9 @@ function StaffKitchenContent() {
             const publishState = !dbMenu ? 'NOT_PUBLISHED' : dbMenu.isActive === false ? 'DISABLED' : 'PUBLISHED';
 
             // Lookup meal details from master catalog for ingredient notes
-            const catalogMeal = OCTOBER_2026_MEAL_CATALOG.find(
-              (m) => m.name.toLowerCase().trim() === dishName.toLowerCase().trim()
-            ) || dbMenu?.meal;
+            const catalogMeal = unpublished
+              ? null
+              : OCTOBER_2026_MEAL_CATALOG.find((m) => m.name.toLowerCase().trim() === dishName.toLowerCase().trim()) || dbMenu?.meal;
 
             // Visual styling per student category
             const theme = {
@@ -682,13 +734,26 @@ function StaffKitchenContent() {
                   ) : (
                     <span className="text-rose-700 flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      <span>{publishState === 'DISABLED' ? 'Disabled: parents cannot order' : 'Not published: parents cannot order'}</span>
+                      <span>Not published: parents cannot order</span>
                     </span>
                   )}
                   <span className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                    {dbMenu ? 'Saved Menu' : 'Timetable Reference'}
+                    {dbMenu && !unpublished ? 'Saved Menu' : 'Timetable Reference'}
                   </span>
                 </div>
+                {publishState === 'PUBLISHED' && !isPastDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnpublishMessage(null);
+                      setUnpublishTarget({ cat, dish: dishName, date: selectedDateStr });
+                    }}
+                    disabled={unpublishing}
+                    className="w-full min-h-[44px] px-4 rounded-xl border-2 border-rose-200 bg-white text-rose-700 hover:bg-rose-50 text-sm font-black disabled:opacity-60"
+                  >
+                    Unpublish
+                  </button>
+                )}
               </div>
             );
           })}
@@ -908,6 +973,41 @@ function StaffKitchenContent() {
       {/* ========================================================================= */}
       {/* MODAL: Full Month October 2026 Timetable                                  */}
       {/* ========================================================================= */}
+      {unpublishTarget && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/50 flex items-end sm:items-center justify-center p-4" onClick={() => !unpublishing && setUnpublishTarget(null)}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="unpublish-title"
+            className="w-full max-w-md bg-white rounded-3xl p-5 space-y-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="unpublish-title" className="text-base font-black text-slate-900 leading-snug">
+              Remove {unpublishTarget.dish} from {formatDatePretty(unpublishTarget.date)}, {unpublishTarget.cat}? Parents will no longer be able to order it.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setUnpublishTarget(null)}
+                disabled={unpublishing}
+                className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-slate-800 text-base font-bold"
+              >
+                Keep it
+              </button>
+              <button
+                type="button"
+                onClick={handleUnpublish}
+                disabled={unpublishing}
+                className="min-h-[48px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-base font-black inline-flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                {unpublishing && <Loader2 className="w-4 h-4 animate-spin" />}
+                Unpublish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isTimetableModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-slate-100">

@@ -138,9 +138,49 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
 }
 
 /**
- * Stops sales of the dish for one date (one category, or 'ALL'): the live entries are switched off,
- * never deleted, so orders, stock and history stay as they are. A dish shared by all categories can
- * only be switched off for all categories at once.
+ * Children with a paid, active order for these menu entries on this date. An order line counts when
+ * it was bought from one of the entries, or (older lines without an entry ID) is the same dish for one
+ * of the categories. A line with no category is counted, to be safe.
+ */
+export async function paidChildrenFor(
+  read: (target: any) => Promise<any>,
+  firestore: Firestore,
+  date: string,
+  entries: Array<MenuEntryLike & { id: string }>,
+  categories: string[]
+): Promise<number> {
+  if (entries.length === 0) return 0;
+  const ids = new Set(entries.map((m) => m.id));
+  const mealIds = new Set(entries.map((m) => m.mealId).filter(Boolean) as string[]);
+  const cats = new Set(categories.map((c) => normalizeStudentCategory(c)));
+  const itemsSnap = await read(firestore.collection('orderItems').where('date', '==', date));
+  const lines = (itemsSnap.docs as Array<{ id: string; data: () => any }>)
+    .map((d) => ({ ...d.data(), id: d.id }))
+    .filter((it: any) => {
+      if (it.menuId) return ids.has(String(it.menuId));
+      if (!it.mealId || !mealIds.has(String(it.mealId))) return false;
+      const itemCat = normalizeStudentCategory(it.studentCategory);
+      return itemCat === 'ALL' || cats.has(itemCat);
+    });
+  const orderIds = Array.from(new Set(lines.map((it: any) => String(it.orderId))));
+  const paid = new Set<string>();
+  for (const orderId of orderIds) {
+    const snap = await read(firestore.collection('orders').doc(orderId));
+    const o = snap.exists ? snap.data() : null;
+    if (o && o.paymentStatus === 'PAID' && o.orderStatus !== 'CANCELLED') paid.add(orderId);
+  }
+  return new Set(lines.filter((it: any) => paid.has(String(it.orderId))).map((it: any) => String(it.studentId || it.id))).size;
+}
+
+export const hasOrdersMessage = (n: number) =>
+  `${n} ${n === 1 ? 'child has' : 'children have'} already ordered this. Ask the admin to cancel and refund those orders first.`;
+
+/**
+ * Takes the dish off sale for one date (one category, or 'ALL'): the live entries are switched off,
+ * never deleted, so history stays as it is. Refused while any child has a paid, active order for it
+ * (the admin cancels and refunds those first). Checked and written in one transaction, so an order
+ * paid at the same moment is never left without a menu. A dish shared by all categories can only be
+ * switched off for all categories at once.
  */
 export async function withdrawDish(
   input: { date: unknown; studentCategory: unknown; actorId: string },
@@ -158,26 +198,39 @@ export async function withdrawDish(
     return { status: 400, body: { error: 'Please choose Pre-primary, Primary, Secondary or all categories.' } };
   }
 
-  const snap = await firestore.collection('menus').where('date', '==', date).get();
-  const entries = snap.docs.map((d) => ({ ...(d.data() as MenuEntryLike), id: d.id }));
-  const toSwitchOff = new Map<string, MenuEntryLike & { id: string }>();
-  for (const cat of categories) {
-    for (const m of rankMenuEntries(entries, date, cat)) {
-      if (m.isHoliday) continue;
-      if (!all && normalizeStudentCategory(m.studentCategory) === 'ALL') {
-        return { status: 409, body: { error: `${date} has one dish for all categories. Switch it off for all categories.`, code: 'SHARED_ENTRY' } };
+  const result = await firestore.runTransaction(async (tx): Promise<PublishDishResult & { switchedOff?: number }> => {
+    const read = (target: any) => tx.get(target);
+    const snap = await read(firestore.collection('menus').where('date', '==', date));
+    const entries = (snap.docs as Array<{ id: string; data: () => any }>).map((d) => ({ ...(d.data() as MenuEntryLike), id: d.id }));
+    const toSwitchOff = new Map<string, MenuEntryLike & { id: string }>();
+    for (const cat of categories) {
+      for (const m of rankMenuEntries(entries, date, cat)) {
+        if (m.isHoliday) continue;
+        if (!all && normalizeStudentCategory(m.studentCategory) === 'ALL') {
+          return {
+            status: 409,
+            body: { error: `${date} has one dish for all categories. It can only be unpublished for all categories at once.`, code: 'SHARED_ENTRY' },
+          };
+        }
+        toSwitchOff.set(m.id, m);
       }
-      toSwitchOff.set(m.id, m);
     }
-  }
+    if (toSwitchOff.size === 0) return { status: 200, body: {}, switchedOff: 0 };
 
-  const now = new Date().toISOString();
-  const batch = firestore.batch();
-  for (const id of toSwitchOff.keys()) {
-    batch.set(firestore.collection('menus').doc(id), { isActive: false, updatedAt: now, withdrawnBy: actorId }, { merge: true });
-  }
-  if (toSwitchOff.size > 0) {
-    await batch.commit();
+    const children = await paidChildrenFor(read, firestore, date, Array.from(toSwitchOff.values()), categories);
+    if (children > 0) {
+      return { status: 409, body: { error: hasOrdersMessage(children), code: 'HAS_ORDERS', children } };
+    }
+
+    const now = new Date().toISOString();
+    for (const id of toSwitchOff.keys()) {
+      tx.set(firestore.collection('menus').doc(id), { isActive: false, updatedAt: now, withdrawnBy: actorId, withdrawnAt: now }, { merge: true });
+    }
+    return { status: 200, body: {}, switchedOff: toSwitchOff.size };
+  });
+  if (result.status !== 200) return { status: result.status, body: result.body };
+
+  if (result.switchedOff) {
     try {
       const { notifyMenuUpdated } = await import('./sync-events');
       await notifyMenuUpdated();
@@ -185,7 +238,17 @@ export async function withdrawDish(
       // non-blocking
     }
   }
-  return { status: 200, body: { success: true, outcome: 'withdrawn', withdrawn: toSwitchOff.size, message: `Menu for ${CATEGORY_LABEL(categories)} on ${date} is no longer on sale.` } };
+  return {
+    status: 200,
+    body: {
+      success: true,
+      outcome: 'withdrawn',
+      withdrawn: result.switchedOff || 0,
+      message: result.switchedOff
+        ? `Menu for ${CATEGORY_LABEL(categories)} on ${date} is no longer on sale.`
+        : `Nothing was on sale for ${CATEGORY_LABEL(categories)} on ${date}.`,
+    },
+  };
 }
 
 /** The menu entries now in effect for the date and categories (to apply quantity/deadline edits). */

@@ -141,13 +141,17 @@ test('BUG (latent): if a meal record is missing, the whole kitchen day and the r
   assert.equal((await staffListOn(D)).length, 2);
 });
 
-test('OK: switching a dish off (publish with nothing selected) keeps paid orders everywhere, and the dish cannot then be swapped', async () => {
+test('CHANGED: a dish with paid orders cannot be switched off (unpublish rule); one already switched off keeps paid orders everywhere and cannot be swapped', async () => {
   seedMenu(D);
   seedOrder('ORD-A', [{ date: D }]);
 
   const off = await adminPublish(jsonRequest('/api/admin/menus/publish', 'POST', { date: D, studentCategory: 'Primary', selectedMealIds: [] }, admin));
-  assert.equal(off.status, 200);
-  assert.equal(fs.getDoc('menus', `menu_${D}_primary`)?.isActive, false);
+  assert.equal(off.status, 409);
+  assert.match((await off.json()).error, /already ordered this\. Ask the admin to cancel and refund those orders first\./);
+  assert.equal(fs.getDoc('menus', `menu_${D}_primary`)?.isActive, true);
+
+  // Switched off before this rule existed: the paid order still shows everywhere.
+  fs.seed('menus', `menu_${D}_primary`, { ...fs.getDoc('menus', `menu_${D}_primary`), isActive: false });
   assert.equal((await kitchenOn(D)).totalMeals, 1);
   assert.equal((await staffListOn(D)).length, 1);
   assert.equal((await parentHistory()).length, 1);

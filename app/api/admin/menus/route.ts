@@ -3,7 +3,9 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
 import { getStudentCategory } from '@/lib/october-2026-timetable';
-import { effectiveEntries, publishDish, withdrawDish } from '@/lib/menu-publish';
+import { effectiveEntries, hasOrdersMessage, paidChildrenFor, publishDish, withdrawDish } from '@/lib/menu-publish';
+import { normalizeStudentCategory } from '@/lib/menu-stock';
+import { STUDENT_CATEGORIES } from '@/lib/monthly-menu';
 
 /** Portions must be whole numbers from 0 to 10,000; anything else is rejected, never stored as NaN. */
 function invalidQuantity(...values: unknown[]): boolean {
@@ -143,6 +145,26 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Quantity must be a whole number between 0 and 10000' }, { status: 400 });
     }
 
+    // Switching an entry off is unpublishing it: the same rule as the Unpublish button applies.
+    if (isActive !== undefined && !Boolean(isActive)) {
+      const { db } = await import('@/lib/firebase-admin');
+      const snap = await db.collection('menus').doc(String(id)).get();
+      const entry = snap.exists ? (snap.data() as any) : null;
+      if (entry?.date && entry.isActive !== false) {
+        const cat = normalizeStudentCategory(entry.studentCategory);
+        const children = await paidChildrenFor(
+          (t) => t.get(),
+          db,
+          String(entry.date),
+          [{ ...entry, id: snap.id }],
+          cat === 'ALL' ? [...STUDENT_CATEGORIES] : [cat]
+        );
+        if (children > 0) {
+          return NextResponse.json({ error: hasOrdersMessage(children), code: 'HAS_ORDERS', children }, { status: 409 });
+        }
+      }
+    }
+
     const updated = await prisma.menu.update({
       where: { id },
       data: {
@@ -201,7 +223,7 @@ export async function DELETE(req: Request) {
         const active = orders.some((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED');
         if (active) {
           return NextResponse.json(
-            { error: 'This menu entry already has orders, so it cannot be deleted. Switch it off instead to stop new orders.', code: 'HAS_ORDERS' },
+            { error: 'This menu entry already has orders, so it cannot be deleted. Ask the admin to cancel and refund those orders first.', code: 'HAS_ORDERS' },
             { status: 409 }
           );
         }

@@ -207,6 +207,33 @@ export default function AdminMenuPage() {
     }
   };
 
+  // Unpublish one category for the selected date (refused by the server if children ordered it).
+  const [unpublishingCat, setUnpublishingCat] = useState<string | null>(null);
+  const handleUnpublish = async (cat: string, dish: string) => {
+    if (unpublishingCat) return;
+    if (!window.confirm(`Remove ${dish} from ${formatDatePretty(selectedDate)}, ${cat}? Parents will no longer be able to order it.`)) return;
+    setUnpublishingCat(cat);
+    try {
+      const res = await fetch('/api/admin/menus/unpublish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: selectedDate, studentCategory: cat }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        broadcastSyncEvent('MENU_UPDATED');
+        showToast(`${dish} removed from ${formatDatePretty(selectedDate)}, ${cat}. Parents can no longer order it.`, 'success');
+        fetchData();
+      } else {
+        showToast(data.error || `The menu could not be unpublished (error ${res.status}).`, 'error');
+      }
+    } catch {
+      showToast('Network error unpublishing the menu', 'error');
+    } finally {
+      setUnpublishingCat(null);
+    }
+  };
+
   const handleCreateNewMeal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMealName.trim()) return;
@@ -420,6 +447,37 @@ export default function AdminMenuPage() {
             <span>Clear Selection</span>
           </button>
         </div>
+      </div>
+
+      {/* What parents can order now, per category, with Unpublish */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
+        <p className="text-xs font-extrabold text-slate-700">On sale for {formatDatePretty(selectedDate)}</p>
+        {(selectedStudentCategory === 'ALL' ? STUDENT_CATEGORIES : [selectedStudentCategory]).map((cat) => {
+          const entry = effectiveMenuEntry(currentDayMenus, selectedDate, cat);
+          const live = entry && !entry.isHoliday ? entry : null;
+          const dish = live?.meal?.name || meals.find((m) => m.id === live?.mealId)?.name || 'this dish';
+          return (
+            <div key={cat} className="flex items-center justify-between gap-3 py-1.5 border-t border-slate-100 first:border-t-0">
+              <div className="min-w-0 text-sm">
+                <span className="font-bold text-slate-900">{cat}: </span>
+                <span className={live ? 'text-slate-700' : 'text-slate-400'}>
+                  {entry?.isHoliday ? 'Holiday' : live ? dish : 'No menu published'}
+                </span>
+              </div>
+              {live && selectedDate >= todayDate && (
+                <button
+                  type="button"
+                  onClick={() => handleUnpublish(cat, dish)}
+                  disabled={unpublishingCat !== null}
+                  className="min-h-[44px] px-4 shrink-0 rounded-xl border-2 border-rose-200 bg-white text-rose-700 hover:bg-rose-50 text-sm font-black inline-flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {unpublishingCat === cat && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Unpublish
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Filter and Search Bar */}
