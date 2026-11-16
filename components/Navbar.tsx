@@ -68,7 +68,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-1 lg:gap-2">
+          <div className="hidden lg:flex items-center gap-1 lg:gap-2">
             {!user && (
               <>
                 <Link
@@ -279,7 +279,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Action Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {!user ? (
               <div className="flex items-center gap-2">
                 <Link
@@ -442,7 +442,7 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-2">
             {isParent && (
               <Link
                 href="/parent/cart"
@@ -468,7 +468,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-6 space-y-1">
+        <div className="lg:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-6 space-y-1">
           {!user ? (
             <div className="flex flex-col gap-2 pt-2">
               <Link
@@ -552,6 +552,13 @@ export default function Navbar() {
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
               >
                 Payments
+              </Link>
+              <Link
+                href="/parent/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              >
+                Parent Profile
               </Link>
               <button
                 onClick={() => {
