@@ -2,7 +2,30 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Plus, Search, X, Loader2, Upload } from 'lucide-react';
+import {
+  AlertCircle,
+  BookOpen,
+  CalendarCheck,
+  CalendarDays,
+  CalendarOff,
+  CalendarRange,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Info,
+  Layers,
+  Loader2,
+  Lock,
+  Pencil,
+  Plus,
+  Repeat,
+  Search,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { formatDatePretty, formatINR, getTodayString } from '@/lib/utils';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
@@ -123,6 +146,15 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
   const stripRef = useRef<HTMLDivElement>(null);
+  // One save at a time: a second tap while a save is running does nothing.
+  const inFlight = useRef(false);
+
+  // A success message clears itself; an error stays until it is closed.
+  useEffect(() => {
+    if (!notice?.ok) return;
+    const id = setTimeout(() => setNotice((n) => (n === notice ? null : n)), 6000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   const loadDays = useCallback(async () => {
     const mine = ++seq.current;
@@ -227,6 +259,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
   const viewOnlyReason = (d: MenuDay) =>
     d.isSunday
       ? 'Sunday: the canteen is closed.'
+      : d.status === 'HOLIDAY'
+        ? 'Holiday: no brunch for any class.'
       : d.isPast
         ? 'Past day: view only.'
         : d.classes.every((c) => !c.editable)
@@ -260,7 +294,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
   };
 
   const saveDish = async (category: ClassName, applyAll: boolean, mealId: string, portions: number | null) => {
-    if (!day) return;
+    if (!day || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setNotice(null);
     const date = day.date;
@@ -305,13 +340,15 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
     } catch {
       setNotice({ ok: false, text: 'Not saved: no connection. Please try again.' });
     } finally {
+      inFlight.current = false;
       setBusy(false);
       await refreshAfterChange();
     }
   };
 
   const saveDayEdit = async (card: ClassCard, applyAll: boolean, v: DishValues) => {
-    if (!day || !card.mealId) return;
+    if (!day || !card.mealId || inFlight.current) return;
+    inFlight.current = true;
     const date = day.date;
     const body = (studentCategory: string) => ({ date, studentCategory, mealId: card.mealId, ...v });
     setBusy(true);
@@ -355,6 +392,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
     } catch {
       setNotice({ ok: false, text: 'Not saved: no connection. Please try again.' });
     } finally {
+      inFlight.current = false;
       setBusy(false);
       await refreshAfterChange();
       await loadDishes();
@@ -362,6 +400,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
   };
 
   const run = async (action: () => Promise<{ ok: boolean; data: Record<string, any> }>, success: string) => {
+    if (inFlight.current) return false;
+    inFlight.current = true;
     setBusy(true);
     setNotice(null);
     try {
@@ -377,142 +417,172 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       setNotice({ ok: false, text: 'Not saved: no connection. Please try again.' });
       return false;
     } finally {
+      inFlight.current = false;
       setBusy(false);
       await refreshAfterChange();
       await loadDishes();
     }
   };
 
+
   // --- Render ----------------------------------------------------------------------------------
 
+  const TABS = [
+    { id: 'MENU' as const, label: 'Menu', icon: CalendarDays },
+    { id: 'MONTH' as const, label: 'Month', icon: CalendarRange },
+    { id: 'DISHES' as const, label: 'Dishes', icon: BookOpen },
+  ];
+  const openUntil = day ? viewOnlyReason(day) : null;
+
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-3 pb-32 space-y-4 overflow-x-hidden">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-black text-slate-900">Student Menu</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-36 md:pb-16 space-y-5 overflow-x-hidden">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Student Menu</h1>
+          <p className="text-sm sm:text-base text-slate-600">What parents can order, by day and class.</p>
+        </div>
         <Link
           href="/staff/menu-import"
-          className="min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 inline-flex items-center gap-1.5"
+          className="self-start sm:self-auto min-h-[44px] px-4 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-800 hover:bg-slate-50 inline-flex items-center gap-2 shadow-sm"
         >
-          <Upload className="w-4 h-4" /> Monthly file
+          <Upload className="w-4 h-4" /> Import monthly menu
         </Link>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-3 gap-2" role="tablist">
-        {(['MENU', 'MONTH', 'DISHES'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`min-h-[44px] rounded-xl text-base font-bold border ${tab === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}
-          >
-            {t === 'MENU' ? 'Menu' : t === 'MONTH' ? 'Month' : 'Dishes'}
-          </button>
-        ))}
-      </div>
-
-      {notice && (
-        <div
-          role="status"
-          className={`p-3 rounded-2xl border text-base font-semibold space-y-2 ${notice.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <span className="min-w-0 break-words">{notice.text}</span>
-            <button type="button" onClick={() => setNotice(null)} aria-label="Close message" className="w-11 h-11 -m-2 shrink-0 flex items-center justify-center">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {notice.retryOthers && (
+      {/* Tabs */}
+      <div role="tablist" aria-label="Student Menu" className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-100 sm:inline-grid sm:w-[420px]">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
             <button
+              key={t.id}
               type="button"
-              disabled={busy}
-              onClick={notice.retryOthers}
-              className="w-full min-h-[44px] rounded-xl bg-white border border-rose-300 text-rose-900 font-bold disabled:opacity-60"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={`min-h-[44px] rounded-xl text-base font-bold inline-flex items-center justify-center gap-2 transition-colors ${
+                active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              Save for the other classes only
+              <Icon className="w-4 h-4" />
+              {t.label}
             </button>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {tab === 'MENU' ? (
         <>
-          {/* Day strip */}
-          <div className="flex items-center gap-1 -mx-1">
-            <button type="button" onClick={() => shiftWindow(-7)} aria-label="Earlier days" className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl text-slate-600">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div ref={stripRef} className="flex-1 min-w-0 flex gap-1.5 overflow-x-auto py-1 [scrollbar-width:none]">
-              {days.map((d) => (
-                <button
-                  key={d.date}
-                  type="button"
-                  data-date={d.date}
-                  onClick={() => setSelected(d.date)}
-                  aria-pressed={selected === d.date}
-                  aria-label={`${d.weekday} ${dayNumber(d.date)}: ${DOT[d.status].label}`}
-                  className={`shrink-0 w-14 min-h-[56px] rounded-xl border flex flex-col items-center justify-center ${
-                    selected === d.date ? 'bg-slate-900 text-white border-slate-900' : d.isPast ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white text-slate-800 border-slate-300'
-                  }`}
-                >
-                  <span className="text-xs font-semibold">{d.weekday}</span>
-                  <span className="text-base font-black leading-tight">{dayNumber(d.date)}</span>
-                  <span className={`mt-0.5 w-2 h-2 rounded-full ${DOT[d.status].color}`} />
-                </button>
+          {/* Date strip: scrolls sideways on its own; the page never does. */}
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 sm:p-3 space-y-2" aria-label="Choose a day">
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => shiftWindow(-7)} aria-label="Earlier days" className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div ref={stripRef} className="flex-1 min-w-0 flex gap-1.5 overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {days.map((d) => {
+                  const active = selected === d.date;
+                  return (
+                    <button
+                      key={d.date}
+                      type="button"
+                      data-date={d.date}
+                      onClick={() => setSelected(d.date)}
+                      aria-pressed={active}
+                      aria-label={`${d.isToday ? 'Today, ' : ''}${d.weekday} ${dayNumber(d.date)}: ${DOT[d.status].label}`}
+                      className={`shrink-0 w-[60px] min-h-[68px] rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                        active
+                          ? 'bg-slate-900 text-white border-slate-900 shadow'
+                          : d.isPast
+                            ? 'bg-slate-50 text-slate-400 border-slate-200'
+                            : d.isToday
+                              ? 'bg-white text-slate-900 border-amber-400 ring-1 ring-amber-400'
+                              : 'bg-white text-slate-800 border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className="text-[11px] font-bold uppercase tracking-wide">{d.isToday ? 'Today' : d.weekday}</span>
+                      <span className="text-lg font-black leading-none">{dayNumber(d.date)}</span>
+                      <span className={`w-2 h-2 rounded-full ${DOT[d.status].color}`} />
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={() => shiftWindow(7)} aria-label="Later days" className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100">
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 px-2 pb-1 text-xs text-slate-600">
+              {(['ALL', 'SOME', 'NONE', 'HOLIDAY', 'SUNDAY'] as const).map((s) => (
+                <span key={s} className="inline-flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${DOT[s].color}`} /> {DOT[s].label}
+                </span>
               ))}
             </div>
-            <button type="button" onClick={() => shiftWindow(7)} aria-label="Later days" className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl text-slate-600">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-            {(['ALL', 'SOME', 'NONE', 'HOLIDAY', 'SUNDAY'] as const).map((s) => (
-              <span key={s} className="inline-flex items-center gap-1">
-                <span className={`w-2 h-2 rounded-full ${DOT[s].color}`} /> {DOT[s].label}
-              </span>
-            ))}
-          </div>
+          </section>
 
-          {error && <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold">{error}</div>}
+          {error && (
+            <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <button type="button" onClick={() => loadDays()} className="min-h-[44px] px-3 rounded-lg bg-white border border-rose-300 font-bold shrink-0">
+                Try again
+              </button>
+            </div>
+          )}
 
-          {!loaded || !day ? (
-            <div className="space-y-3" aria-hidden>
+          {error && !day ? null : !loaded || !day ? (
+            <div className="grid gap-4 lg:grid-cols-3" aria-hidden>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-36 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+                <div key={i} className="h-72 rounded-2xl bg-white border border-slate-200 animate-pulse" />
               ))}
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-lg font-black text-slate-900">{formatDatePretty(day.date)}</p>
-                  <p className="text-sm text-slate-600">
-                    {viewOnlyReason(day) || `Parents can order until ${day.classes[0]?.deadline || '08:30'}${day.isToday ? ' today' : ' on the day'}.`}
-                  </p>
+              {/* Selected day */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="space-y-1.5">
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                    {day.isToday && <span className="text-amber-600">Today · </span>}
+                    {formatDatePretty(day.date)}
+                  </h2>
+                  {openUntil ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-sm font-semibold">
+                      <Lock className="w-3.5 h-3.5" /> {openUntil}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-sm font-semibold">
+                      <Clock className="w-3.5 h-3.5" /> Parents can order until {day.classes[0]?.deadline || '08:30'}
+                      {day.isToday ? ' today' : ' on the day'}
+                    </span>
+                  )}
                 </div>
-                {anyEditable && day.status !== 'HOLIDAY' && (
-                  <button
-                    type="button"
-                    onClick={() => setSheet({ kind: 'holiday' })}
-                    className="min-h-[44px] px-3 rounded-xl border border-rose-200 bg-white text-rose-700 text-sm font-bold"
-                  >
-                    Mark as holiday
-                  </button>
-                )}
-                {!day.isPast && day.status === 'HOLIDAY' && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => run(() => send('/api/admin/menus/holiday', 'POST', { date: day.date, studentCategory: 'ALL', action: 'undo' }), 'Holiday removed. Nothing is on sale yet.')}
-                    className="min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60"
-                  >
-                    Undo holiday (all)
-                  </button>
-                )}
+                <div className="flex gap-2">
+                  {anyEditable && day.status !== 'HOLIDAY' && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setSheet({ kind: 'holiday' })}
+                      className="min-h-[44px] px-4 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold hover:bg-slate-50 inline-flex items-center gap-2 disabled:opacity-60"
+                    >
+                      <CalendarOff className="w-4 h-4" /> Mark as holiday
+                    </button>
+                  )}
+                  {!day.isPast && day.status === 'HOLIDAY' && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => run(() => send('/api/admin/menus/holiday', 'POST', { date: day.date, studentCategory: 'ALL', action: 'undo' }), 'Holiday removed. Nothing is on sale yet.')}
+                      className="min-h-[44px] px-4 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      Undo holiday (all classes)
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-3">
+              {/* One card per class: side by side on wide screens, stacked on phones. */}
+              <div className="grid gap-4 lg:grid-cols-3 items-start">
                 {day.classes.map((c) => (
                   <ClassCardView
                     key={c.category}
@@ -525,6 +595,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
                     onEdit={() => {
                       const dish = dishes.find((d) => d.id === c.mealId);
                       if (dish) setSheet({ kind: 'edit', dish });
+                      else setNotice({ ok: false, text: 'This dish is still loading. Please try again in a moment.' });
                     }}
                     onUndoHoliday={() =>
                       run(() => send('/api/admin/menus/holiday', 'POST', { date: day.date, studentCategory: c.category, action: 'undo' }), `Holiday removed for ${c.category}. Nothing is on sale yet.`)
@@ -542,10 +613,47 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       ) : tab === 'MONTH' ? (
         <MonthTab startMonth={(selected || today).slice(0, 7)} today={today} onOpenDay={openDay} />
       ) : (
-        <DishesTab dishes={dishes} isAdmin={isAdmin} busy={busy} onNew={() => setSheet({ kind: 'new' })} onEdit={(d) => setSheet({ kind: 'edit', dish: d })} onDelete={(d) => {
-          if (!window.confirm(`Delete ${d.name} from the dish list? This cannot be undone.`)) return;
-          run(() => send(`/api/admin/meals?id=${encodeURIComponent(d.id)}`, 'DELETE'), `${d.name} deleted.`);
-        }} />
+        <DishesTab
+          dishes={dishes}
+          isAdmin={isAdmin}
+          busy={busy}
+          onNew={() => setSheet({ kind: 'new' })}
+          onEdit={(d) => setSheet({ kind: 'edit', dish: d })}
+          onDelete={(d) => {
+            if (!window.confirm(`Delete ${d.name} from the dish list? This cannot be undone.`)) return;
+            run(() => send(`/api/admin/meals?id=${encodeURIComponent(d.id)}`, 'DELETE'), `${d.name} deleted.`);
+          }}
+        />
+      )}
+
+      {/* Messages float above the page, so they are seen wherever the button was. */}
+      {notice && (
+        <div className="fixed inset-x-0 bottom-24 md:bottom-6 z-[70] px-4 pointer-events-none">
+          <div
+            role={notice.ok ? 'status' : 'alert'}
+            className={`pointer-events-auto max-w-lg mx-auto p-3 rounded-2xl border shadow-lg text-base font-semibold space-y-2 ${
+              notice.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {notice.ok ? <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />}
+              <span className="min-w-0 flex-1 break-words">{notice.text}</span>
+              <button type="button" onClick={() => setNotice(null)} aria-label="Close message" className="w-11 h-11 -m-2 shrink-0 flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {notice.retryOthers && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={notice.retryOthers}
+                className="w-full min-h-[44px] rounded-xl bg-white border border-rose-300 text-rose-900 font-bold disabled:opacity-60"
+              >
+                Save for the other classes only
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Sheets */}
@@ -589,7 +697,11 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       )}
       {sheet?.kind === 'extraPortions' && day && (
         <PortionsSheet
-          card={{ ...sheet.card, mealName: `${sheet.extra.mealName} (extra)`, ordered: sheet.extra.ordered, maxQuantity: sheet.extra.maxQuantity }}
+          title={`Portions: ${sheet.extra.mealName}`}
+          subtitle={`Extra for ${sheet.card.category}`}
+          ordered={sheet.extra.ordered}
+          total={sheet.extra.maxQuantity}
+          left={sheet.extra.availableQuantity}
           busy={busy}
           onClose={() => setSheet(null)}
           onSave={(n) =>
@@ -601,29 +713,20 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
         />
       )}
       {sheet?.kind === 'extraRemove' && day && (
-        <BottomSheet title="Remove extra" onClose={() => setSheet(null)}>
-          <p className="text-base text-slate-900">
-            Remove the extra {sheet.extra.mealName} from {formatDatePretty(day.date)}, {sheet.card.category}? Parents will no longer be able to order it.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => setSheet(null)} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold">
-              Keep it
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                run(
-                  () => send('/api/admin/menus/extras', 'POST', { action: 'remove', date: day.date, studentCategory: sheet.card.category, mealId: sheet.extra.mealId }),
-                  `${sheet.extra.mealName} removed from ${formatDatePretty(day.date)}, ${sheet.card.category}.`
-                )
-              }
-              className="min-h-[48px] rounded-xl bg-rose-600 text-white text-base font-black disabled:opacity-60"
-            >
-              Remove
-            </button>
-          </div>
-        </BottomSheet>
+        <ConfirmSheet
+          title="Remove extra"
+          busy={busy}
+          confirmLabel="Remove extra"
+          onClose={() => setSheet(null)}
+          onConfirm={() =>
+            run(
+              () => send('/api/admin/menus/extras', 'POST', { action: 'remove', date: day.date, studentCategory: sheet.card.category, mealId: sheet.extra.mealId }),
+              `${sheet.extra.mealName} removed from ${formatDatePretty(day.date)}, ${sheet.card.category}.`
+            )
+          }
+        >
+          Remove the extra {sheet.extra.mealName} from {formatDatePretty(day.date)}, {sheet.card.category}? Parents will no longer be able to order it.
+        </ConfirmSheet>
       )}
       {sheet?.kind === 'edit' && (
         <DishForm
@@ -636,7 +739,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       )}
       {sheet?.kind === 'new' && (
         <DishForm
-          title="New dish"
+          title="Add dish"
           busy={busy}
           onClose={() => setSheet(null)}
           onSave={(v) => run(() => send('/api/admin/meals', 'POST', { ...v, category: 'LUNCH' }), `${v.name} added to the dish list.`)}
@@ -644,7 +747,11 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       )}
       {sheet?.kind === 'portions' && day && (
         <PortionsSheet
-          card={sheet.card}
+          title={`Portions: ${sheet.card.category}`}
+          subtitle={sheet.card.mealName || ''}
+          ordered={sheet.card.ordered}
+          total={sheet.card.maxQuantity}
+          left={sheet.card.availableQuantity}
           busy={busy}
           onClose={() => setSheet(null)}
           onSave={(n) => run(() => send('/api/admin/menus/portions', 'POST', { date: day.date, studentCategory: sheet.card.category, portions: n }), `${sheet.card.category}: ${n} portions.`)}
@@ -661,35 +768,63 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
         />
       )}
       {sheet?.kind === 'remove' && day && (
-        <BottomSheet title="Remove dish" onClose={() => setSheet(null)}>
-          <p className="text-base text-slate-900">
-            Remove {sheet.card.mealName} from {formatDatePretty(day.date)}, {sheet.card.category}? Parents will no longer be able to order it.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => setSheet(null)} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold">
-              Keep it
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                run(
-                  () => send('/api/admin/menus/unpublish', 'POST', { date: day.date, studentCategory: sheet.card.category }),
-                  `${sheet.card.mealName} removed from ${formatDatePretty(day.date)}, ${sheet.card.category}. Parents can no longer order it.`
-                )
-              }
-              className="min-h-[48px] rounded-xl bg-rose-600 text-white text-base font-black inline-flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Remove
-            </button>
-          </div>
-        </BottomSheet>
+        <ConfirmSheet
+          title="Remove dish"
+          busy={busy}
+          confirmLabel="Remove"
+          onClose={() => setSheet(null)}
+          onConfirm={() =>
+            run(
+              () => send('/api/admin/menus/unpublish', 'POST', { date: day.date, studentCategory: sheet.card.category }),
+              `${sheet.card.mealName} removed from ${formatDatePretty(day.date)}, ${sheet.card.category}. Parents can no longer order it.`
+            )
+          }
+        >
+          Remove {sheet.card.mealName} from {formatDatePretty(day.date)}, {sheet.card.category}? Parents will no longer be able to order it.
+        </ConfirmSheet>
       )}
     </div>
   );
 }
 
 // --- Pieces ----------------------------------------------------------------------------------
+
+const PRIMARY_BTN =
+  'min-h-[48px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-base font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 transition-colors';
+const SECONDARY_BTN =
+  'min-h-[48px] px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-left inline-flex items-center gap-2 disabled:opacity-60 transition-colors';
+
+function StatusPill({ state }: { state: ClassCard['state'] }) {
+  if (state === 'HOLIDAY') return <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">Holiday</span>;
+  if (state === 'ON_SALE')
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> On sale
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Not on sale
+    </span>
+  );
+}
+
+/** Ordered / Portions / Left, exactly as the server reports them. */
+function Counts({ ordered, total, left, small = false }: { ordered: number; total: number | null; left: number | null; small?: boolean }) {
+  const cell = (label: string, value: number | null, strong = false) => (
+    <div className="flex-1 min-w-0 px-2 py-1.5 text-center">
+      <p className={`${small ? 'text-base' : 'text-xl'} font-black tabular-nums ${strong ? 'text-slate-900' : 'text-slate-800'}`}>{value ?? '–'}</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    </div>
+  );
+  return (
+    <div className="flex divide-x divide-slate-200 rounded-xl bg-slate-50 border border-slate-200">
+      {cell('Ordered', ordered, true)}
+      {cell('Portions', total)}
+      {cell('Left', left)}
+    </div>
+  );
+}
 
 function ClassCardView({
   card: c,
@@ -720,87 +855,110 @@ function ClassCardView({
 }) {
   const onSale = c.state === 'ON_SALE';
   return (
-    <section className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">{c.category}</h2>
+    <article className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <header className="flex items-center justify-between gap-2 px-4 pt-4">
+        <h3 className="text-base font-black text-slate-900">{c.category}</h3>
+        <StatusPill state={c.state} />
+      </header>
+
+      <div className="p-4 space-y-4">
         {c.state === 'HOLIDAY' ? (
-          <span className="text-sm font-bold text-rose-700">Holiday</span>
+          <>
+            <div className="rounded-xl bg-rose-50 border border-rose-100 p-3">
+              <p className="text-sm font-bold text-rose-700">No brunch</p>
+              <p className="text-lg font-black text-slate-900 break-words">{c.holidayReason}</p>
+            </div>
+            {!day.isPast && (
+              <button type="button" disabled={busy} onClick={onUndoHoliday} className={`${SECONDARY_BTN} w-full justify-center font-bold`}>
+                Undo holiday
+              </button>
+            )}
+          </>
         ) : onSale ? (
-          <span className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> On sale
-          </span>
+          <>
+            <div className="space-y-1">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-lg font-black text-slate-900 leading-snug break-words min-w-0">{c.mealName}</p>
+                <span className="text-lg font-black text-slate-900 shrink-0">{c.price !== null ? formatINR(c.price) : ''}</span>
+              </div>
+              {c.isVegetarian !== null && <VegBadge isVegetarian={c.isVegetarian} size="sm" showLabel />}
+            </div>
+            <Counts ordered={c.ordered} total={c.maxQuantity} left={c.availableQuantity} />
+
+            {c.shared && (
+              <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Shared by all 3 classes (older entry). Changing one class gives each class its own.
+              </p>
+            )}
+            {c.duplicates > 0 && (
+              <p className="text-sm text-slate-600">
+                {c.duplicates} older duplicate {c.duplicates === 1 ? 'entry is' : 'entries are'} hidden from parents.
+              </p>
+            )}
+
+            {c.editable && (
+              <button type="button" disabled={busy} onClick={onAdd} className={`${PRIMARY_BTN} w-full`}>
+                <Repeat className="w-4 h-4" /> Change dish
+              </button>
+            )}
+            <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+              {c.editable && c.mealId && (
+                <button type="button" disabled={busy} onClick={onDayEdit} className={SECONDARY_BTN}>
+                  <CalendarCheck className="w-4 h-4 shrink-0 text-slate-500" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold leading-tight">Edit for this day</span>
+                    <span className="block text-xs text-slate-500 leading-tight">This date only</span>
+                  </span>
+                </button>
+              )}
+              {c.mealId && (
+                <button type="button" disabled={busy} onClick={onEdit} className={SECONDARY_BTN}>
+                  <Pencil className="w-4 h-4 shrink-0 text-slate-500" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold leading-tight">Edit everywhere</span>
+                    <span className="block text-xs text-slate-500 leading-tight">Every day it&apos;s used</span>
+                  </span>
+                </button>
+              )}
+              {c.editable && (
+                <button type="button" disabled={busy} onClick={onPortions} className={SECONDARY_BTN}>
+                  <Layers className="w-4 h-4 shrink-0 text-slate-500" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold leading-tight">Portions</span>
+                    <span className="block text-xs text-slate-500 leading-tight">{c.maxQuantity ?? '–'} in total</span>
+                  </span>
+                </button>
+              )}
+              {c.removable && (
+                <button type="button" disabled={busy} onClick={onRemove} className={`${SECONDARY_BTN} border-rose-200 hover:bg-rose-50 text-rose-700`}>
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span className="text-sm font-bold">Remove</span>
+                </button>
+              )}
+            </div>
+          </>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500">
-            <span className="w-2 h-2 rounded-full bg-slate-300" /> Not on sale
-          </span>
+          <div className="rounded-xl border-2 border-dashed border-slate-200 p-4 text-center space-y-3">
+            <p className="text-base font-bold text-slate-500">Nothing on sale</p>
+            {c.editable && (
+              <button type="button" disabled={busy} onClick={onAdd} className={`${PRIMARY_BTN} w-full`}>
+                <Plus className="w-4 h-4" /> Add dish
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {c.state === 'HOLIDAY' ? (
-        <p className="text-lg font-black text-slate-900 break-words">Holiday: {c.holidayReason}</p>
-      ) : onSale ? (
-        <div className="space-y-1">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-lg font-black text-slate-900 break-words min-w-0">{c.mealName}</p>
-            <span className="text-lg font-black text-slate-900 shrink-0">{c.price !== null ? formatINR(c.price) : ''}</span>
-          </div>
-          {c.isVegetarian !== null && <VegBadge isVegetarian={c.isVegetarian} size="sm" />}
-          <p className="text-base text-slate-700">
-            <strong>{c.ordered}</strong> ordered
-            {c.maxQuantity !== null && (
-              <>
-                {' '}/ <strong>{c.maxQuantity}</strong> available
-              </>
-            )}
-          </p>
-        </div>
-      ) : (
-        <p className="text-lg font-bold text-slate-500">Nothing on sale</p>
-      )}
-
-      {c.shared && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">Shared by all 3 classes (older entry). Changing one class gives each class its own.</p>}
-      {c.duplicates > 0 && <p className="text-sm text-slate-600">{c.duplicates} older duplicate {c.duplicates === 1 ? 'entry is' : 'entries are'} hidden from parents.</p>}
-
-      {(c.editable || c.removable || (c.state === 'HOLIDAY' && !day.isPast)) && (
-        <div className="grid grid-cols-2 gap-2">
-          {c.editable && c.state !== 'HOLIDAY' && (
-            <button type="button" disabled={busy} onClick={onAdd} className="min-h-[48px] rounded-xl bg-slate-900 text-white text-base font-bold disabled:opacity-60">
-              {onSale ? 'Change dish' : 'Add dish'}
-            </button>
-          )}
-          {c.removable && (
-            <button type="button" disabled={busy} onClick={onRemove} className="min-h-[48px] rounded-xl border-2 border-rose-200 bg-white text-rose-700 text-base font-bold disabled:opacity-60">
-              Remove
-            </button>
-          )}
-          {c.editable && onSale && (
-            <button type="button" disabled={busy} onClick={onPortions} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60">
-              Portions: {c.maxQuantity ?? '–'}
-            </button>
-          )}
-          {c.editable && onSale && c.mealId && (
-            <button type="button" disabled={busy} onClick={onDayEdit} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60">
-              Edit for this day
-            </button>
-          )}
-          {onSale && c.mealId && (
-            <button type="button" disabled={busy} onClick={onEdit} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60">
-              Edit everywhere
-            </button>
-          )}
-          {c.state === 'HOLIDAY' && !day.isPast && (
-            <button type="button" disabled={busy} onClick={onUndoHoliday} className="col-span-2 min-h-[48px] rounded-xl border border-slate-300 bg-white text-slate-800 text-base font-bold disabled:opacity-60">
-              Undo holiday
-            </button>
-          )}
-        </div>
-      )}
-
+      {/* Extras: optional add-ons, ordered by parents together with the brunch. */}
       {onSale && (c.extras.length > 0 || c.editable) && (
-        <div className="pt-3 border-t border-slate-100 space-y-2">
-          <p className="text-sm font-black uppercase tracking-wide text-slate-500">Extras</p>
+        <section className="border-t border-amber-100 bg-amber-50/50 px-4 py-3 space-y-2" aria-label={`Extras for ${c.category}`}>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-sm font-black text-amber-900">Extras</p>
+            <p className="text-xs text-amber-800">Optional add-ons with the brunch</p>
+          </div>
+          {c.extras.length === 0 && <p className="text-sm text-slate-600">No extras for this day.</p>}
           {c.extras.map((x) => (
-            <div key={x.mealId} className="rounded-xl border border-slate-200 p-3 space-y-2">
+            <div key={x.mealId} className="rounded-xl bg-white border border-amber-100 p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <span className="flex items-center gap-2 min-w-0">
                   {x.isVegetarian !== null && <VegBadge isVegetarian={x.isVegetarian} size="sm" />}
@@ -808,18 +966,16 @@ function ClassCardView({
                 </span>
                 <span className="text-base font-bold text-slate-900 shrink-0">{x.price !== null ? formatINR(x.price) : ''}</span>
               </div>
-              <p className="text-sm text-slate-700">
-                <strong>{x.ordered}</strong> ordered / <strong>{x.maxQuantity}</strong> available
-              </p>
+              <Counts ordered={x.ordered} total={x.maxQuantity} left={x.availableQuantity} small />
               {(c.editable || !day.isPast) && (
                 <div className="grid grid-cols-2 gap-2">
                   {c.editable && (
-                    <button type="button" disabled={busy} onClick={() => onExtraPortions(x)} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-sm font-bold disabled:opacity-60">
-                      Portions: {x.maxQuantity}
+                    <button type="button" disabled={busy} onClick={() => onExtraPortions(x)} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-sm font-bold hover:bg-slate-50 disabled:opacity-60">
+                      Portions
                     </button>
                   )}
                   {!day.isPast && (
-                    <button type="button" disabled={busy} onClick={() => onExtraRemove(x)} className="min-h-[44px] rounded-xl border-2 border-rose-200 bg-white text-rose-700 text-sm font-bold disabled:opacity-60">
+                    <button type="button" disabled={busy} onClick={() => onExtraRemove(x)} className="min-h-[44px] rounded-xl border border-rose-200 bg-white text-rose-700 text-sm font-bold hover:bg-rose-50 disabled:opacity-60">
                       Remove
                     </button>
                   )}
@@ -828,34 +984,177 @@ function ClassCardView({
             </div>
           ))}
           {c.editable && (
-            <button type="button" disabled={busy} onClick={onExtraAdd} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 inline-flex items-center justify-center gap-1.5 disabled:opacity-60">
+            <button type="button" disabled={busy} onClick={onExtraAdd} className="w-full min-h-[44px] rounded-xl border border-dashed border-amber-400 bg-white text-amber-900 text-sm font-bold inline-flex items-center justify-center gap-1.5 hover:bg-amber-50 disabled:opacity-60">
               <Plus className="w-4 h-4" /> Add extra
             </button>
           )}
-        </div>
+        </section>
       )}
-    </section>
+    </article>
   );
 }
 
-function BottomSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function BottomSheet({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
+  // Escape closes; the page behind does not scroll while the sheet is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-900/50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-slate-900/50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl p-4 pb-8 space-y-4 shadow-xl"
+        className="w-full sm:max-w-lg max-h-[92dvh] flex flex-col bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-lg font-black text-slate-900">{title}</p>
-          <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 flex items-center justify-center text-slate-500">
+        <div className="flex items-start justify-between gap-2 px-5 pt-4 pb-3 border-b border-slate-100">
+          <div className="min-w-0">
+            <p className="text-lg font-black text-slate-900 break-words">{title}</p>
+            {subtitle && <p className="text-sm text-slate-600 break-words">{subtitle}</p>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 shrink-0 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4">{children}</div>
       </div>
+    </div>
+  );
+}
+
+function ConfirmSheet({
+  title,
+  confirmLabel,
+  busy,
+  onClose,
+  onConfirm,
+  children,
+}: {
+  title: string;
+  confirmLabel: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <BottomSheet title={title} onClose={onClose}>
+      <p className="text-base text-slate-900">{children}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" onClick={onClose} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
+          Keep it
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onConfirm}
+          className="min-h-[48px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-base font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />} {confirmLabel}
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+/** Two big choices (radio cards): "All 3 classes" and "<class> only". */
+function ApplyTo({ name, category, value, onChange, allFirst = true }: { name: string; category: ClassName; value: boolean; onChange: (all: boolean) => void; allFirst?: boolean }) {
+  const options = [
+    { v: true, label: 'All 3 classes', hint: 'Pre-primary, Primary and Secondary' },
+    { v: false, label: `${category} only`, hint: 'The other classes stay as they are' },
+  ];
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-bold text-slate-700 mb-1">Apply to</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(allFirst ? options : [...options].reverse()).map((o) => (
+          <label
+            key={String(o.v)}
+            className={`flex items-start gap-3 min-h-[52px] px-3 py-2 rounded-xl border cursor-pointer ${value === o.v ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}
+          >
+            <input type="radio" name={name} checked={value === o.v} onChange={() => onChange(o.v)} className="w-5 h-5 mt-0.5 accent-slate-900" />
+            <span>
+              <span className="block text-base font-bold text-slate-900">{o.label}</span>
+              <span className="block text-xs text-slate-500">{o.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function DishPicker({
+  dishes,
+  selectedId,
+  onSelect,
+  onNew,
+  emptyText = 'No dish matches.',
+}: {
+  dishes: Dish[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  emptyText?: string;
+}) {
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return dishes.filter((d) => !q || d.name.toLowerCase().includes(q));
+  }, [dishes, search]);
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search dishes"
+          aria-label="Search dishes"
+          className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
+        />
+      </div>
+      <ul className="max-h-[34dvh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl" role="radiogroup" aria-label="Dishes">
+        {filtered.map((d) => {
+          const active = selectedId === d.id;
+          return (
+            <li key={d.id}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onSelect(d.id)}
+                className={`w-full min-h-[52px] px-3 py-2 flex items-center justify-between gap-3 text-left ${active ? 'bg-emerald-50' : 'bg-white hover:bg-slate-50'}`}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center ${active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300'}`}>
+                    {active && <Check className="w-3 h-3" />}
+                  </span>
+                  <VegBadge isVegetarian={d.isVegetarian} size="sm" />
+                  <span className="text-base font-semibold text-slate-900 break-words min-w-0">
+                    {d.name}
+                    {d.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}
+                  </span>
+                </span>
+                <span className="text-base font-bold text-slate-800 shrink-0">{formatINR(d.price)}</span>
+              </button>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && <li className="p-4 text-base text-slate-500">{emptyText}</li>}
+      </ul>
+      <button type="button" onClick={onNew} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5">
+        <Plus className="w-4 h-4" /> New dish
+      </button>
     </div>
   );
 }
@@ -880,18 +1179,17 @@ function DishSheet({
   onSave: (mealId: string, applyAll: boolean, portions: number | null) => void;
 }) {
   const card = day.classes.find((c) => c.category === category)!;
-  const [search, setSearch] = useState('');
   const [mealId, setMealId] = useState<string>(card.mealId || '');
   const [applyAll, setApplyAll] = useState(true);
-  const [portions, setPortions] = useState(String(card.maxQuantity ?? 50));
+  // Starts at the class's total, but never below what is already ordered (shown on screen; the
+  // server still enforces it).
+  const [portions, setPortions] = useState(() =>
+    String(Math.max(card.maxQuantity ?? 50, ...day.classes.filter((c) => c.editable && c.mealId && c.mealId === card.mealId).map((c) => c.ordered)))
+  );
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState('');
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return dishes.filter((d) => !d.dayOnly && (!q || d.name.toLowerCase().includes(q)));
-  }, [dishes, search]);
-
+  const choices = useMemo(() => dishes.filter((d) => !d.dayOnly), [dishes]);
   const targets = applyAll ? day.classes.filter((c) => c.editable) : [card];
   const minPortions = Math.max(0, ...targets.map((c) => (c.mealId === mealId ? c.ordered : 0)));
 
@@ -914,7 +1212,11 @@ function DishSheet({
   };
 
   return (
-    <BottomSheet title={`${mode === 'add' ? 'Add' : 'Change'} dish: ${formatDatePretty(day.date)}`} onClose={onClose}>
+    <BottomSheet
+      title={mode === 'add' ? 'Add dish' : 'Change dish'}
+      subtitle={`${formatDatePretty(day.date)} · ${category}${card.mealName && mode === 'change' ? ` · now: ${card.mealName}` : ''}`}
+      onClose={onClose}
+    >
       {creating ? (
         <DishFields
           submitLabel="Add dish"
@@ -936,54 +1238,8 @@ function DishSheet({
         />
       ) : (
         <>
-          <div className="relative">
-            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search dishes"
-              className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base"
-            />
-          </div>
-          <ul className="max-h-[38vh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl" role="radiogroup">
-            {filtered.map((d) => (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={mealId === d.id}
-                  onClick={() => setMealId(d.id)}
-                  className={`w-full min-h-[52px] px-3 py-2 flex items-center justify-between gap-3 text-left ${mealId === d.id ? 'bg-amber-50' : 'bg-white'}`}
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className={`w-5 h-5 shrink-0 rounded-full border-2 ${mealId === d.id ? 'border-amber-600 bg-amber-500' : 'border-slate-300'}`} />
-                    <VegBadge isVegetarian={d.isVegetarian} size="sm" />
-                    <span className="text-base font-semibold text-slate-900 break-words min-w-0">{d.name}</span>
-                  </span>
-                  <span className="text-base font-bold text-slate-800 shrink-0">{formatINR(d.price)}</span>
-                </button>
-              </li>
-            ))}
-            {filtered.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
-          </ul>
-          <button type="button" onClick={() => setCreating(true)} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 inline-flex items-center justify-center gap-1.5">
-            <Plus className="w-4 h-4" /> New dish
-          </button>
-
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-bold text-slate-700">Apply to</legend>
-            {[
-              { v: true, label: 'All 3 classes' },
-              { v: false, label: `${category} only` },
-            ].map((o) => (
-              <label key={String(o.v)} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
-                <input type="radio" name="apply" checked={applyAll === o.v} onChange={() => setApplyAll(o.v)} className="w-5 h-5" />
-                <span className="text-base text-slate-900">{o.label}</span>
-              </label>
-            ))}
-          </fieldset>
-
+          <DishPicker dishes={choices} selectedId={mealId} onSelect={setMealId} onNew={() => setCreating(true)} />
+          <ApplyTo name="apply" category={category} value={applyAll} onChange={setApplyAll} />
           <label className="block">
             <span className="text-sm font-bold text-slate-700">Portions {applyAll ? '(each class)' : ''}</span>
             <input
@@ -993,23 +1249,33 @@ function DishSheet({
               max={10000}
               value={portions}
               onChange={(e) => setPortions(e.target.value)}
-              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base"
+              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
             {minPortions > 0 && <span className="text-sm text-slate-600">At least {minPortions} (already ordered).</span>}
           </label>
-
           {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={save}
-            className="w-full min-h-[52px] rounded-xl bg-emerald-600 text-white text-lg font-black inline-flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {busy && <Loader2 className="w-5 h-5 animate-spin" />} Save
-          </button>
+          <SheetActions busy={busy} onCancel={onClose} onSave={save} saveLabel="Save" />
         </>
       )}
     </BottomSheet>
+  );
+}
+
+function SheetActions({ busy, onCancel, onSave, saveLabel, danger = false }: { busy: boolean; onCancel: () => void; onSave: () => void; saveLabel: string; danger?: boolean }) {
+  return (
+    <div className="grid grid-cols-[auto_1fr] gap-2 pt-1">
+      <button type="button" onClick={onCancel} disabled={busy} className="min-h-[52px] px-5 rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
+        Cancel
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onSave}
+        className={`min-h-[52px] rounded-xl text-white text-lg font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-slate-900 hover:bg-slate-800'}`}
+      >
+        {busy && <Loader2 className="w-5 h-5 animate-spin" />} {saveLabel}
+      </button>
+    </div>
   );
 }
 
@@ -1020,6 +1286,7 @@ function DishFields({
   submitLabel,
   busy,
   onCancel,
+  cancelLabel = 'Back',
   onSubmit,
   notes,
 }: {
@@ -1027,6 +1294,7 @@ function DishFields({
   submitLabel: string;
   busy: boolean;
   onCancel?: () => void;
+  cancelLabel?: string;
   onSubmit: (v: DishValues) => void;
   notes?: React.ReactNode;
 }) {
@@ -1047,66 +1315,86 @@ function DishFields({
 
   return (
     <div className="space-y-3">
+      {notes}
       <label className="block">
-        <span className="text-sm font-bold text-slate-700">Name</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 text-base" />
+        <span className="text-sm font-bold text-slate-700">Dish name</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900" />
       </label>
-      <label className="block">
-        <span className="text-sm font-bold text-slate-700">Price (₹)</span>
-        <input type="number" inputMode="decimal" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 text-base" />
-      </label>
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Veg or non-veg">
-        {[
-          { v: true, label: 'Veg' },
-          { v: false, label: 'Non-veg' },
-        ].map((o) => (
-          <button
-            key={o.label}
-            type="button"
-            role="radio"
-            aria-checked={veg === o.v}
-            onClick={() => setVeg(o.v)}
-            className={`min-h-[44px] rounded-xl border text-base font-bold ${veg === o.v ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}
-          >
-            {o.label}
-          </button>
-        ))}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="text-sm font-bold text-slate-700">Price (₹)</span>
+          <input type="number" inputMode="decimal" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </label>
+        <div>
+          <span className="text-sm font-bold text-slate-700">Type</span>
+          <div className="mt-1 grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100" role="radiogroup" aria-label="Veg or non-veg">
+            {[
+              { v: true, label: 'Veg' },
+              { v: false, label: 'Non-veg' },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                role="radio"
+                aria-checked={veg === o.v}
+                onClick={() => setVeg(o.v)}
+                className={`min-h-[44px] rounded-lg text-sm font-bold ${veg === o.v ? (o.v ? 'bg-white text-emerald-800 shadow-sm' : 'bg-white text-rose-800 shadow-sm') : 'text-slate-600'}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <label className="block">
         <span className="text-sm font-bold text-slate-700">Description (optional)</span>
-        <input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 text-base" />
+        <input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900" />
       </label>
-      {notes}
       {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
-      <div className={`grid gap-2 ${onCancel ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {onCancel && (
-          <button type="button" onClick={onCancel} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold">
-            Back
+      {onCancel ? (
+        <div className="grid grid-cols-[auto_1fr] gap-2 pt-1">
+          <button type="button" onClick={onCancel} disabled={busy} className="min-h-[52px] px-5 rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
+            {cancelLabel}
           </button>
-        )}
-        <button type="button" disabled={busy} onClick={submit} className="min-h-[48px] rounded-xl bg-emerald-600 text-white text-base font-black disabled:opacity-60">
-          {submitLabel}
+          <button type="button" disabled={busy} onClick={submit} className={`${PRIMARY_BTN} min-h-[52px] text-lg`}>
+            {busy && <Loader2 className="w-5 h-5 animate-spin" />} {submitLabel}
+          </button>
+        </div>
+      ) : (
+        <button type="button" disabled={busy} onClick={submit} className={`${PRIMARY_BTN} w-full min-h-[52px] text-lg`}>
+          {busy && <Loader2 className="w-5 h-5 animate-spin" />} {submitLabel}
         </button>
-      </div>
+      )}
+    </div>
+  );
+}
+
+function Note({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 'slate' | 'amber' }) {
+  return (
+    <div className={`flex gap-2 text-sm rounded-xl p-3 border ${tone === 'amber' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+      <Info className="w-4 h-4 shrink-0 mt-0.5" />
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
 
 function DishForm({ title, initial, busy, onClose, onSave }: { title: string; initial?: Dish; busy: boolean; onClose: () => void; onSave: (v: DishValues) => void }) {
   return (
-    <BottomSheet title={title} onClose={onClose}>
+    <BottomSheet title={title} subtitle={initial ? initial.name : undefined} onClose={onClose}>
       <DishFields
         initial={initial}
         submitLabel="Save"
         busy={busy}
+        onCancel={onClose}
+        cancelLabel="Cancel"
         onSubmit={onSave}
         notes={
           initial ? (
-            <div className="space-y-1.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <Note tone="amber">
               <p className="font-bold">Edits this dish everywhere it&apos;s used.</p>
               <p>Price changes apply to new orders only, on every day this dish is on sale.</p>
               <p>The monthly menu file finds dishes by name. If you rename this dish, use the new name in future monthly files too, or the import will create a separate dish.</p>
-            </div>
+            </Note>
           ) : null
         }
       />
@@ -1114,40 +1402,52 @@ function DishForm({ title, initial, busy, onClose, onSave }: { title: string; in
   );
 }
 
-function PortionsSheet({ card, busy, onClose, onSave }: { card: ClassCard; busy: boolean; onClose: () => void; onSave: (n: number) => void }) {
-  const [value, setValue] = useState(String(card.maxQuantity ?? 50));
+function PortionsSheet({
+  title,
+  subtitle,
+  ordered,
+  total,
+  left,
+  busy,
+  onClose,
+  onSave,
+}: {
+  title: string;
+  subtitle: string;
+  ordered: number;
+  total: number | null;
+  left: number | null;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (n: number) => void;
+}) {
+  const [value, setValue] = useState(String(total ?? 50));
   const [problem, setProblem] = useState('');
+  const save = () => {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > 10000) return setProblem('Portions must be a whole number from 0 to 10000.');
+    if (n < ordered) return setProblem(`${ordered} already ordered. Portions can't be lower than that.`);
+    setProblem('');
+    onSave(n);
+  };
   return (
-    <BottomSheet title={`Portions: ${card.category}`} onClose={onClose}>
-      <p className="text-base text-slate-700">
-        {card.mealName}: {card.ordered} ordered so far.
-      </p>
-      <input
-        type="number"
-        inputMode="numeric"
-        min={card.ordered}
-        max={10000}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        aria-label="Portions"
-        className="w-full min-h-[48px] px-3 rounded-xl border border-slate-300 text-base"
-      />
-      <p className="text-sm text-slate-600">At least {card.ordered} (already ordered).</p>
+    <BottomSheet title={title} subtitle={subtitle} onClose={onClose}>
+      <Counts ordered={ordered} total={total} left={left} />
+      <label className="block">
+        <span className="text-sm font-bold text-slate-700">New total portions</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={ordered}
+          max={10000}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
+        />
+        <span className="text-sm text-slate-600">At least {ordered} (already ordered).</span>
+      </label>
       {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          const n = Number(value);
-          if (!Number.isInteger(n) || n < 0 || n > 10000) return setProblem('Portions must be a whole number from 0 to 10000.');
-          if (n < card.ordered) return setProblem(`${card.ordered} already ordered. Portions can't be lower than that.`);
-          setProblem('');
-          onSave(n);
-        }}
-        className="w-full min-h-[52px] rounded-xl bg-emerald-600 text-white text-lg font-black disabled:opacity-60"
-      >
-        Save
-      </button>
+      <SheetActions busy={busy} onCancel={onClose} onSave={save} saveLabel="Save portions" />
     </BottomSheet>
   );
 }
@@ -1158,33 +1458,38 @@ function HolidaySheet({ day, busy, onClose, onSave }: { day: MenuDay; busy: bool
   const [reason, setReason] = useState('');
   const [problem, setProblem] = useState('');
   return (
-    <BottomSheet title={`Holiday: ${formatDatePretty(day.date)}`} onClose={onClose}>
+    <BottomSheet title="Mark as holiday" subtitle={formatDatePretty(day.date)} onClose={onClose}>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-bold text-slate-700">For</legend>
+        <legend className="text-sm font-bold text-slate-700 mb-1">No brunch for</legend>
         {(choices.length === 3 ? (['ALL', ...choices] as Array<'ALL' | ClassName>) : choices).map((c) => (
-          <label key={c} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
-            <input type="radio" name="holiday-scope" checked={scope === c} onChange={() => setScope(c)} className="w-5 h-5" />
-            <span className="text-base">{c === 'ALL' ? 'All 3 classes' : `${c} only`}</span>
+          <label key={c} className={`flex items-center gap-3 min-h-[48px] px-3 rounded-xl border cursor-pointer ${scope === c ? 'border-slate-900 bg-slate-50' : 'border-slate-200'}`}>
+            <input type="radio" name="holiday-scope" checked={scope === c} onChange={() => setScope(c)} className="w-5 h-5 accent-slate-900" />
+            <span className="text-base font-semibold">{c === 'ALL' ? 'All 3 classes' : `${c} only`}</span>
           </label>
         ))}
       </fieldset>
       <label className="block">
         <span className="text-sm font-bold text-slate-700">Reason</span>
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Diwali" maxLength={80} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 text-base" />
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Diwali"
+          maxLength={80}
+          className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
+        />
       </label>
       {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
+      <SheetActions
+        busy={busy}
+        onCancel={onClose}
+        danger
+        saveLabel="Mark as holiday"
+        onSave={() => {
           if (reason.trim().length < 2) return setProblem('Please write a short reason.');
           setProblem('');
           onSave(scope, reason.trim());
         }}
-        className="w-full min-h-[52px] rounded-xl bg-rose-600 text-white text-lg font-black disabled:opacity-60"
-      >
-        Mark as holiday
-      </button>
+      />
     </BottomSheet>
   );
 }
@@ -1212,7 +1517,7 @@ function DishesTab({
   const main = list.filter((d) => !d.dayOnly);
   const copies = list.filter((d) => d.dayOnly);
   const row = (d: Dish) => (
-    <li key={d.id} className="px-3 py-2 flex items-center gap-2">
+    <li key={d.id} className="px-4 py-3 flex items-center gap-3">
       <VegBadge isVegetarian={d.isVegetarian} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="text-base font-semibold text-slate-900 break-words">
@@ -1224,19 +1529,19 @@ function DishesTab({
           {d.dayOnly && d.dayOnlyDate ? ` · only on ${formatDatePretty(d.dayOnlyDate)}` : ''}
         </p>
       </div>
-      <button type="button" disabled={busy} onClick={() => onEdit(d)} className="min-h-[44px] px-3 rounded-xl border border-slate-300 text-sm font-bold">
+      <button type="button" disabled={busy} onClick={() => onEdit(d)} className="min-h-[44px] px-4 rounded-xl border border-slate-300 bg-white text-sm font-bold hover:bg-slate-50 disabled:opacity-60">
         Edit
       </button>
       {isAdmin && (
-        <button type="button" disabled={busy} onClick={() => onDelete(d)} className="min-h-[44px] px-3 rounded-xl border border-rose-200 text-rose-700 text-sm font-bold">
+        <button type="button" disabled={busy} onClick={() => onDelete(d)} className="min-h-[44px] px-3 rounded-xl border border-rose-200 bg-white text-rose-700 text-sm font-bold hover:bg-rose-50 disabled:opacity-60">
           Delete
         </button>
       )}
     </li>
   );
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1 min-w-0">
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -1244,20 +1549,25 @@ function DishesTab({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dishes"
-            className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base"
+            aria-label="Search dishes"
+            className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
         </div>
-        <button type="button" onClick={onNew} className="min-h-[48px] px-4 shrink-0 rounded-xl bg-slate-900 text-white text-base font-bold inline-flex items-center gap-1">
-          <Plus className="w-4 h-4" /> New
+        <button type="button" onClick={onNew} className={`${PRIMARY_BTN} px-5 shrink-0`}>
+          <Plus className="w-4 h-4" /> Add dish
         </button>
       </div>
-      <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl">
+      <p className="text-sm text-slate-600">
+        {main.length} {main.length === 1 ? 'dish' : 'dishes'}. Dishes marked <span className="font-bold text-amber-800">Extra</span> are used as optional add-ons.
+      </p>
+      <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl shadow-sm lg:grid lg:grid-cols-2 lg:divide-y-0 lg:[&>li]:border-b lg:[&>li]:border-slate-100 lg:[&>li:nth-child(odd)]:border-r">
         {main.map(row)}
-        {main.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
+        {main.length === 0 && <li className="p-4 text-base text-slate-500">{search ? 'No dish matches this search.' : 'No dishes yet. Tap “Add dish”.'}</li>}
       </ul>
       {copies.length > 0 && (
-        <details className="bg-white border border-slate-200 rounded-2xl">
-          <summary className="min-h-[44px] px-3 flex items-center text-base font-bold text-slate-700 cursor-pointer">Day-only copies ({copies.length})</summary>
+        <details className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <summary className="min-h-[48px] px-4 flex items-center text-base font-bold text-slate-700 cursor-pointer">Day-only copies ({copies.length})</summary>
+          <p className="px-4 pb-2 text-sm text-slate-600">Made with “Edit for this day”. Each is used on one date only.</p>
           <ul className="divide-y divide-slate-100 border-t border-slate-100">{copies.map(row)}</ul>
         </details>
       )}
@@ -1285,30 +1595,13 @@ function DayEditSheet({
   const [applyAll, setApplyAll] = useState(same.length === 3);
   const initial = dish || { id: card.mealId || '', name: card.mealName || '', price: card.price || 0, isVegetarian: card.isVegetarian !== false };
   return (
-    <BottomSheet title={`Edit for ${formatDatePretty(day.date)} only`} onClose={onClose}>
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-bold text-slate-700">Apply to</legend>
-        {[
-          { v: true, label: 'All 3 classes' },
-          { v: false, label: `${card.category} only` },
-        ].map((o) => (
-          <label key={String(o.v)} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
-            <input type="radio" name="day-edit-apply" checked={applyAll === o.v} onChange={() => setApplyAll(o.v)} className="w-5 h-5" />
-            <span className="text-base text-slate-900">{o.label}</span>
-          </label>
-        ))}
-      </fieldset>
-      <DishFields
-        initial={initial}
-        submitLabel="Save for this day"
-        busy={busy}
-        onSubmit={(v) => onSave(applyAll, v)}
-        notes={
-          <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3">
-            Only {formatDatePretty(day.date)} changes. Other days keep the original dish.
-          </p>
-        }
-      />
+    <BottomSheet title="Edit for this day" subtitle={`${formatDatePretty(day.date)} · ${card.mealName || ''}`} onClose={onClose}>
+      <Note>
+        <p className="font-bold">Changes this dish for this date only. Other days remain unchanged.</p>
+        <p>Parents see the new name and price for {formatDatePretty(day.date)}.</p>
+      </Note>
+      <ApplyTo name="day-edit-apply" category={card.category} value={applyAll} onChange={setApplyAll} />
+      <DishFields initial={initial} submitLabel="Save for this day" busy={busy} onCancel={onClose} cancelLabel="Cancel" onSubmit={(v) => onSave(applyAll, v)} />
     </BottomSheet>
   );
 }
@@ -1331,22 +1624,28 @@ function ExtraSheet({
   onSave: (mealId: string, applyAll: boolean, portions: number) => void;
 }) {
   const card = day.classes.find((c) => c.category === category)!;
-  const [search, setSearch] = useState('');
   const [mealId, setMealId] = useState('');
   const [applyAll, setApplyAll] = useState(false);
   const [portions, setPortions] = useState('20');
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState('');
-  const taken = new Set([card.mealId, ...card.extras.map((x) => x.mealId)]);
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const choices = useMemo(() => {
+    const taken = new Set([card.mealId, ...card.extras.map((x) => x.mealId)]);
     return dishes
-      .filter((d) => !d.dayOnly && !taken.has(d.id) && (!q || d.name.toLowerCase().includes(q)))
+      .filter((d) => !d.dayOnly && !taken.has(d.id))
       .sort((a, b) => Number(Boolean(b.isExtra)) - Number(Boolean(a.isExtra)) || a.name.localeCompare(b.name));
-  }, [dishes, search, card]);
+  }, [dishes, card]);
+
+  const save = () => {
+    const n = Number(portions);
+    if (!mealId) return setProblem('Choose a dish first.');
+    if (!Number.isInteger(n) || n < 1 || n > 10000) return setProblem('Portions must be a whole number from 1 to 10000.');
+    setProblem('');
+    onSave(mealId, applyAll, n);
+  };
 
   return (
-    <BottomSheet title={`Add extra: ${formatDatePretty(day.date)}`} onClose={onClose}>
+    <BottomSheet title="Add extra" subtitle={`${formatDatePretty(day.date)} · ${category}`} onClose={onClose}>
       {creating ? (
         <DishFields
           submitLabel="Add dish"
@@ -1367,55 +1666,11 @@ function ExtraSheet({
         />
       ) : (
         <>
-          <div className="relative">
-            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search dishes"
-              className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base"
-            />
-          </div>
-          <ul className="max-h-[34vh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl" role="radiogroup">
-            {filtered.map((d) => (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={mealId === d.id}
-                  onClick={() => setMealId(d.id)}
-                  className={`w-full min-h-[52px] px-3 py-2 flex items-center justify-between gap-3 text-left ${mealId === d.id ? 'bg-amber-50' : 'bg-white'}`}
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className={`w-5 h-5 shrink-0 rounded-full border-2 ${mealId === d.id ? 'border-amber-600 bg-amber-500' : 'border-slate-300'}`} />
-                    <VegBadge isVegetarian={d.isVegetarian} size="sm" />
-                    <span className="text-base font-semibold text-slate-900 break-words min-w-0">
-                      {d.name}
-                      {d.isExtra && <span className="ml-1.5 text-[11px] font-black uppercase text-amber-800">Extra</span>}
-                    </span>
-                  </span>
-                  <span className="text-base font-bold text-slate-800 shrink-0">{formatINR(d.price)}</span>
-                </button>
-              </li>
-            ))}
-            {filtered.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
-          </ul>
-          <button type="button" onClick={() => setCreating(true)} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 inline-flex items-center justify-center gap-1.5">
-            <Plus className="w-4 h-4" /> New dish
-          </button>
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-bold text-slate-700">Apply to</legend>
-            {[
-              { v: false, label: `${category} only` },
-              { v: true, label: 'All 3 classes' },
-            ].map((o) => (
-              <label key={String(o.v)} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
-                <input type="radio" name="extra-apply" checked={applyAll === o.v} onChange={() => setApplyAll(o.v)} className="w-5 h-5" />
-                <span className="text-base text-slate-900">{o.label}</span>
-              </label>
-            ))}
-          </fieldset>
+          <Note tone="amber">
+            <p>Extras are optional add-ons. Parents can add up to 3 of each extra per child, only with that day&apos;s brunch.</p>
+          </Note>
+          <DishPicker dishes={choices} selectedId={mealId} onSelect={setMealId} onNew={() => setCreating(true)} />
+          <ApplyTo name="extra-apply" category={category} value={applyAll} onChange={setApplyAll} allFirst={false} />
           <label className="block">
             <span className="text-sm font-bold text-slate-700">Portions {applyAll ? '(each class)' : ''}</span>
             <input
@@ -1425,25 +1680,11 @@ function ExtraSheet({
               max={10000}
               value={portions}
               onChange={(e) => setPortions(e.target.value)}
-              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base"
+              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </label>
-          <p className="text-sm text-slate-600">Parents can add up to 3 of each extra per child, only with that day&apos;s brunch.</p>
           {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              const n = Number(portions);
-              if (!mealId) return setProblem('Choose a dish first.');
-              if (!Number.isInteger(n) || n < 1 || n > 10000) return setProblem('Portions must be a whole number from 1 to 10000.');
-              setProblem('');
-              onSave(mealId, applyAll, n);
-            }}
-            className="w-full min-h-[52px] rounded-xl bg-emerald-600 text-white text-lg font-black disabled:opacity-60"
-          >
-            Save
-          </button>
+          <SheetActions busy={busy} onCancel={onClose} onSave={save} saveLabel="Add extra" />
         </>
       )}
     </BottomSheet>
@@ -1483,16 +1724,27 @@ function MonthTab({ startMonth, today, onOpenDay }: { startMonth: string; today:
 
   const idx = monthIndex(month);
   const label = new Date(`${month}-15T12:00:00+05:30`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
-  const short: Record<string, string> = { 'Pre-primary': 'PP', Primary: 'P', Secondary: 'S' };
+
+  const cell = (c: ClassCard) =>
+    c.state === 'ON_SALE' ? (
+      <span className="text-slate-900">
+        {c.mealName}
+        {c.extras.length > 0 && <span className="ml-1 text-xs font-bold text-amber-800">+{c.extras.length} extra{c.extras.length > 1 ? 's' : ''}</span>}
+      </span>
+    ) : c.state === 'HOLIDAY' ? (
+      <span className="text-rose-700 font-semibold">Holiday</span>
+    ) : (
+      <span className="text-slate-400">Nothing on sale</span>
+    );
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <button type="button" disabled={idx <= thisMonth - 6} onClick={() => setMonth(monthOf(idx - 1))} aria-label="Previous month" className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-300 bg-white disabled:opacity-40">
+      <div className="flex items-center justify-between gap-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-2">
+        <button type="button" disabled={idx <= thisMonth - 6} onClick={() => setMonth(monthOf(idx - 1))} aria-label="Previous month" className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-slate-100 disabled:opacity-30">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <p className="text-lg font-black text-slate-900">{label}</p>
-        <button type="button" disabled={idx >= thisMonth + 6} onClick={() => setMonth(monthOf(idx + 1))} aria-label="Next month" className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-300 bg-white disabled:opacity-40">
+        <button type="button" disabled={idx >= thisMonth + 6} onClick={() => setMonth(monthOf(idx + 1))} aria-label="Next month" className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-slate-100 disabled:opacity-30">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -1500,35 +1752,46 @@ function MonthTab({ startMonth, today, onOpenDay }: { startMonth: string; today:
       {!days ? (
         <div className="h-64 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
       ) : (
-        <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl">
-          {days.map((d) => {
-            const holiday = d.classes.find((c) => c.state === 'HOLIDAY');
-            const text = d.isSunday
-              ? 'Sunday'
-              : d.status === 'HOLIDAY'
-                ? `Holiday: ${holiday?.holidayReason || ''}`
-                : d.status === 'NONE'
-                  ? 'Nothing on sale'
-                  : d.classes
-                      .map((c) => `${short[c.category]} ${c.state === 'ON_SALE' ? c.mealName : c.state === 'HOLIDAY' ? 'Holiday' : '—'}${c.extras.length ? ` +${c.extras.length}` : ''}`)
-                      .join(' · ');
-            return (
-              <li key={d.date}>
-                <button
-                  type="button"
-                  onClick={() => onOpenDay(d.date)}
-                  className={`w-full min-h-[48px] px-3 py-2 flex items-start gap-3 text-left ${d.isToday ? 'bg-amber-50' : ''} ${d.isPast ? 'text-slate-400' : ''}`}
-                >
-                  <span className="w-14 shrink-0 text-sm font-black">
-                    {d.weekday} {Number(d.date.slice(8, 10))}
-                  </span>
-                  <span className={`mt-1.5 w-2 h-2 shrink-0 rounded-full ${DOT[d.status].color}`} aria-label={DOT[d.status].label} />
-                  <span className="min-w-0 text-sm text-slate-800 break-words">{text}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          {/* Column titles on wide screens */}
+          <div className="hidden md:grid grid-cols-[8rem_1fr_1fr_1fr] gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs font-black uppercase tracking-wide text-slate-500">
+            <span>Date</span>
+            <span>Pre-primary</span>
+            <span>Primary</span>
+            <span>Secondary</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {days.map((d) => {
+              const holiday = d.classes.find((c) => c.state === 'HOLIDAY');
+              const whole = d.isSunday ? 'Sunday · canteen closed' : d.status === 'HOLIDAY' ? `Holiday: ${holiday?.holidayReason || ''}` : d.status === 'NONE' ? 'Nothing on sale' : null;
+              return (
+                <li key={d.date}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenDay(d.date)}
+                    className={`w-full min-h-[52px] px-4 py-2.5 text-left hover:bg-slate-50 grid gap-1 md:grid-cols-[8rem_1fr_1fr_1fr] md:gap-3 md:items-center ${d.isToday ? 'bg-amber-50/60' : ''} ${d.isPast ? 'opacity-60' : ''}`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-black text-slate-900">
+                      <span className={`w-2 h-2 shrink-0 rounded-full ${DOT[d.status].color}`} aria-label={DOT[d.status].label} />
+                      {d.weekday} {Number(d.date.slice(8, 10))}
+                      {d.isToday && <span className="text-[11px] font-bold text-amber-700 uppercase">Today</span>}
+                    </span>
+                    {whole ? (
+                      <span className={`text-sm md:col-span-3 ${d.isSunday || d.status === 'NONE' ? 'text-slate-500' : 'text-rose-700 font-semibold'}`}>{whole}</span>
+                    ) : (
+                      d.classes.map((c) => (
+                        <span key={c.category} className="text-sm min-w-0 break-words">
+                          <span className="md:hidden font-bold text-slate-500">{c.category}: </span>
+                          {cell(c)}
+                        </span>
+                      ))
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </div>
   );
