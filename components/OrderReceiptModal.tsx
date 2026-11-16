@@ -95,7 +95,7 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
                       <VegBadge isVegetarian={item.isVegetarian !== false} size="sm" />
-                      <span className="font-bold text-slate-800">{item.mealName}</span>
+                      <span className="font-bold text-slate-800">{item.mealName}{item.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}</span>
                       <span className="text-slate-400">× {item.quantity}</span>
                     </div>
                     <div className="text-[11px] text-slate-500">

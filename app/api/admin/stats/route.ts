@@ -89,7 +89,8 @@ export async function GET(req: Request) {
     ]);
 
     // Only paid orders count (like the kitchen): unpaid or test orders are never meals to cook or revenue.
-    const isPaid = (it: any) => it.order?.paymentStatus === 'PAID';
+    // Meal counts are the main brunch only (extras are add-ons, not meals).
+    const isPaid = (it: any) => it.order?.paymentStatus === 'PAID' && it.kind !== 'EXTRA';
     const tomorrowItems = loadedTomorrowItems.filter(isPaid);
     const todayItems = loadedTodayItems.filter(isPaid);
 

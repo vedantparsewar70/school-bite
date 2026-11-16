@@ -14,6 +14,7 @@ import {
   usesSharedEntry,
   type MenuEntry,
 } from './menu-orders';
+import { extrasOn, isExtraLine, paidExtrasRefusal, switchOffExtras } from './menu-extras';
 import { APP_TIMEZONE, getOffsetDateString, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
 
 /**
@@ -67,6 +68,9 @@ export async function markHoliday(
   const plan: MonthlyMenuPlan = { title: null, month: date.slice(0, 7), issues: [], days: [{ row: 0, date, dayLabel: date, weekday: null, cells, errors: [] }] };
   const options = { replaceUnordered: true, actorId, fileName: `manual holiday: ${categories.join(', ')} ${date}` };
 
+  const extrasBlock = await paidExtrasRefusal(date, categories, firestore);
+  if (extrasBlock) return extrasBlock;
+
   const preview = await applyMonthlyMenu(plan, { ...options, dryRun: true }, firestore);
   const outcomes = categories.map((cat) => ({ cat, outcome: preview.days[0].cells[cat].outcome as string }));
   const blocked = outcomes.filter((o) => o.outcome === 'conflict-has-orders').map((o) => o.cat);
@@ -83,6 +87,7 @@ export async function markHoliday(
   if (!final.every((o) => ['create', 'replace', 'unchanged'].includes(o.outcome))) {
     return { status: 409, body: { error: 'This day changed meanwhile. Please refresh and try again.' } };
   }
+  await switchOffExtras(date, categories, actorId, firestore);
   await notify();
   return { status: 200, body: { success: true, message: `${date} is a holiday for ${categories.length === 3 ? 'all classes' : categories.join(', ')}.` } };
 }
@@ -206,6 +211,19 @@ export interface ClassCard {
   editable: boolean;
   /** Remove allowed (not past, and something is on sale). */
   removable: boolean;
+  /** Optional extras on sale for this class and day (lib/menu-extras.ts). */
+  extras: ExtraCard[];
+}
+
+export interface ExtraCard {
+  mealId: string;
+  mealName: string;
+  price: number | null;
+  isVegetarian: boolean | null;
+  maxQuantity: number;
+  availableQuantity: number;
+  ordered: number;
+  children: number;
 }
 
 export interface MenuDay {
@@ -223,21 +241,24 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
   const start = Date.parse(`${from}T00:00:00Z`);
   const dates = Array.from({ length: days }, (_, i) => new Date(start + i * 86400000).toISOString().slice(0, 10));
 
-  const [menuSnap, itemSnap] = await Promise.all([
+  const [menuSnap, itemSnap, extras] = await Promise.all([
     firestore.collection('menus').where('date', 'in', dates).get(),
     firestore.collection('orderItems').where('date', 'in', dates).get(),
+    extrasOn(dates, firestore),
   ]);
   const entries = menuSnap.docs.map((d) => ({ ...(d.data() as MenuEntry), id: d.id }));
   const items = itemSnap.docs.map((d) => ({ ...(d.data() as any), id: d.id }));
   const orderIds = Array.from(new Set(items.map((it) => String(it.orderId)).filter(Boolean)));
-  const mealIds = Array.from(new Set(entries.map((m) => m.mealId).filter(Boolean) as string[]));
+  const mealIds = Array.from(new Set([...entries.map((m) => m.mealId), ...extras.map((e) => e.mealId)].filter(Boolean) as string[]));
   const [orderSnaps, mealSnaps] = await Promise.all([
     orderIds.length ? firestore.getAll(...orderIds.map((id) => firestore.collection('orders').doc(id))) : Promise.resolve([]),
     mealIds.length ? firestore.getAll(...mealIds.map((id) => firestore.collection('meals').doc(id))) : Promise.resolve([]),
   ]);
   const paid = new Set(orderSnaps.filter((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED').map((o) => o.id));
   const meals = new Map(mealSnaps.filter((m) => m.exists).map((m) => [m.id, m.data() as any]));
-  const paidItems = items.filter((it) => paid.has(String(it.orderId)));
+  // Main-dish counts never include extras; extras are counted per extra entry.
+  const paidItems = items.filter((it) => paid.has(String(it.orderId)) && !isExtraLine(it));
+  const paidExtras = items.filter((it) => paid.has(String(it.orderId)) && isExtraLine(it));
 
   return dates.map((date) => {
     const dayEntries = entries.filter((m) => m.date === date);
@@ -277,6 +298,23 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
         duplicates: Math.max(0, rankMenuEntries(dayEntries, date, category).length - 1),
         editable: !isSunday && !closed,
         removable: !isPast && onSale,
+        extras: extras
+          .filter((e) => e.date === date && e.isActive !== false && normalizeStudentCategory(e.studentCategory) === category)
+          .map((e) => {
+            const m = meals.get(e.mealId);
+            const lines = paidExtras.filter((it) => it.menuExtraId === e.id);
+            return {
+              mealId: e.mealId,
+              mealName: m?.name ? String(m.name) : 'Extra',
+              price: m && Number.isFinite(Number(m.price)) ? Number(m.price) : null,
+              isVegetarian: m ? m.isVegetarian !== false : null,
+              maxQuantity: Number(e.maxQuantity ?? 0),
+              availableQuantity: Number(e.availableQuantity ?? 0),
+              ordered: lines.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0),
+              children: new Set(lines.map((it) => String(it.studentId || it.id))).size,
+            };
+          })
+          .sort((a, b) => a.mealName.localeCompare(b.mealName)),
       };
     });
     const open = classes.filter((c) => c.state !== 'HOLIDAY');

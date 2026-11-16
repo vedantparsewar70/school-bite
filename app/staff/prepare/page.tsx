@@ -15,6 +15,8 @@ type KitchenData = {
   byCategory?: Array<{ category: string; total: number; dishes: Array<{ mealName: string; quantity: number }> }>;
   teacherMeals: Array<{ mealName: string; quantity: number }>;
   teacherMealsTotal: number;
+  extrasByCategory?: Array<{ category: string; total: number; extras: Array<{ mealName: string; quantity: number }> }>;
+  extrasTotal?: number;
   plan?: { isSunday: boolean; isServingDay: boolean; categories: CategoryDay[] };
   deadline?: string;
   cutoff?: 'FINAL' | 'OPEN';
@@ -246,6 +248,32 @@ export default function StaffPreparePage() {
               </ul>
             ) : (
               <p className="text-base text-slate-600 mt-1">No paid teacher orders.</p>
+            )}
+          </section>
+
+          <section className="rounded-2xl bg-white border border-slate-200 p-4 break-inside-avoid">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-bold text-amber-800 uppercase tracking-wide">Extras (separate)</h2>
+              <span className="text-xl font-black tabular-nums">{data?.extrasTotal || 0}</span>
+            </div>
+            {data?.extrasByCategory?.length ? (
+              <div className="mt-2 space-y-2">
+                {data.extrasByCategory.map((g: any) => (
+                  <div key={g.category}>
+                    <p className="text-sm font-black text-slate-700">{g.category}</p>
+                    <ul className="space-y-0.5">
+                      {g.extras.map((x: any) => (
+                        <li key={x.mealName} className="flex justify-between text-base">
+                          <span className="text-slate-800 break-words min-w-0">{x.mealName}</span>
+                          <span className="font-black tabular-nums shrink-0">{x.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-base text-slate-600 mt-1">No extras ordered.</p>
             )}
           </section>
         </>

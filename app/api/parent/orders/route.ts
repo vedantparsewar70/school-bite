@@ -155,8 +155,12 @@ async function existingCheckoutResponse(orderId: string, parentId: string, reval
 }
 
 /** Identifies a cart by its children, meals, dates and quantities. */
-function cartSignature(items: Array<{ studentId?: string; mealId?: string; date?: string; quantity?: number }>): string {
-  return items.map((i) => `${i.studentId}|${i.mealId}|${i.date}|${Number(i.quantity) || 1}`).sort().join(';');
+function cartSignature(items: Array<{ studentId?: string; mealId?: string; date?: string; quantity?: number; kind?: string }>): string {
+  // Extra lines are marked so an extra never matches a main dish; main-only carts sign as before.
+  return items
+    .map((i) => `${i.studentId}|${i.mealId}|${i.date}|${Number(i.quantity) || 1}${i.kind === 'EXTRA' ? '|EXTRA' : ''}`)
+    .sort()
+    .join(';');
 }
 
 /**
@@ -283,6 +287,7 @@ export async function GET(req: Request) {
         studentRollNo: item.student?.rollNo || '',
         mealId: item.mealId,
         mealName: item.mealName || item.meal?.name || 'Meal',
+        isExtra: item.kind === 'EXTRA',
         mealCategory: item.meal?.category || 'General',
         mealImage: item.meal?.imageUrl || null,
         isVegetarian: Boolean(item.meal?.isVegetarian),
@@ -526,9 +531,12 @@ export async function POST(req: Request) {
       const student = parentStudentsMap.get(it.studentId);
       // Same rule as the menu the parent was shown (/api/menu), so checkout never disagrees with it.
       const studentCategory = getStudentCategory(student?.grade, student?.studentCategory);
+      const { kind, menuExtraId, ...rest } = it as typeof it & { kind?: unknown; menuExtraId?: unknown };
+      void menuExtraId;
       return {
-        ...it,
+        ...rest,
         studentCategory,
+        ...(kind === 'EXTRA' ? { kind: 'EXTRA' as const } : {}),
       };
     });
     const availabilityResult = await validateCartAvailability(cartItemsWithCategory);
@@ -591,6 +599,7 @@ export async function POST(req: Request) {
         ...item,
         quantity: itemQuantity,
         menuId: availabilityResult.items[index]?.menuId || null,
+        ...((item as { kind?: string }).kind === 'EXTRA' ? { menuExtraId: availabilityResult.items[index]?.menuExtraId || null } : {}),
         mealPrice: serverUnitPrice,
         mealName: meal.name,
         mealCategory: meal.category,

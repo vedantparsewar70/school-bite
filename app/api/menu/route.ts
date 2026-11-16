@@ -5,6 +5,9 @@ import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudentCategory } from '@/lib/october-2026-timetable';
 import { displayMenuEntry, type MenuEntryLike } from '@/lib/menu-entries';
+import { extrasOn, MAX_EXTRA_PER_CHILD } from '@/lib/menu-extras';
+import { deadlineFor, type MenuEntry } from '@/lib/menu-orders';
+import { normalizeStudentCategory } from '@/lib/menu-stock';
 
 export function clearMenuCache() {
   // Authoritative database querying is always real-time
@@ -189,6 +192,69 @@ export async function GET(req: Request) {
       };
     });
 
+    // Optional extras for one date and class, shown under the main brunch (lib/menu-extras.ts).
+    let extras: any[] = [];
+    if (date && filterCategory && normalizeStudentCategory(filterCategory) !== 'ALL') {
+      const cat = normalizeStudentCategory(filterCategory);
+      const main = evaluatedMenus.find((m: any) => m.date === date);
+      const onDay = (await extrasOn([date])).filter((e) => e.isActive !== false && normalizeStudentCategory(e.studentCategory) === cat);
+      if (onDay.length > 0 && main && !main.isHoliday) {
+        const extraMeals = await prisma.meal.findMany({
+          where: { id: { in: Array.from(new Set(onDay.map((e) => e.mealId))) } },
+          include: { mealAllergens: { include: { allergen: true } } },
+        });
+        const byId = new Map(extraMeals.map((m: any) => [m.id, m]));
+        const deadline = deadlineFor(allMenus as unknown as MenuEntry[], date, cat);
+        const deadlinePassed = date < todayStr || isDeadlinePassed(date, deadline);
+        extras = onDay
+          .filter((e) => byId.has(e.mealId))
+          .map((e) => {
+            const meal: any = byId.get(e.mealId);
+            const allergensList = (meal.mealAllergens || []).map((ma: any) => ma.allergen?.name).filter(Boolean);
+            if (meal.allergens && allergensList.length === 0) {
+              String(meal.allergens).split(/[,;]/).forEach((p: string) => {
+                const t = p.trim();
+                if (t && !allergensList.includes(t)) allergensList.push(t);
+              });
+            }
+            const conflict =
+              childId && studentAllergiesList.length > 0
+                ? evaluateAllergyConflict(studentAllergiesList, allergensList, studentName, meal.name)
+                : { hasConflict: false, matchingAllergens: [] as string[] };
+            const availableQuantity = Number(e.availableQuantity ?? 0);
+            return {
+              id: e.id,
+              date,
+              studentCategory: cat,
+              mealId: e.mealId,
+              orderingDeadline: deadline,
+              availableQuantity,
+              maxPerChild: MAX_EXTRA_PER_CHILD,
+              isAvailable: !deadlinePassed && availableQuantity > 0,
+              isDeadlinePassed: deadlinePassed,
+              meal: {
+                id: meal.id,
+                name: meal.name,
+                price: Number(meal.price),
+                category: meal.category,
+                isVegetarian: meal.isVegetarian !== false,
+                description: meal.description || null,
+                allergens: meal.allergens || null,
+                allergensList,
+                imageUrl: null,
+              },
+              allergyEvaluation: {
+                hasConflict: conflict.hasConflict,
+                matchingAllergens: conflict.matchingAllergens,
+                childName: studentName || undefined,
+                mealName: meal.name,
+              },
+            };
+          })
+          .sort((a, b) => a.meal.name.localeCompare(b.meal.name));
+      }
+    }
+
     const headers: Record<string, string> = {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
@@ -198,6 +264,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         menus: evaluatedMenus,
+        extras,
         policy: {
           allowAllergyOrders,
         },

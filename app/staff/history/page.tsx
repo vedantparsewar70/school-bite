@@ -31,7 +31,7 @@ type TeacherOrder = {
 
 const given = (t: TeacherOrder) => t.orderStatus === 'GIVEN' || t.orderStatus === 'COLLECTED';
 const meals = (list: Array<{ mealName: string; quantity: number }>) =>
-  list.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}`).join(', ');
+  list.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}${(m as { isExtra?: boolean }).isExtra ? ' (extra)' : ''}`).join(', ');
 
 /** Who was served on a date, one row per child (and teachers). Undo only for today. */
 export default function StaffHistoryPage() {

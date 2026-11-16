@@ -48,6 +48,7 @@ export async function paidOrdersFor(
   const lines = (itemsSnap.docs as Array<{ id: string; data: () => any }>)
     .map((d) => ({ ...d.data(), id: d.id }))
     .filter((it: any) => {
+      if (it.kind === 'EXTRA') return false; // extras have their own rules (lib/menu-extras.ts)
       if (it.menuId) return ids.has(String(it.menuId));
       if (!it.mealId || !mealIds.has(String(it.mealId))) return false;
       const itemCat = normalizeStudentCategory(it.studentCategory);

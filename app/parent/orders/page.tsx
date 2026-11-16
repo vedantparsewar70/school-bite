@@ -213,7 +213,7 @@ function OrdersPageContent() {
                         <div className="space-y-0.5 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <VegBadge isVegetarian={item.isVegetarian} size="sm" />
-                            <span className="font-bold text-slate-800 text-sm leading-snug break-words">{item.mealName}</span>
+                            <span className="font-bold text-slate-800 text-sm leading-snug break-words">{item.mealName}{item.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}</span>
                             <span className="text-slate-400 font-semibold">× {item.quantity}</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 flex-wrap">

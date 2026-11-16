@@ -81,7 +81,12 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
   const name = String(meal.name);
 
   const cells = Object.fromEntries(
-    STUDENT_CATEGORIES.map((cat) => [cat, categories.includes(cat) ? { kind: 'MEAL', dish: name, merged: false } : { kind: 'BLANK' }])
+    STUDENT_CATEGORIES.map((cat) => [
+      cat,
+      categories.includes(cat)
+        ? { kind: 'MEAL', dish: name, merged: false, ...(meal.dayOnly === true ? { mealId } : {}) }
+        : { kind: 'BLANK' },
+    ])
   ) as MonthlyMenuPlan['days'][number]['cells'];
   const plan: MonthlyMenuPlan = {
     title: null,
@@ -93,7 +98,7 @@ export async function publishDish(input: PublishDishInput, firestore: Firestore 
 
   // Check first: the import matches recipes by name, so it must resolve to exactly this recipe.
   const preview = await applyMonthlyMenu(plan, { ...options, dryRun: true }, firestore);
-  const dish = preview.dishes.find((d) => d.key === dishKey(name));
+  const dish = preview.dishes.find((d) => d.key === (meal.dayOnly === true ? `id:${mealId}` : dishKey(name)));
   if (!dish || dish.mealId !== mealId) {
     return { status: 409, body: { error: 'Another catalog recipe has the same name. Rename one of them in the catalog first.' } };
   }
@@ -191,6 +196,10 @@ export async function withdrawDish(
     }
   }
 
+  const { paidExtrasRefusal, switchOffExtras } = await import('./menu-extras');
+  const extrasBlock = await paidExtrasRefusal(date, categories, firestore);
+  if (extrasBlock) return extrasBlock;
+
   const result = await firestore.runTransaction(async (tx): Promise<PublishDishResult & { switchedOff?: number }> => {
     const read = (target: any) => tx.get(target);
     const snap = await read(firestore.collection('menus').where('date', '==', date));
@@ -223,6 +232,7 @@ export async function withdrawDish(
   });
   if (result.status !== 200) return { status: result.status, body: result.body };
 
+  if (result.switchedOff) await switchOffExtras(date, categories, actorId, firestore);
   if (result.switchedOff) {
     try {
       const { notifyMenuUpdated } = await import('./sync-events');

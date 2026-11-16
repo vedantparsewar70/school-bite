@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     });
 
     // Strictly filter out CANCELLED orders or FAILED/REFUNDED/CANCELLED payments
-    const validItems = items.filter((it) => {
+    const paidItems = items.filter((it) => {
       const order = it.order;
       if (!order) return false;
       if (order.orderStatus === 'CANCELLED') return false;
@@ -65,6 +65,9 @@ export async function GET(req: Request) {
       }
       return true;
     });
+    // Meal totals are the main brunch only; extras are listed separately (per class).
+    const validItems = paidItems.filter((it) => (it as any).kind !== 'EXTRA');
+    const extraItems = paidItems.filter((it) => (it as any).kind === 'EXTRA');
 
     // Aggregate meal counts for kitchen production
     const mealCountsMap = new Map<
@@ -203,6 +206,35 @@ export async function GET(req: Request) {
           .sort((a, b) => b.quantity - a.quantity || a.mealName.localeCompare(b.mealName)),
       }));
 
+    // Extras per class (paid, not cancelled), and who ordered them.
+    const extrasMap = new Map<string, Map<string, number>>();
+    const extraList = extraItems.map((it) => {
+      const cat = normalizeStudentCategory((it as any).studentCategory || (it.student as any)?.studentCategory);
+      const name = it.mealName || it.meal?.name || 'Extra';
+      const dishes = extrasMap.get(cat) || new Map<string, number>();
+      dishes.set(name, (dishes.get(name) || 0) + it.quantity);
+      extrasMap.set(cat, dishes);
+      return {
+        orderItemId: it.id,
+        studentName: it.student?.name || 'Student',
+        grade: it.student?.grade || '',
+        division: it.student?.division || '',
+        rollNo: it.student?.rollNo || '',
+        studentCategory: cat,
+        mealName: name,
+        quantity: it.quantity,
+      };
+    });
+    const extrasByCategory = Array.from(extrasMap.entries())
+      .sort((a, b) => categoryOrder(a[0]) - categoryOrder(b[0]) || a[0].localeCompare(b[0]))
+      .map(([category, dishes]) => ({
+        category,
+        total: Array.from(dishes.values()).reduce((sum, n) => sum + n, 0),
+        extras: Array.from(dishes.entries())
+          .map(([mealName, quantity]) => ({ mealName, quantity }))
+          .sort((a, b) => b.quantity - a.quantity || a.mealName.localeCompare(b.mealName)),
+      }));
+
     // Which categories have brunch, and whether ordering has closed (counts are final).
     const plan = dayPlan(await menuEntriesOn(date), date);
 
@@ -244,6 +276,9 @@ export async function GET(req: Request) {
       })),
       studentCategoryBreakdown,
       byCategory,
+      extrasByCategory,
+      extrasTotal: extraItems.reduce((sum, it) => sum + it.quantity, 0),
+      extraList,
       plan: { isSunday: plan.isSunday, isServingDay: plan.isServingDay, categories: plan.categories },
       deadline: plan.deadline,
       studentList,

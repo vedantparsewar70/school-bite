@@ -33,6 +33,9 @@ export interface StockLine {
   quantity: number;
   studentCategory?: string | null;
   menuId?: string | null;
+  /** 'EXTRA' for an optional add-on: its stock lives in menuExtras, not in menus. */
+  kind?: string | null;
+  menuExtraId?: string | null;
 }
 
 export interface MenuStock {
@@ -53,6 +56,13 @@ export async function resolveMenuInTransaction(
   firestore: Firestore,
   line: StockLine
 ): Promise<{ ref: DocumentReference; data: DocumentData } | null> {
+  if (line.kind === 'EXTRA') {
+    const id = line.menuExtraId || `extra_${line.date}_${menuCategorySlug(line.studentCategory)}_${line.mealId}`;
+    const ref = firestore.collection('menuExtras').doc(id);
+    const snap = await transaction.get(ref);
+    const data = snap.exists ? snap.data() || {} : null;
+    return data && data.mealId === line.mealId && data.date === line.date ? { ref, data } : null;
+  }
   const menus = firestore.collection('menus');
   const legacyCategoryId = `menu_${line.date}_${String(line.studentCategory || 'all').toLowerCase().replace(/\s+/g, '_')}`;
   const candidateIds = Array.from(

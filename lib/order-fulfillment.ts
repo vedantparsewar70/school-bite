@@ -153,14 +153,15 @@ export function serviceProblem(
 type MenuStockCheck = Awaited<ReturnType<typeof collectMenuStockInTransaction>>;
 
 function stockLines(
-  cartItems: Array<{ mealId: string; date: string; quantity?: number; studentCategory?: string | null; menuId?: string | null }>
+  cartItems: Array<{ mealId: string; date: string; quantity?: number; studentCategory?: string | null; menuId?: string | null; kind?: string | null; menuExtraId?: string | null }>
 ) {
   return cartItems.map((item) => ({
     mealId: item.mealId,
     date: item.date,
     quantity: Number(item.quantity || 1),
     studentCategory: item.studentCategory || null,
-    menuId: item.menuId || null,
+    menuId: item.kind === 'EXTRA' ? null : item.menuId || null,
+    ...(item.kind === 'EXTRA' ? { kind: 'EXTRA', menuExtraId: item.menuExtraId || null } : {}),
   }));
 }
 
@@ -210,7 +211,10 @@ function writeParentOrder(
       mealId: item.mealId,
       // The dish name as bought, so renaming the dish later never changes a paid order.
       mealName: typeof item.mealName === 'string' && item.mealName ? item.mealName : null,
-      menuId: menuStock.lineMenuIds[index],
+      // An extra's stock entry is in menuExtras: recorded as menuExtraId, never as a menu entry.
+      ...(item.kind === 'EXTRA'
+        ? { kind: 'EXTRA', menuId: null, menuExtraId: menuStock.lineMenuIds[index] }
+        : { menuId: menuStock.lineMenuIds[index] }),
       date: item.date,
       quantity: item.quantity,
       unitPrice: item.mealPrice,

@@ -255,7 +255,7 @@ export async function DELETE(req: Request) {
       ]);
       const lines = [
         ...byMenuId.docs.map((d: any) => d.data()),
-        ...byDate.docs.map((d: any) => d.data()).filter((it: any) => !it.menuId && it.mealId === menu.mealId),
+        ...byDate.docs.map((d: any) => d.data()).filter((it: any) => !it.menuId && it.kind !== 'EXTRA' && it.mealId === menu.mealId),
       ];
       const orderIds = Array.from(new Set(lines.map((it: any) => String(it.orderId))));
       if (orderIds.length > 0) {

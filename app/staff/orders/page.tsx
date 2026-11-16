@@ -366,7 +366,7 @@ function ServeContent() {
                         <p className="text-lg font-black text-slate-900 leading-tight break-words">{r.studentName}</p>
                         <p className="text-sm text-slate-600 mt-0.5">{classLine(r)}</p>
                         <p className="text-base font-semibold text-slate-800 mt-1 break-words">
-                          {r.meals.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}`).join(', ')}
+                          {r.meals.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}${(m as { isExtra?: boolean }).isExtra ? ' (extra)' : ''}`).join(', ')}
                         </p>
                         {r.hasAllergyAlert && (
                           <p className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-800 text-sm font-bold">

@@ -85,6 +85,8 @@ export interface CartItem {
   orderingDeadline?: string;
   hasAllergyAlert?: boolean;
   conflictAllergens?: string[];
+  /** 'EXTRA' for an optional add-on to that day's brunch (Banana, Buttermilk…). */
+  kind?: 'EXTRA';
 }
 
 export interface OrderItemData {
@@ -106,6 +108,8 @@ export interface OrderItemData {
   totalPrice: number;
   hasAllergyAlert?: boolean;
   conflictAllergens?: string | null;
+  /** An optional add-on to that day's brunch. */
+  isExtra?: boolean;
 }
 
 export interface PaymentData {

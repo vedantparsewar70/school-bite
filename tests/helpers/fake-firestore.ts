@@ -156,7 +156,11 @@ class FakeQuery {
   where(field: string, op: string, value: unknown) {
     let test: (v: unknown) => boolean;
     if (op === '==') test = (v) => v === value;
-    else if (op === 'in' && Array.isArray(value)) test = (v) => value.includes(v);
+    else if (op === 'in' && Array.isArray(value)) {
+      // As in production Firestore: an 'in' filter takes 1 to 30 values.
+      if (value.length === 0 || value.length > 30) throw new Error(`Firestore 'in' filters take 1 to 30 values (got ${value.length})`);
+      test = (v) => value.includes(v);
+    }
     else throw new Error(`FakeFirestore only supports '==' and 'in' filters (got ${op})`);
     return new FakeQuery(this.store, this.collectionName, [...this.filters, [field, test]]);
   }

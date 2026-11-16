@@ -44,9 +44,26 @@ export async function GET(req: Request) {
 
     let totalRevenue = 0;
     let totalMealsSold = 0;
+    // Extras: revenue counts them; meal counts are the main brunch only, extras listed separately.
+    let totalExtrasSold = 0;
+    let extrasRevenue = 0;
+    const extraMap = new Map<string, { mealId: string; mealName: string; count: number; revenue: number }>();
 
     for (const it of items) {
       totalRevenue += it.totalPrice;
+      if ((it as any).kind === 'EXTRA') {
+        totalExtrasSold += it.quantity;
+        extrasRevenue += it.totalPrice;
+        const e = extraMap.get(it.mealId) || { mealId: it.mealId, mealName: it.mealName || it.meal?.name || 'Extra', count: 0, revenue: 0 };
+        e.count += it.quantity;
+        e.revenue += it.totalPrice;
+        extraMap.set(it.mealId, e);
+        const dExtra = dateMap.get(it.date) || { date: it.date, revenue: 0, mealsCount: 0, ordersSet: new Set<string>() };
+        dExtra.revenue += it.totalPrice;
+        dExtra.ordersSet.add(it.orderId);
+        dateMap.set(it.date, dExtra);
+        continue;
+      }
       totalMealsSold += it.quantity;
 
       // By date
@@ -112,6 +129,7 @@ export async function GET(req: Request) {
       classDivision: `${it.student.grade}-${it.student.division}`,
       rollNo: it.student.rollNo,
       mealName: it.mealName || it.meal?.name || 'Meal',
+      itemType: (it as any).kind === 'EXTRA' ? 'Extra' : 'Brunch',
       quantity: it.quantity,
       unitPrice: it.unitPrice,
       totalPrice: it.totalPrice,
@@ -119,9 +137,12 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json({
+      mostOrderedExtras: Array.from(extraMap.values()).sort((a, b) => b.count - a.count),
       summary: {
         totalRevenue,
         totalMealsSold,
+        totalExtrasSold,
+        extrasRevenue,
         totalOrders: new Set(items.map((i) => i.orderId)).size,
         uniqueStudents: new Set(items.map((i) => i.studentId)).size,
       },

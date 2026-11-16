@@ -358,9 +358,9 @@ function AdminOrdersContent() {
             const mealDate = firstItem?.date || dateFilter || todayDateStr;
 
             // Group items by meal for clean display
-            const groupedItemsMap = new Map<string, { mealName: string; isVegetarian: boolean; quantity: number }>();
+            const groupedItemsMap = new Map<string, { mealName: string; isVegetarian: boolean; quantity: number; isExtra: boolean }>();
             for (const it of (o.items || [])) {
-              const key = it.mealName || it.mealId;
+              const key = `${it.isExtra ? 'extra:' : ''}${it.mealName || it.mealId}`;
               const existing = groupedItemsMap.get(key);
               if (existing) {
                 existing.quantity += it.quantity;
@@ -369,6 +369,7 @@ function AdminOrdersContent() {
                   mealName: it.mealName,
                   isVegetarian: it.isVegetarian,
                   quantity: it.quantity,
+                  isExtra: Boolean(it.isExtra),
                 });
               }
             }
@@ -412,7 +413,7 @@ function AdminOrdersContent() {
                           className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-800 shadow-2xs"
                         >
                           <VegBadge isVegetarian={it.isVegetarian} size="sm" />
-                          <span className="font-bold">{it.mealName}</span>
+                          <span className="font-bold">{it.mealName}{it.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}</span>
                           <span className="bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded-md text-[11px]">
                             × {it.quantity}
                           </span>
@@ -564,7 +565,7 @@ function AdminOrdersContent() {
                     <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
                       <div className="flex items-center gap-2 min-w-0">
                         <VegBadge isVegetarian={it.isVegetarian} size="sm" />
-                        <span className="font-bold text-slate-900">{it.mealName}</span>
+                        <span className="font-bold text-slate-900">{it.mealName}{it.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}</span>
                         <span className="text-[11px] text-slate-600 truncate">{it.studentName}</span>
                         {it.date && (
                           <span className={`text-[11px] whitespace-nowrap ${it.servedAt ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>

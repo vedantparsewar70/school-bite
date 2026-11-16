@@ -69,7 +69,7 @@ export default function AdminReportsPage() {
       `"${r.studentId}"`,
       `"${r.classDivision}"`,
       r.rollNo,
-      `"${r.mealName}"`,
+      `"${r.mealName}${r.itemType === 'Extra' ? ' (extra)' : ''}"`,
       r.quantity,
       r.unitPrice,
       r.totalPrice,
@@ -130,7 +130,9 @@ export default function AdminReportsPage() {
           <p className="text-3xl font-black text-emerald-700">
             {formatINR(reports?.summary?.totalRevenue || 0)}
           </p>
-          <p className="text-[11px] text-slate-400">Paid student orders</p>
+          <p className="text-[11px] text-slate-400">
+            Paid student orders{reports?.summary?.extrasRevenue ? `, incl. ${formatINR(reports.summary.extrasRevenue)} extras` : ''}
+          </p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-1">
@@ -138,7 +140,9 @@ export default function AdminReportsPage() {
           <p className="text-3xl font-black text-amber-600">
             {reports?.summary?.totalMealsSold || 0}
           </p>
-          <p className="text-[11px] text-slate-400">Portions ordered</p>
+          <p className="text-[11px] text-slate-400">
+            Brunch portions{reports?.summary?.totalExtrasSold ? ` · plus ${reports.summary.totalExtrasSold} extras` : ''}
+          </p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs space-y-1">
@@ -157,6 +161,22 @@ export default function AdminReportsPage() {
           <p className="text-[11px] text-slate-400">Distinct active students</p>
         </div>
       </div>
+
+      {reports?.mostOrderedExtras?.length > 0 && (
+        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-2">
+          <h3 className="text-base font-extrabold text-slate-900">Extras sold</h3>
+          <ul className="divide-y divide-slate-100">
+            {reports.mostOrderedExtras.map((e: any) => (
+              <li key={e.mealId} className="py-2 flex items-center justify-between gap-3 text-sm">
+                <span className="font-bold text-slate-800">{e.mealName}</span>
+                <span className="text-slate-600">
+                  {e.count} · {formatINR(e.revenue)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Visual Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

@@ -421,6 +421,7 @@ export default function CartPage() {
                                 <VegBadge isVegetarian={item.isVegetarian} size="sm" />
                                 <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">
                                   {item.mealName}
+                                  {item.kind === 'EXTRA' && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}
                                 </h4>
                               </div>
                               <p className="text-xs font-semibold text-amber-700 mt-0.5">

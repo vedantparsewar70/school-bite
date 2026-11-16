@@ -7,7 +7,7 @@ export interface NotServedChild {
   rollNo?: string | null;
   studentCategory?: string | null;
   served: boolean;
-  meals: Array<{ mealName: string; quantity: number }>;
+  meals: Array<{ mealName: string; quantity: number; isExtra?: boolean }>;
 }
 
 export interface NotServedTeacher {
@@ -22,8 +22,8 @@ export const teacherServed = (t: { orderStatus: string }) => t.orderStatus === '
 export const classLabel = (r: { grade?: string | null; division?: string | null }) =>
   r.grade && r.division ? `${r.grade}-${r.division}` : r.grade || '';
 
-export const dishLabel = (list: Array<{ mealName: string; quantity: number }>) =>
-  list.map((m) => `${m.mealName}${m.quantity > 1 ? ` x ${m.quantity}` : ''}`).join('; ');
+export const dishLabel = (list: Array<{ mealName: string; quantity: number; isExtra?: boolean }>) =>
+  list.map((m) => `${m.mealName}${m.quantity > 1 ? ` x ${m.quantity}` : ''}${m.isExtra ? ' (extra)' : ''}`).join('; ');
 
 const rollKey = (r: string | null | undefined) => {
   const n = Number(r);

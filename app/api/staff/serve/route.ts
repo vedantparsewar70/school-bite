@@ -88,7 +88,7 @@ export async function GET(req: Request) {
       division: string;
       rollNo: string;
       studentCategory: string;
-      meals: Array<{ orderItemId: string; orderId: string; mealName: string; quantity: number; servedAt: string | null }>;
+      meals: Array<{ orderItemId: string; orderId: string; mealName: string; quantity: number; servedAt: string | null; isExtra: boolean }>;
       hasAllergyAlert: boolean;
       allergens: string | null;
       servedAt: string | null;
@@ -123,6 +123,7 @@ export async function GET(req: Request) {
         mealName: it.mealName || 'Meal',
         quantity: Number(it.quantity || 1),
         servedAt,
+        isExtra: it.kind === 'EXTRA',
       });
       if (it.hasAllergyAlert) {
         row.hasAllergyAlert = true;
@@ -152,6 +153,8 @@ export async function GET(req: Request) {
     const list = Array.from(rows.values()).map((r) => {
       // A child is served only when every one of their meals on this date was handed over.
       const allServed = r.meals.every((m) => m.servedAt);
+      // Main brunch first, then the extras: one tick serves them all.
+      r.meals.sort((a, b) => Number(a.isExtra) - Number(b.isExtra));
       return { ...r, served: allServed, servedAt: allServed ? r.servedAt : null, servedBy: allServed ? r.servedBy : null };
     });
     list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'en', { sensitivity: 'base' }));

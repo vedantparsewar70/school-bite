@@ -27,7 +27,8 @@ export const STUDENT_CATEGORIES = ['Pre-primary', 'Primary', 'Secondary'] as con
 export type StudentCategory = (typeof STUDENT_CATEGORIES)[number];
 
 export type MenuCell =
-  | { kind: 'MEAL'; dish: string; merged: boolean }
+  /** `mealId`: an exact catalogue dish (a day-only copy may share its original's name). Never set by the import. */
+  | { kind: 'MEAL'; dish: string; merged: boolean; mealId?: string }
   | { kind: 'HOLIDAY'; reason: string; merged: boolean }
   | { kind: 'BLANK' }
   | { kind: 'INVALID'; value: string };
@@ -286,20 +287,25 @@ export async function applyMonthlyMenu(
   // Dishes: reuse an existing catalogue meal with the same name, otherwise a new meal.
   const mealsSnap = await firestore.collection('meals').get();
   const mealsByKey = new Map<string, any>();
+  const mealsById = new Map<string, any>();
   for (const d of mealsSnap.docs) {
     const meal = d.data();
-    if (meal?.name) mealsByKey.set(dishKey(String(meal.name)), { ...meal, id: meal.id || d.id });
+    if (!meal?.name) continue;
+    mealsById.set(meal.id || d.id, { ...meal, id: meal.id || d.id });
+    // Day-only copies ("Edit for this day") are never matched by name, so the import never uses them.
+    if (meal.dayOnly !== true) mealsByKey.set(dishKey(String(meal.name)), { ...meal, id: meal.id || d.id });
   }
+  const cellKey = (cell: { dish: string; mealId?: string }) => (cell.mealId ? `id:${cell.mealId}` : dishKey(cell.dish));
 
   const dishes = new Map<string, DishSummary>();
   for (const day of plan.days) {
     for (const cat of STUDENT_CATEGORIES) {
       const cell = day.cells[cat];
       if (cell.kind !== 'MEAL') continue;
-      const key = dishKey(cell.dish);
+      const key = cellKey(cell);
       let dish = dishes.get(key);
       if (!dish) {
-        const existing = mealsByKey.get(key);
+        const existing = cell.mealId ? mealsById.get(cell.mealId) : mealsByKey.get(key);
         const input = options.dishes?.[key] || {};
         const price = existing ? Number(existing.price) : Number(input.price);
         const typedAllergens = typeof input.allergens === 'string' ? input.allergens.split(/[,;]/).map((a) => a.trim()).filter(Boolean).join(', ') : '';
@@ -351,7 +357,8 @@ export async function applyMonthlyMenu(
       const active = new Set(
         orders.filter((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED').map((o) => o.id)
       );
-      orderItemsByDate.set(date, lines.filter((it) => active.has(String(it.orderId || ''))));
+      // Extras are never part of the main brunch the import sets.
+      orderItemsByDate.set(date, lines.filter((it) => active.has(String(it.orderId || '')) && (it as { kind?: string }).kind !== 'EXTRA'));
     }
     return orderItemsByDate.get(date)!;
   };
@@ -400,7 +407,7 @@ export async function applyMonthlyMenu(
         const dayMenus = await menusOn(date);
         const desired =
           cell.kind === 'MEAL'
-            ? { mealId: dishes.get(dishKey(cell.dish))!.mealId, isHoliday: false, holidayReason: null }
+            ? { mealId: dishes.get(cellKey(cell))!.mealId, isHoliday: false, holidayReason: null }
             : { mealId: '', isHoliday: true, holidayReason: cell.reason };
         const matches = (m: StoredMenu) =>
           String(m.mealId || '') === desired.mealId &&

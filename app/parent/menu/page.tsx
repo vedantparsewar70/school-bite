@@ -105,6 +105,9 @@ function MenuPageContent() {
   });
 
   const [menus, setMenus] = useState<any[]>([]);
+  // Optional extras for the selected child and day (shown under the brunch).
+  const [extras, setExtras] = useState<any[]>([]);
+  const [allowAllergyOrders, setAllowAllergyOrders] = useState(true);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
@@ -141,6 +144,8 @@ function MenuPageContent() {
       if (res.ok) {
         const data = await res.json();
         setMenus(data.menus || []);
+        setExtras(Array.isArray(data.extras) ? data.extras : []);
+        setAllowAllergyOrders(data.policy?.allowAllergyOrders !== false);
       }
     } catch (err) {
       console.error('Failed to fetch menu:', err);
@@ -221,6 +226,53 @@ function MenuPageContent() {
       `Added ${menuItem.meal.name} for ${selectedChild.name.split(' ')[0]} (${activeStudentCategory})!`,
       hasConflict ? 'info' : 'success'
     );
+  };
+
+  /** Adds one of an extra (max 3 per child per day; the server also counts earlier orders). */
+  const addExtra = (extra: any) => {
+    if (!selectedChild) {
+      showToast('Please select a child first', 'error');
+      return;
+    }
+    const inCartLine = cartItems.find(
+      (c) => c.kind === 'EXTRA' && c.mealId === extra.meal.id && c.date === extra.date && c.studentId === selectedChild.id
+    );
+    const qty = inCartLine?.quantity || 0;
+    if (qty >= Math.min(extra.maxPerChild || 3, extra.availableQuantity)) {
+      showToast(qty >= (extra.maxPerChild || 3) ? `At most ${extra.maxPerChild || 3} ${extra.meal.name} per child per day` : `Only ${extra.availableQuantity} left`, 'error');
+      return;
+    }
+    if (extra.allergyEvaluation?.hasConflict) {
+      if (!allowAllergyOrders) {
+        showToast(`${extra.meal.name} conflicts with ${selectedChild.name.split(' ')[0]}'s allergy profile.`, 'error');
+        return;
+      }
+      if (!qty && !window.confirm(`${extra.meal.name} contains ${extra.allergyEvaluation.matchingAllergens.join(', ')}, which is on ${selectedChild.name.split(' ')[0]}'s allergy list. Add it anyway?`)) return;
+    }
+    if (inCartLine) {
+      updateQuantity(inCartLine.cartItemId, qty + 1);
+      return;
+    }
+    addToCart({
+      kind: 'EXTRA',
+      studentId: selectedChild.id,
+      studentName: selectedChild.name,
+      studentGrade: selectedChild.grade,
+      studentDivision: selectedChild.division || '-',
+      studentCategory: activeStudentCategory,
+      mealId: extra.meal.id,
+      mealName: extra.meal.name,
+      mealPrice: extra.meal.price,
+      mealCategory: extra.meal.category,
+      mealImage: null,
+      isVegetarian: extra.meal.isVegetarian,
+      date: extra.date,
+      quantity: 1,
+      orderingDeadline: extra.orderingDeadline,
+      hasAllergyAlert: Boolean(extra.allergyEvaluation?.hasConflict),
+      conflictAllergens: extra.allergyEvaluation?.matchingAllergens || [],
+    });
+    showToast(`Added ${extra.meal.name} (extra) for ${selectedChild.name.split(' ')[0]}`, extra.allergyEvaluation?.hasConflict ? 'info' : 'success');
   };
 
   const handleSelectMeal = (menuItem: any, date: string) => {
@@ -472,7 +524,7 @@ function MenuPageContent() {
 
               const inCart = cartItems.find(
                 (c) =>
-                  c.mealId === menuItem.meal?.id &&
+                  c.kind !== 'EXTRA' && c.mealId === menuItem.meal?.id &&
                   c.date === selectedDate &&
                   c.studentId === selectedChildId
               );
@@ -688,6 +740,87 @@ function MenuPageContent() {
                 </div>
               );
             })}
+
+            {/* EXTRAS: optional add-ons for this child and day, paid with the brunch. */}
+            {extras.length > 0 && menus.some((m) => !m.isHoliday) && (
+              <section className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-5 space-y-3" aria-label="Extras">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Extras (optional)</h3>
+                  <p className="text-sm text-slate-600">Added to the same order, with the brunch. Up to 3 of each per child.</p>
+                </div>
+                <ul className="divide-y divide-slate-100">
+                  {extras.map((extra) => {
+                    const line = cartItems.find(
+                      (c) => c.kind === 'EXTRA' && c.mealId === extra.meal.id && c.date === extra.date && c.studentId === selectedChild?.id
+                    );
+                    const brunchInCart = cartItems.some((c) => c.kind !== 'EXTRA' && c.date === extra.date && c.studentId === selectedChild?.id);
+                    const closed = isPastDate || !extra.isAvailable;
+                    return (
+                      <li key={extra.id} className="py-3 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex items-start gap-2">
+                            <VegBadge isVegetarian={extra.meal.isVegetarian} size="sm" />
+                            <div className="min-w-0">
+                              <p className="text-base font-bold text-slate-900 break-words">{extra.meal.name}</p>
+                              <p className="text-sm text-slate-600">
+                                {formatINR(extra.meal.price)}
+                                {!closed && ` · ${extra.availableQuantity} left`}
+                              </p>
+                            </div>
+                          </div>
+                          {closed ? (
+                            <span className="text-sm font-semibold text-slate-500 shrink-0">
+                              {extra.isDeadlinePassed || isPastDate ? 'Closed' : 'Sold out'}
+                            </span>
+                          ) : line ? (
+                            <div className="flex items-center gap-1 shrink-0 bg-amber-50 border border-amber-300 rounded-xl p-1">
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(line.cartItemId, line.quantity - 1)}
+                                aria-label={`One less ${extra.meal.name}`}
+                                className="w-11 h-11 rounded-lg bg-white border border-amber-200 flex items-center justify-center"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <span className="min-w-[2rem] text-center text-base font-black text-amber-900">{line.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => addExtra(extra)}
+                                aria-label={`One more ${extra.meal.name}`}
+                                className="w-11 h-11 rounded-lg bg-amber-500 text-white flex items-center justify-center disabled:opacity-50"
+                                disabled={line.quantity >= Math.min(extra.maxPerChild || 3, extra.availableQuantity)}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => addExtra(extra)}
+                              className="min-h-[44px] px-4 shrink-0 rounded-xl border-2 border-amber-400 text-amber-900 text-sm font-bold inline-flex items-center gap-1"
+                            >
+                              <Plus className="w-4 h-4" /> Add
+                            </button>
+                          )}
+                        </div>
+                        {extra.allergyEvaluation?.hasConflict && (
+                          <p className="text-sm text-rose-800 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <span>
+                              Allergy alert: contains {extra.allergyEvaluation.matchingAllergens.join(', ')}
+                              {selectedChild ? ` (${selectedChild.name.split(' ')[0]}'s allergy list)` : ''}.
+                            </span>
+                          </p>
+                        )}
+                        {line && !brunchInCart && (
+                          <p className="text-sm text-amber-800">Extras go with the brunch: add the brunch above too, unless you already ordered it for this day.</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
           </div>
         )}
       </div>

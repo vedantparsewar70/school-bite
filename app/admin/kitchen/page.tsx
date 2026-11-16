@@ -372,6 +372,32 @@ function KitchenPageContent() {
             )}
           </section>
 
+          <section className="rounded-2xl bg-white border border-slate-200 p-4 break-inside-avoid">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-bold text-amber-800 uppercase tracking-wide">Extras (separate)</h2>
+              <span className="text-xl font-black tabular-nums">{kitchenData?.extrasTotal || 0}</span>
+            </div>
+            {kitchenData?.extrasByCategory?.length ? (
+              <div className="mt-2 space-y-2">
+                {kitchenData.extrasByCategory.map((g: any) => (
+                  <div key={g.category}>
+                    <p className="text-sm font-black text-slate-700">{g.category}</p>
+                    <ul className="space-y-0.5">
+                      {g.extras.map((x: any) => (
+                        <li key={x.mealName} className="flex justify-between text-base">
+                          <span className="text-slate-800 break-words min-w-0">{x.mealName}</span>
+                          <span className="font-black tabular-nums shrink-0">{x.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-base text-slate-600 mt-1">No extras ordered.</p>
+            )}
+          </section>
+
           {/* SECTION 2: Classroom & Student Distribution Roster */}
           {kitchenData?.studentList && kitchenData.studentList.length > 0 && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden print:mt-6">

@@ -34,6 +34,17 @@ type ClassCard = {
   duplicates: number;
   editable: boolean;
   removable: boolean;
+  extras: ExtraCard[];
+};
+type ExtraCard = {
+  mealId: string;
+  mealName: string;
+  price: number | null;
+  isVegetarian: boolean | null;
+  maxQuantity: number;
+  availableQuantity: number;
+  ordered: number;
+  children: number;
 };
 type MenuDay = {
   date: string;
@@ -44,7 +55,19 @@ type MenuDay = {
   status: 'ALL' | 'SOME' | 'NONE' | 'HOLIDAY' | 'SUNDAY';
   classes: ClassCard[];
 };
-type Dish = { id: string; name: string; price: number; isVegetarian: boolean; description?: string | null; category?: string };
+type Dish = {
+  id: string;
+  name: string;
+  price: number;
+  isVegetarian: boolean;
+  description?: string | null;
+  category?: string;
+  /** Used as an extra (add-on) somewhere. */
+  isExtra?: boolean;
+  /** A copy made by "Edit for this day" (hidden from the normal lists). */
+  dayOnly?: boolean;
+  dayOnlyDate?: string;
+};
 
 type Sheet =
   | { kind: 'dish'; category: ClassName; mode: 'add' | 'change' }
@@ -53,6 +76,10 @@ type Sheet =
   | { kind: 'portions'; card: ClassCard }
   | { kind: 'holiday' }
   | { kind: 'remove'; card: ClassCard }
+  | { kind: 'dayEdit'; card: ClassCard }
+  | { kind: 'extraAdd'; category: ClassName }
+  | { kind: 'extraPortions'; card: ClassCard; extra: ExtraCard }
+  | { kind: 'extraRemove'; card: ClassCard; extra: ExtraCard }
   | null;
 
 const STRIP_DAYS = 14;
@@ -83,7 +110,7 @@ async function send(url: string, method: string, body?: unknown) {
 }
 
 export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boolean }) {
-  const [tab, setTab] = useState<'MENU' | 'DISHES'>('MENU');
+  const [tab, setTab] = useState<'MENU' | 'MONTH' | 'DISHES'>('MENU');
   const [today, setToday] = useState(() => getTodayString());
   const [from, setFrom] = useState(() => getTodayString());
   const [days, setDays] = useState<MenuDay[]>([]);
@@ -183,6 +210,12 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
     setSelected((cur) => (cur && cur >= nextFrom && cur <= addDays(nextFrom, STRIP_DAYS - 1) ? cur : nextFrom));
   };
 
+  const openDay = (date: string) => {
+    setSelected(date);
+    if (date < from || date > addDays(from, STRIP_DAYS - 1)) setFrom(date);
+    setTab('MENU');
+  };
+
   const day = days.find((d) => d.date === selected) || null;
   const anyEditable = Boolean(day?.classes.some((c) => c.editable));
 
@@ -277,6 +310,57 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
     }
   };
 
+  const saveDayEdit = async (card: ClassCard, applyAll: boolean, v: DishValues) => {
+    if (!day || !card.mealId) return;
+    const date = day.date;
+    const body = (studentCategory: string) => ({ date, studentCategory, mealId: card.mealId, ...v });
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await send('/api/admin/meals/day-copy', 'POST', body(applyAll ? 'ALL' : card.category));
+      if (r.ok) {
+        setNotice({ ok: true, text: r.data.message || `${v.name} saved for ${formatDatePretty(date)}.` });
+        setSheet(null);
+        return;
+      }
+      const blocked: ClassName[] = Array.isArray(r.data.blockedCategories) ? r.data.blockedCategories : [];
+      const others = CLASSES.filter((c) => !blocked.includes(c));
+      setNotice({
+        ok: false,
+        text: r.data.error || 'Not saved. Please try again.',
+        retryOthers:
+          applyAll && blocked.length > 0 && others.length > 0 && r.data.code === 'HAS_ORDERS'
+            ? async () => {
+                setBusy(true);
+                setNotice(null);
+                try {
+                  // One copy for the remaining classes: each class is saved on its own.
+                  for (const cat of others) {
+                    const one = await send('/api/admin/meals/day-copy', 'POST', body(cat));
+                    if (!one.ok) {
+                      setNotice({ ok: false, text: `${cat}: ${one.data.error || 'Not saved.'}` });
+                      return;
+                    }
+                  }
+                  setNotice({ ok: true, text: `${v.name} saved for ${others.join(', ')} on ${formatDatePretty(date)}.` });
+                  setSheet(null);
+                } finally {
+                  setBusy(false);
+                  await refreshAfterChange();
+                  await loadDishes();
+                }
+              }
+            : undefined,
+      });
+    } catch {
+      setNotice({ ok: false, text: 'Not saved: no connection. Please try again.' });
+    } finally {
+      setBusy(false);
+      await refreshAfterChange();
+      await loadDishes();
+    }
+  };
+
   const run = async (action: () => Promise<{ ok: boolean; data: Record<string, any> }>, success: string) => {
     setBusy(true);
     setNotice(null);
@@ -313,8 +397,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-2" role="tablist">
-        {(['MENU', 'DISHES'] as const).map((t) => (
+      <div className="grid grid-cols-3 gap-2" role="tablist">
+        {(['MENU', 'MONTH', 'DISHES'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -323,7 +407,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
             onClick={() => setTab(t)}
             className={`min-h-[44px] rounded-xl text-base font-bold border ${tab === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}
           >
-            {t === 'MENU' ? 'Menu' : 'Dishes'}
+            {t === 'MENU' ? 'Menu' : t === 'MONTH' ? 'Month' : 'Dishes'}
           </button>
         ))}
       </div>
@@ -445,12 +529,18 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
                     onUndoHoliday={() =>
                       run(() => send('/api/admin/menus/holiday', 'POST', { date: day.date, studentCategory: c.category, action: 'undo' }), `Holiday removed for ${c.category}. Nothing is on sale yet.`)
                     }
+                    onDayEdit={() => setSheet({ kind: 'dayEdit', card: c })}
+                    onExtraAdd={() => setSheet({ kind: 'extraAdd', category: c.category })}
+                    onExtraPortions={(extra) => setSheet({ kind: 'extraPortions', card: c, extra })}
+                    onExtraRemove={(extra) => setSheet({ kind: 'extraRemove', card: c, extra })}
                   />
                 ))}
               </div>
             </>
           )}
         </>
+      ) : tab === 'MONTH' ? (
+        <MonthTab startMonth={(selected || today).slice(0, 7)} today={today} onOpenDay={openDay} />
       ) : (
         <DishesTab dishes={dishes} isAdmin={isAdmin} busy={busy} onNew={() => setSheet({ kind: 'new' })} onEdit={(d) => setSheet({ kind: 'edit', dish: d })} onDelete={(d) => {
           if (!window.confirm(`Delete ${d.name} from the dish list? This cannot be undone.`)) return;
@@ -471,9 +561,73 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
           onSave={(mealId, applyAll, portions) => saveDish(sheet.category, applyAll, mealId, portions)}
         />
       )}
+      {sheet?.kind === 'dayEdit' && day && (
+        <DayEditSheet
+          day={day}
+          card={sheet.card}
+          dish={dishes.find((d) => d.id === sheet.card.mealId) || null}
+          busy={busy}
+          onClose={() => setSheet(null)}
+          onSave={(applyAll, v) => saveDayEdit(sheet.card, applyAll, v)}
+        />
+      )}
+      {sheet?.kind === 'extraAdd' && day && (
+        <ExtraSheet
+          day={day}
+          category={sheet.category}
+          dishes={dishes}
+          busy={busy}
+          onClose={() => setSheet(null)}
+          onCreated={(d) => setDishes((prev) => [d, ...prev.filter((x) => x.id !== d.id)])}
+          onSave={(mealId, applyAll, portions) =>
+            run(
+              () => send('/api/admin/menus/extras', 'POST', { action: 'add', date: day.date, studentCategory: applyAll ? 'ALL' : sheet.category, mealId, portions }),
+              `Extra added for ${applyAll ? 'all 3 classes' : sheet.category}.`
+            )
+          }
+        />
+      )}
+      {sheet?.kind === 'extraPortions' && day && (
+        <PortionsSheet
+          card={{ ...sheet.card, mealName: `${sheet.extra.mealName} (extra)`, ordered: sheet.extra.ordered, maxQuantity: sheet.extra.maxQuantity }}
+          busy={busy}
+          onClose={() => setSheet(null)}
+          onSave={(n) =>
+            run(
+              () => send('/api/admin/menus/extras', 'POST', { action: 'portions', date: day.date, studentCategory: sheet.card.category, mealId: sheet.extra.mealId, portions: n }),
+              `${sheet.extra.mealName}: ${n} portions.`
+            )
+          }
+        />
+      )}
+      {sheet?.kind === 'extraRemove' && day && (
+        <BottomSheet title="Remove extra" onClose={() => setSheet(null)}>
+          <p className="text-base text-slate-900">
+            Remove the extra {sheet.extra.mealName} from {formatDatePretty(day.date)}, {sheet.card.category}? Parents will no longer be able to order it.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setSheet(null)} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold">
+              Keep it
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () => send('/api/admin/menus/extras', 'POST', { action: 'remove', date: day.date, studentCategory: sheet.card.category, mealId: sheet.extra.mealId }),
+                  `${sheet.extra.mealName} removed from ${formatDatePretty(day.date)}, ${sheet.card.category}.`
+                )
+              }
+              className="min-h-[48px] rounded-xl bg-rose-600 text-white text-base font-black disabled:opacity-60"
+            >
+              Remove
+            </button>
+          </div>
+        </BottomSheet>
+      )}
       {sheet?.kind === 'edit' && (
         <DishForm
-          title="Edit dish"
+          title="Edit everywhere"
           initial={sheet.dish}
           busy={busy}
           onClose={() => setSheet(null)}
@@ -546,6 +700,10 @@ function ClassCardView({
   onPortions,
   onEdit,
   onUndoHoliday,
+  onDayEdit,
+  onExtraAdd,
+  onExtraPortions,
+  onExtraRemove,
 }: {
   card: ClassCard;
   day: MenuDay;
@@ -555,6 +713,10 @@ function ClassCardView({
   onPortions: () => void;
   onEdit: () => void;
   onUndoHoliday: () => void;
+  onDayEdit: () => void;
+  onExtraAdd: () => void;
+  onExtraPortions: (extra: ExtraCard) => void;
+  onExtraRemove: (extra: ExtraCard) => void;
 }) {
   const onSale = c.state === 'ON_SALE';
   return (
@@ -616,14 +778,58 @@ function ClassCardView({
               Portions: {c.maxQuantity ?? '–'}
             </button>
           )}
+          {c.editable && onSale && c.mealId && (
+            <button type="button" disabled={busy} onClick={onDayEdit} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60">
+              Edit for this day
+            </button>
+          )}
           {onSale && c.mealId && (
             <button type="button" disabled={busy} onClick={onEdit} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-bold disabled:opacity-60">
-              Edit dish
+              Edit everywhere
             </button>
           )}
           {c.state === 'HOLIDAY' && !day.isPast && (
             <button type="button" disabled={busy} onClick={onUndoHoliday} className="col-span-2 min-h-[48px] rounded-xl border border-slate-300 bg-white text-slate-800 text-base font-bold disabled:opacity-60">
               Undo holiday
+            </button>
+          )}
+        </div>
+      )}
+
+      {onSale && (c.extras.length > 0 || c.editable) && (
+        <div className="pt-3 border-t border-slate-100 space-y-2">
+          <p className="text-sm font-black uppercase tracking-wide text-slate-500">Extras</p>
+          {c.extras.map((x) => (
+            <div key={x.mealId} className="rounded-xl border border-slate-200 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex items-center gap-2 min-w-0">
+                  {x.isVegetarian !== null && <VegBadge isVegetarian={x.isVegetarian} size="sm" />}
+                  <span className="text-base font-bold text-slate-900 break-words min-w-0">{x.mealName}</span>
+                </span>
+                <span className="text-base font-bold text-slate-900 shrink-0">{x.price !== null ? formatINR(x.price) : ''}</span>
+              </div>
+              <p className="text-sm text-slate-700">
+                <strong>{x.ordered}</strong> ordered / <strong>{x.maxQuantity}</strong> available
+              </p>
+              {(c.editable || !day.isPast) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {c.editable && (
+                    <button type="button" disabled={busy} onClick={() => onExtraPortions(x)} className="min-h-[44px] rounded-xl border border-slate-300 bg-white text-sm font-bold disabled:opacity-60">
+                      Portions: {x.maxQuantity}
+                    </button>
+                  )}
+                  {!day.isPast && (
+                    <button type="button" disabled={busy} onClick={() => onExtraRemove(x)} className="min-h-[44px] rounded-xl border-2 border-rose-200 bg-white text-rose-700 text-sm font-bold disabled:opacity-60">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {c.editable && (
+            <button type="button" disabled={busy} onClick={onExtraAdd} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 inline-flex items-center justify-center gap-1.5 disabled:opacity-60">
+              <Plus className="w-4 h-4" /> Add extra
             </button>
           )}
         </div>
@@ -683,7 +889,7 @@ function DishSheet({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return dishes.filter((d) => !q || d.name.toLowerCase().includes(q));
+    return dishes.filter((d) => !d.dayOnly && (!q || d.name.toLowerCase().includes(q)));
   }, [dishes, search]);
 
   const targets = applyAll ? day.classes.filter((c) => c.editable) : [card];
@@ -1003,6 +1209,31 @@ function DishesTab({
     const q = search.trim().toLowerCase();
     return dishes.filter((d) => !q || d.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
   }, [dishes, search]);
+  const main = list.filter((d) => !d.dayOnly);
+  const copies = list.filter((d) => d.dayOnly);
+  const row = (d: Dish) => (
+    <li key={d.id} className="px-3 py-2 flex items-center gap-2">
+      <VegBadge isVegetarian={d.isVegetarian} size="sm" />
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-semibold text-slate-900 break-words">
+          {d.name}
+          {d.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}
+        </p>
+        <p className="text-sm text-slate-600">
+          {formatINR(d.price)}
+          {d.dayOnly && d.dayOnlyDate ? ` · only on ${formatDatePretty(d.dayOnlyDate)}` : ''}
+        </p>
+      </div>
+      <button type="button" disabled={busy} onClick={() => onEdit(d)} className="min-h-[44px] px-3 rounded-xl border border-slate-300 text-sm font-bold">
+        Edit
+      </button>
+      {isAdmin && (
+        <button type="button" disabled={busy} onClick={() => onDelete(d)} className="min-h-[44px] px-3 rounded-xl border border-rose-200 text-rose-700 text-sm font-bold">
+          Delete
+        </button>
+      )}
+    </li>
+  );
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
@@ -1021,25 +1252,284 @@ function DishesTab({
         </button>
       </div>
       <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl">
-        {list.map((d) => (
-          <li key={d.id} className="px-3 py-2 flex items-center gap-2">
-            <VegBadge isVegetarian={d.isVegetarian} size="sm" />
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold text-slate-900 break-words">{d.name}</p>
-              <p className="text-sm text-slate-600">{formatINR(d.price)}</p>
-            </div>
-            <button type="button" disabled={busy} onClick={() => onEdit(d)} className="min-h-[44px] px-3 rounded-xl border border-slate-300 text-sm font-bold">
-              Edit
-            </button>
-            {isAdmin && (
-              <button type="button" disabled={busy} onClick={() => onDelete(d)} className="min-h-[44px] px-3 rounded-xl border border-rose-200 text-rose-700 text-sm font-bold">
-                Delete
-              </button>
-            )}
-          </li>
-        ))}
-        {list.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
+        {main.map(row)}
+        {main.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
       </ul>
+      {copies.length > 0 && (
+        <details className="bg-white border border-slate-200 rounded-2xl">
+          <summary className="min-h-[44px] px-3 flex items-center text-base font-bold text-slate-700 cursor-pointer">Day-only copies ({copies.length})</summary>
+          <ul className="divide-y divide-slate-100 border-t border-slate-100">{copies.map(row)}</ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function DayEditSheet({
+  day,
+  card,
+  dish,
+  busy,
+  onClose,
+  onSave,
+}: {
+  day: MenuDay;
+  card: ClassCard;
+  dish: Dish | null;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (applyAll: boolean, v: DishValues) => void;
+}) {
+  // Default: every class that has this same dish today (usually all 3).
+  const same = day.classes.filter((c) => c.editable && c.mealId === card.mealId);
+  const [applyAll, setApplyAll] = useState(same.length === 3);
+  const initial = dish || { id: card.mealId || '', name: card.mealName || '', price: card.price || 0, isVegetarian: card.isVegetarian !== false };
+  return (
+    <BottomSheet title={`Edit for ${formatDatePretty(day.date)} only`} onClose={onClose}>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-bold text-slate-700">Apply to</legend>
+        {[
+          { v: true, label: 'All 3 classes' },
+          { v: false, label: `${card.category} only` },
+        ].map((o) => (
+          <label key={String(o.v)} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
+            <input type="radio" name="day-edit-apply" checked={applyAll === o.v} onChange={() => setApplyAll(o.v)} className="w-5 h-5" />
+            <span className="text-base text-slate-900">{o.label}</span>
+          </label>
+        ))}
+      </fieldset>
+      <DishFields
+        initial={initial}
+        submitLabel="Save for this day"
+        busy={busy}
+        onSubmit={(v) => onSave(applyAll, v)}
+        notes={
+          <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            Only {formatDatePretty(day.date)} changes. Other days keep the original dish.
+          </p>
+        }
+      />
+    </BottomSheet>
+  );
+}
+
+function ExtraSheet({
+  day,
+  category,
+  dishes,
+  busy,
+  onClose,
+  onCreated,
+  onSave,
+}: {
+  day: MenuDay;
+  category: ClassName;
+  dishes: Dish[];
+  busy: boolean;
+  onClose: () => void;
+  onCreated: (d: Dish) => void;
+  onSave: (mealId: string, applyAll: boolean, portions: number) => void;
+}) {
+  const card = day.classes.find((c) => c.category === category)!;
+  const [search, setSearch] = useState('');
+  const [mealId, setMealId] = useState('');
+  const [applyAll, setApplyAll] = useState(false);
+  const [portions, setPortions] = useState('20');
+  const [creating, setCreating] = useState(false);
+  const [problem, setProblem] = useState('');
+  const taken = new Set([card.mealId, ...card.extras.map((x) => x.mealId)]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return dishes
+      .filter((d) => !d.dayOnly && !taken.has(d.id) && (!q || d.name.toLowerCase().includes(q)))
+      .sort((a, b) => Number(Boolean(b.isExtra)) - Number(Boolean(a.isExtra)) || a.name.localeCompare(b.name));
+  }, [dishes, search, card]);
+
+  return (
+    <BottomSheet title={`Add extra: ${formatDatePretty(day.date)}`} onClose={onClose}>
+      {creating ? (
+        <DishFields
+          submitLabel="Add dish"
+          busy={busy}
+          onCancel={() => setCreating(false)}
+          onSubmit={async (v) => {
+            const r = await send('/api/admin/meals', 'POST', { ...v, category: 'SNACK' });
+            const meal = (r.data.meal || null) as Dish | null;
+            if (meal && (r.ok || r.data.code === 'DUPLICATE_RECIPE')) {
+              onCreated(meal);
+              setMealId(meal.id);
+              setCreating(false);
+              setProblem(r.ok ? '' : `${meal.name} is already in the list, so it was chosen.`);
+            } else {
+              setProblem(r.data.error || 'The dish could not be added.');
+            }
+          }}
+        />
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search dishes"
+              className="w-full min-h-[48px] pl-10 pr-3 rounded-xl border border-slate-300 bg-white text-base"
+            />
+          </div>
+          <ul className="max-h-[34vh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl" role="radiogroup">
+            {filtered.map((d) => (
+              <li key={d.id}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={mealId === d.id}
+                  onClick={() => setMealId(d.id)}
+                  className={`w-full min-h-[52px] px-3 py-2 flex items-center justify-between gap-3 text-left ${mealId === d.id ? 'bg-amber-50' : 'bg-white'}`}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className={`w-5 h-5 shrink-0 rounded-full border-2 ${mealId === d.id ? 'border-amber-600 bg-amber-500' : 'border-slate-300'}`} />
+                    <VegBadge isVegetarian={d.isVegetarian} size="sm" />
+                    <span className="text-base font-semibold text-slate-900 break-words min-w-0">
+                      {d.name}
+                      {d.isExtra && <span className="ml-1.5 text-[11px] font-black uppercase text-amber-800">Extra</span>}
+                    </span>
+                  </span>
+                  <span className="text-base font-bold text-slate-800 shrink-0">{formatINR(d.price)}</span>
+                </button>
+              </li>
+            ))}
+            {filtered.length === 0 && <li className="p-4 text-base text-slate-500">No dish matches.</li>}
+          </ul>
+          <button type="button" onClick={() => setCreating(true)} className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-400 text-base font-bold text-slate-800 inline-flex items-center justify-center gap-1.5">
+            <Plus className="w-4 h-4" /> New dish
+          </button>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-bold text-slate-700">Apply to</legend>
+            {[
+              { v: false, label: `${category} only` },
+              { v: true, label: 'All 3 classes' },
+            ].map((o) => (
+              <label key={String(o.v)} className="flex items-center gap-3 min-h-[44px] px-3 rounded-xl border border-slate-200">
+                <input type="radio" name="extra-apply" checked={applyAll === o.v} onChange={() => setApplyAll(o.v)} className="w-5 h-5" />
+                <span className="text-base text-slate-900">{o.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <label className="block">
+            <span className="text-sm font-bold text-slate-700">Portions {applyAll ? '(each class)' : ''}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={10000}
+              value={portions}
+              onChange={(e) => setPortions(e.target.value)}
+              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base"
+            />
+          </label>
+          <p className="text-sm text-slate-600">Parents can add up to 3 of each extra per child, only with that day&apos;s brunch.</p>
+          {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const n = Number(portions);
+              if (!mealId) return setProblem('Choose a dish first.');
+              if (!Number.isInteger(n) || n < 1 || n > 10000) return setProblem('Portions must be a whole number from 1 to 10000.');
+              setProblem('');
+              onSave(mealId, applyAll, n);
+            }}
+            className="w-full min-h-[52px] rounded-xl bg-emerald-600 text-white text-lg font-black disabled:opacity-60"
+          >
+            Save
+          </button>
+        </>
+      )}
+    </BottomSheet>
+  );
+}
+
+const monthIndex = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+const monthOf = (i: number) => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
+
+/** Every date of a month, one compact row per day; tapping a row opens it in the Menu tab. */
+function MonthTab({ startMonth, today, onOpenDay }: { startMonth: string; today: string; onOpenDay: (date: string) => void }) {
+  const thisMonth = monthIndex(today.slice(0, 7));
+  const clamp = (i: number) => Math.min(thisMonth + 6, Math.max(thisMonth - 6, i));
+  const [month, setMonth] = useState(() => monthOf(clamp(monthIndex(startMonth))));
+  const [days, setDays] = useState<MenuDay[] | null>(null);
+  const [error, setError] = useState('');
+  const seq = useRef(0);
+
+  const load = useCallback(async () => {
+    const mine = ++seq.current;
+    try {
+      const res = await fetchWithTimeout(`/api/staff/menu-month?month=${month}`);
+      const body = await res.json().catch(() => ({}));
+      if (mine !== seq.current) return;
+      if (!res.ok) return setError(body.error || 'Could not load the month.');
+      setDays(body.days || []);
+      setError('');
+    } catch {
+      if (mine === seq.current) setError('Could not load the month. Check the connection.');
+    }
+  }, [month]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+  useSyncWatcher({ pollIntervalMs: 60000, onMenuUpdate: () => load() });
+
+  const idx = monthIndex(month);
+  const label = new Date(`${month}-15T12:00:00+05:30`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  const short: Record<string, string> = { 'Pre-primary': 'PP', Primary: 'P', Secondary: 'S' };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" disabled={idx <= thisMonth - 6} onClick={() => setMonth(monthOf(idx - 1))} aria-label="Previous month" className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-300 bg-white disabled:opacity-40">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <p className="text-lg font-black text-slate-900">{label}</p>
+        <button type="button" disabled={idx >= thisMonth + 6} onClick={() => setMonth(monthOf(idx + 1))} aria-label="Next month" className="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-300 bg-white disabled:opacity-40">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+      {error && <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold">{error}</div>}
+      {!days ? (
+        <div className="h-64 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
+      ) : (
+        <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl">
+          {days.map((d) => {
+            const holiday = d.classes.find((c) => c.state === 'HOLIDAY');
+            const text = d.isSunday
+              ? 'Sunday'
+              : d.status === 'HOLIDAY'
+                ? `Holiday: ${holiday?.holidayReason || ''}`
+                : d.status === 'NONE'
+                  ? 'Nothing on sale'
+                  : d.classes
+                      .map((c) => `${short[c.category]} ${c.state === 'ON_SALE' ? c.mealName : c.state === 'HOLIDAY' ? 'Holiday' : '—'}${c.extras.length ? ` +${c.extras.length}` : ''}`)
+                      .join(' · ');
+            return (
+              <li key={d.date}>
+                <button
+                  type="button"
+                  onClick={() => onOpenDay(d.date)}
+                  className={`w-full min-h-[48px] px-3 py-2 flex items-start gap-3 text-left ${d.isToday ? 'bg-amber-50' : ''} ${d.isPast ? 'text-slate-400' : ''}`}
+                >
+                  <span className="w-14 shrink-0 text-sm font-black">
+                    {d.weekday} {Number(d.date.slice(8, 10))}
+                  </span>
+                  <span className={`mt-1.5 w-2 h-2 shrink-0 rounded-full ${DOT[d.status].color}`} aria-label={DOT[d.status].label} />
+                  <span className="min-w-0 text-sm text-slate-800 break-words">{text}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

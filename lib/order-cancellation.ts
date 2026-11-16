@@ -229,6 +229,7 @@ export async function cancelOrderWithRefund(
         quantity: Number(item.quantity || 0),
         studentCategory: item.studentCategory || null,
         menuId: item.menuId || null,
+        ...(item.kind === 'EXTRA' ? { kind: 'EXTRA', menuExtraId: item.menuExtraId || null } : {}),
       }))
     );
 

@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { isDeadlinePassed, APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from '@/lib/utils';
 import { effectiveMenuEntry } from '@/lib/menu-entries';
+import { checkExtraLines, isExtraLine } from '@/lib/menu-extras';
 
 export interface MealItemAvailability {
   mealId: string;
@@ -12,6 +13,8 @@ export interface MealItemAvailability {
   availableQuantity: number;
   serverPrice: number;
   menuId?: string | null;
+  /** Extra lines (kind EXTRA): the menuExtras entry; menuId stays null. */
+  menuExtraId?: string | null;
   reason?: string;
 }
 
@@ -40,6 +43,9 @@ export async function validateCartAvailability(
     date: string;
     quantity?: number;
     mealName?: string;
+    studentId?: string;
+    studentCategory?: string;
+    kind?: string;
   }>
 ): Promise<CartAvailabilityValidation> {
   if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
@@ -68,6 +74,7 @@ export async function validateCartAvailability(
     },
   });
 
+
   const normalizeCat = (cat?: string) => {
     if (!cat || cat === 'ALL') return 'ALL';
     const c = String(cat).toLowerCase();
@@ -76,6 +83,28 @@ export async function validateCartAvailability(
     if (c.includes('pri')) return 'Primary';
     return cat;
   };
+
+  // Extras: checked as a group against the extras collection (lib/menu-extras.ts).
+  const extraIndexes = cartItems.map((it, i) => (isExtraLine(it) ? i : -1)).filter((i) => i >= 0);
+  const extraChecks =
+    extraIndexes.length > 0
+      ? await checkExtraLines(
+          extraIndexes
+            .map((i) => ({ i, it: cartItems[i] }))
+            .filter(({ it }) => typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date))
+            .map(({ i, it }) => ({
+              index: i,
+              studentId: String(it.studentId || ''),
+              date: it.date,
+              mealId: it.mealId,
+              quantity: Number(it.quantity) || 1,
+              studentCategory: normalizeCat(it.studentCategory),
+            })),
+          cartItems.filter((it) => !isExtraLine(it)).map((it) => ({ studentId: String(it.studentId || ''), date: it.date })),
+          dateMenuRecords as any[],
+          new Map(meals.map((m: any) => [m.id, m.name]))
+        )
+      : new Map();
 
   const itemResults: MealItemAvailability[] = [];
   // Portions already requested by earlier cart lines, per menu record
@@ -203,6 +232,24 @@ export async function validateCartAvailability(
         availableQuantity: 0,
         serverPrice: 0,
         reason: 'Meal does not exist in the school menu catalog.',
+      });
+      continue;
+    }
+
+    if (isExtraLine(item)) {
+      const check = extraChecks.get(cartItems.indexOf(item));
+      itemResults.push({
+        mealId: item.mealId,
+        date: item.date,
+        mealName,
+        isAvailable: Boolean(check) && !check!.reason,
+        isActive: Boolean(check) && !check!.reason,
+        isDeadlinePassed: Boolean(check?.deadlinePassed),
+        availableQuantity: check?.availableQuantity ?? 0,
+        serverPrice,
+        menuId: null,
+        menuExtraId: check?.extraId ?? null,
+        ...(check && !check.reason ? {} : { reason: check?.reason || 'This extra is not available for this date/category.' }),
       });
       continue;
     }

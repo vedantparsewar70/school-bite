@@ -174,6 +174,7 @@ export async function GET(req: Request) {
           conflictAllergens: item.conflictAllergens || item.student?.allergies || null,
           mealId: item.mealId,
           mealName: item.mealName || item.meal?.name || 'Meal',
+          isExtra: item.kind === 'EXTRA',
           mealCategory: item.meal?.category || 'General',
           isVegetarian: Boolean(item.meal?.isVegetarian),
           date: item.date,

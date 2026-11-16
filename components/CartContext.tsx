@@ -83,7 +83,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [checkedOwnerId]);
 
   const addToCart = (item: Omit<CartItem, 'cartItemId'>) => {
-    const key = `${item.studentId}-${item.mealId}-${item.date}`;
+    // An extra has its own line, even if the same dish were also a brunch.
+    const key = `${item.studentId}-${item.mealId}-${item.date}${item.kind === 'EXTRA' ? '-extra' : ''}`;
     setCartItems((prev) => {
       const idx = prev.findIndex((i) => i.cartItemId === key);
       if (idx > -1) {
@@ -100,7 +101,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeFromCart = (cartItemId: string) => {
-    setCartItems((prev) => prev.filter((i) => i.cartItemId !== cartItemId));
+    setCartItems((prev) => {
+      const removed = prev.find((i) => i.cartItemId === cartItemId);
+      // Extras go with the brunch: removing a child's brunch for a day removes that day's extras too.
+      const dropExtras = removed && removed.kind !== 'EXTRA';
+      return prev.filter(
+        (i) =>
+          i.cartItemId !== cartItemId &&
+          !(dropExtras && i.kind === 'EXTRA' && i.studentId === removed!.studentId && i.date === removed!.date)
+      );
+    });
   };
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
