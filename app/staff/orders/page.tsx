@@ -55,6 +55,7 @@ function ServeContent() {
 
   const [rows, setRows] = useState<ServeRow[]>([]);
   const [closedReason, setClosedReason] = useState<string | null>(null);
+  const [closedCategories, setClosedCategories] = useState<Array<{ category: string; reason: string }>>([]);
   const [teachers, setTeachers] = useState<TeacherOrder[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -93,6 +94,7 @@ function ServeContent() {
       if (seq !== loadSeq.current) return;
       setRows(data.rows || []);
       setClosedReason(data.closedReason || null);
+      setClosedCategories(Array.isArray(data.closedCategories) ? data.closedCategories : []);
       setTeachers((teacherData.orders || []).filter((o: TeacherOrder) => o.orderStatus !== 'CANCELLED'));
       setLoadError('');
     } catch {
@@ -330,6 +332,11 @@ function ServeContent() {
           </div>
         ) : tab === 'STUDENTS' ? (
           <>
+            {closedCategories.map((c) => (
+              <div key={c.category} className="px-4 py-3 rounded-2xl bg-rose-50 border border-rose-200 text-base font-bold text-rose-900">
+                No brunch for {c.category} ({c.reason})
+              </div>
+            ))}
             {closedReason && rows.length === 0 ? (
               <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center">
                 <p className="text-lg font-black text-slate-900">{closedReason}</p>

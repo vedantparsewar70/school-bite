@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
-import { comparePassword, hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
+import { comparePassword, hashPassword, createSessionToken, sessionMaxAgeSeconds, TOKEN_COOKIE_NAME } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { clearLoginFailures, getTrustedClientIp, loginLockRemainingMs, recordLoginFailure } from '@/lib/login-throttle';
 import { UserRole } from '@/types';
@@ -234,7 +234,7 @@ export async function POST(req: Request) {
         secure: isHttps,
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
+        maxAge: sessionMaxAgeSeconds(user.role), // staff 30 days, others 7
       });
     } catch {
       // Cookie header fallback applied below
@@ -275,7 +275,7 @@ export async function POST(req: Request) {
       secure: isHttps,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: sessionMaxAgeSeconds(user.role),
     });
 
     return response;

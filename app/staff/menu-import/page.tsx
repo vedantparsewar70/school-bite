@@ -82,7 +82,7 @@ export default function MonthlyMenuImportPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center gap-3">
-        <Link href="/staff/kitchen" className="p-2 rounded-xl text-slate-500 hover:bg-slate-100" aria-label="Back to Student Menu">
+        <Link href="/staff/kitchen" className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100" aria-label="Back to Student Menu">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
@@ -117,7 +117,7 @@ export default function MonthlyMenuImportPage() {
         <button
           onClick={() => send('preview')}
           disabled={!file || busy !== ''}
-          className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2"
+          className="w-full sm:w-auto min-h-[44px] px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2"
         >
           {busy === 'preview' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           Check the file
@@ -186,7 +186,7 @@ export default function MonthlyMenuImportPage() {
                             min="1"
                             value={v.price}
                             onChange={(e) => setDecision(d.key, { price: e.target.value })}
-                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm"
+                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-base"
                           />
                         </label>
                         <label className="text-xs font-semibold text-slate-700">
@@ -194,7 +194,7 @@ export default function MonthlyMenuImportPage() {
                           <select
                             value={v.isVegetarian}
                             onChange={(e) => setDecision(d.key, { isVegetarian: e.target.value as DishDecision['isVegetarian'] })}
-                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
+                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-base bg-white"
                           >
                             <option value="">Choose…</option>
                             <option value="yes">Yes, vegetarian</option>
@@ -209,11 +209,11 @@ export default function MonthlyMenuImportPage() {
                             value={v.allergens}
                             disabled={v.noAllergens}
                             onChange={(e) => setDecision(d.key, { allergens: e.target.value })}
-                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm disabled:bg-slate-100"
+                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-base disabled:bg-slate-100"
                           />
                         </label>
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <label className="flex items-center gap-2 min-h-[44px] text-sm text-slate-700">
                         <input
                           type="checkbox"
                           className="w-5 h-5"
@@ -230,7 +230,7 @@ export default function MonthlyMenuImportPage() {
               <button
                 onClick={() => send('preview')}
                 disabled={busy !== ''}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-50"
               >
                 {busy === 'preview' ? 'Checking…' : 'Re-check'}
               </button>
@@ -274,7 +274,7 @@ export default function MonthlyMenuImportPage() {
           {!published && (
             <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
               {hasDiffering && (
-                <label className="flex items-start gap-2 text-sm text-slate-700">
+                <label className="flex items-start gap-2 min-h-[44px] py-2 text-sm text-slate-700">
                   <input type="checkbox" className="w-5 h-5 mt-0.5" checked={replaceUnordered} onChange={(e) => setReplaceUnordered(e.target.checked)} />
                   <span>
                     Replace saved days that differ from this file. Days that already have orders are never changed.

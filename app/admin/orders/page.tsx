@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -22,7 +23,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
-import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor, getTodayString, getOffsetDateString } from '@/lib/utils';
+import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor, getTodayString } from '@/lib/utils';
 import { formatServeTime } from '@/lib/service-dates';
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
@@ -46,9 +47,31 @@ function AdminOrdersContent() {
   const [loading, setLoading] = useState(true);
 
   // Filters
-  const tomorrowDateStr = getOffsetDateString(1);
+  // Today in India (IST), worked out on every render so it moves on after midnight.
   const todayDateStr = getTodayString();
-  const [dateFilter, setDateFilter] = useState(initialDate || tomorrowDateStr);
+  // The next date with brunch (skips Sundays, holidays and unpublished days); the default view.
+  const [nextServingDate, setNextServingDate] = useState<string | null>(null);
+  const [dateFilter, setDateFilterState] = useState(initialDate || todayDateStr);
+  const dateTouched = React.useRef(Boolean(initialDate));
+  const setDateFilter = (value: string) => {
+    dateTouched.current = true;
+    setDateFilterState(value);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/staff/next-serving-day', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.date) return;
+        setNextServingDate(d.date);
+        if (!dateTouched.current) setDateFilterState(d.date);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [todayDateStr]);
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
@@ -185,16 +208,6 @@ function AdminOrdersContent() {
       {/* Quick Date Pills */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setDateFilter(tomorrowDateStr)}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            dateFilter === tomorrowDateStr
-              ? 'bg-amber-500 text-white shadow-md'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          Tomorrow ({formatDatePretty(tomorrowDateStr).split(',')[0]})
-        </button>
-        <button
           onClick={() => setDateFilter(todayDateStr)}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             dateFilter === todayDateStr
@@ -204,6 +217,24 @@ function AdminOrdersContent() {
         >
           Today ({formatDatePretty(todayDateStr).split(',')[0]})
         </button>
+        {nextServingDate && (
+          <button
+            onClick={() => setDateFilter(nextServingDate)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              dateFilter === nextServingDate
+                ? 'bg-amber-500 text-white shadow-md'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Next serving day ({formatDatePretty(nextServingDate).split(',')[0]})
+          </button>
+        )}
+        <Link
+          href="/admin/not-served"
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+        >
+          Not served list
+        </Link>
         <button
           onClick={() => setDateFilter('')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -272,7 +303,7 @@ function AdminOrdersContent() {
           </div>
         </div>
 
-        {(classFilter || statusFilter || paymentFilter || search || (dateFilter && dateFilter !== tomorrowDateStr)) && (
+        {(classFilter || statusFilter || paymentFilter || search || (dateFilter && dateFilter !== (nextServingDate || todayDateStr))) && (
           <div className="flex justify-end pt-1">
             <button
               onClick={handleResetFilters}

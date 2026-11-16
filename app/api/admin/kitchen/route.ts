@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
 import { db } from '@/lib/firebase-admin';
 import { applyServiceStatus, itemServedAt, orderServiceDates, serviceStatusFor } from '@/lib/service-dates';
+import { cutoffState, dayPlan, menuEntriesOn, SERVING_CATEGORIES } from '@/lib/serving-day';
+import { normalizeStudentCategory } from '@/lib/menu-stock';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,7 +26,7 @@ export async function GET(req: Request) {
 
     const cached = kitchenCache.get(date);
     if (!bypassCache && cached && Date.now() - cached.timestamp < KITCHEN_CACHE_TTL) {
-      return NextResponse.json(cached.data, {
+      return NextResponse.json({ ...cached.data, cutoff: cutoffState(date, cached.data.deadline) }, {
         headers: { 'X-Cache': 'HIT', 'Cache-Control': 'no-store, max-age=0' },
       });
     }
@@ -177,6 +179,33 @@ export async function GET(req: Request) {
       };
     });
 
+    // Dishes to prepare per category (Pre-primary, Primary, Secondary), from each order line.
+    const byCategoryMap = new Map<string, Map<string, number>>();
+    for (const [index, it] of validItems.entries()) {
+      const lineCat = normalizeStudentCategory((it as any).studentCategory);
+      const cat = lineCat !== 'ALL' ? lineCat : normalizeStudentCategory(studentList[index].studentCategory);
+      const dishes = byCategoryMap.get(cat) || new Map<string, number>();
+      const name = it.mealName || it.meal?.name || 'Meal';
+      dishes.set(name, (dishes.get(name) || 0) + it.quantity);
+      byCategoryMap.set(cat, dishes);
+    }
+    const categoryOrder = (c: string) => {
+      const i = (SERVING_CATEGORIES as readonly string[]).indexOf(c);
+      return i === -1 ? 99 : i;
+    };
+    const byCategory = Array.from(byCategoryMap.entries())
+      .sort((a, b) => categoryOrder(a[0]) - categoryOrder(b[0]) || a[0].localeCompare(b[0]))
+      .map(([category, dishes]) => ({
+        category,
+        total: Array.from(dishes.values()).reduce((sum, n) => sum + n, 0),
+        dishes: Array.from(dishes.entries())
+          .map(([mealName, quantity]) => ({ mealName, quantity }))
+          .sort((a, b) => b.quantity - a.quantity || a.mealName.localeCompare(b.mealName)),
+      }));
+
+    // Which categories have brunch, and whether ordering has closed (counts are final).
+    const plan = dayPlan(await menuEntriesOn(date), date);
+
     const uniqueOrderIds = new Set(validItems.map((i) => i.orderId).filter(Boolean));
     const mealCountsList = Array.from(mealCountsMap.values())
       .map(({ orderIds, ...rest }) => rest)
@@ -214,12 +243,16 @@ export async function GET(req: Request) {
         count,
       })),
       studentCategoryBreakdown,
+      byCategory,
+      plan: { isSunday: plan.isSunday, isServingDay: plan.isServingDay, categories: plan.categories },
+      deadline: plan.deadline,
       studentList,
     };
 
     kitchenCache.set(date, { data: payload, timestamp: Date.now() });
 
-    return NextResponse.json(payload, {
+    // Worked out on every request (not cached), so "Final" appears right at the cutoff.
+    return NextResponse.json({ ...payload, cutoff: cutoffState(date, payload.deadline) }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
   } catch (error) {

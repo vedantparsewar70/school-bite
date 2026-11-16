@@ -141,3 +141,17 @@ test('the staff session from login is accepted by the teacher-order API; parents
   assert.equal((await placeTeacherOrder(teacherOrderRequest())).status, 400);
   assert.equal((await placeTeacherOrder(teacherOrderRequest('forged.token.value'))).status, 400);
 });
+
+test('staff sign-ins last 30 days (sliding, see /api/auth/me); admin sign-ins 7 days', async () => {
+  env.STAFF_EMAIL = 'staff@school.com';
+  env.STAFF_PASS = 'test-only-staff-pass';
+  const staffRes = await login(loginRequest({ email: 'staff@school.com', password: 'test-only-staff-pass', requestedRole: 'staff' }));
+  assert.equal(staffRes.status, 200);
+  assert.match(staffRes.headers.get('set-cookie') || '', /Max-Age=2592000/);
+
+  await seedUser('usr_admin_1', 'admin@school.com', 'ADMIN', 'test-only-admin-pass');
+  const adminRes = await login(loginRequest({ email: 'admin@school.com', password: 'test-only-admin-pass', requestedRole: 'admin' }));
+  assert.equal(adminRes.status, 200);
+  assert.match(adminRes.headers.get('set-cookie') || '', /Max-Age=604800/);
+  assert.doesNotMatch(adminRes.headers.get('set-cookie') || '', /Max-Age=2592000/);
+});

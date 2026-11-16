@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString, isSundayDate } from '@/lib/utils';
+import { dayPlan, menuEntriesOn } from '@/lib/serving-day';
 import {
   AlreadyServedError,
   applyItemServe,
@@ -28,10 +29,20 @@ function categoryOf(item: any, student: any): string {
   return Number.isFinite(n) && n > 5 ? 'Secondary' : 'Primary';
 }
 
-/** Why there is no brunch on a date: Sunday, or every menu entry of the date is a holiday. */
-async function closedReason(date: string): Promise<string | null> {
+/**
+ * Why there is no brunch on a date: Sunday, or every menu entry of the date is a holiday. Also the
+ * categories with a holiday when others still have brunch (shown as "No brunch for Pre-primary").
+ */
+async function closedReason(date: string): Promise<{ reason: string | null; categories: Array<{ category: string; reason: string }> }> {
+  const entries = await menuEntriesOn(date);
+  const categories = dayPlan(entries, date)
+    .categories.filter((c) => c.state === 'HOLIDAY')
+    .map((c) => ({ category: c.category, reason: c.holidayReason || 'holiday' }));
+  return { reason: wholeDayReason(date, entries), categories };
+}
+
+function wholeDayReason(date: string, menus: Array<{ isHoliday?: boolean; holidayReason?: string | null }>): string | null {
   if (isSundayDate(date)) return 'No brunch today (Sunday)';
-  const menus = (await db.collection('menus').where('date', '==', date).get()).docs.map((d) => d.data());
   if (menus.length > 0 && menus.every((m) => m.isHoliday)) {
     const reason = menus.find((m) => m.holidayReason)?.holidayReason;
     return reason ? `No brunch today (${reason})` : 'No brunch today (holiday)';
@@ -148,7 +159,9 @@ export async function GET(req: Request) {
     return NextResponse.json({
       date,
       today,
-      closedReason: closed,
+      closedReason: closed.reason,
+      // Holidays for some categories only (the whole day is covered by closedReason).
+      closedCategories: closed.reason ? [] : closed.categories,
       rows: list,
       totals: { children: list.length, served: list.filter((r) => r.served).length },
     });

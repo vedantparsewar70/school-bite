@@ -1,24 +1,12 @@
 import { NextResponse } from 'next/server';
+import { nextServingDay } from '@/lib/serving-day';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { db } from '@/lib/firebase-admin';
-import { getTodayString, getOffsetDateString, isSundayDate, nextNonSundayDateString, APP_TIMEZONE } from '@/lib/utils';
 
-/**
- * The next date the canteen serves: the first date after today with an active, non-holiday menu
- * entry, never a Sunday. Looks 30 days ahead (one Firestore `in` query); if nothing is published
- * yet, it is the next non-Sunday date, so the dashboard asks for that date's menu.
- */
-async function nextMealDate(): Promise<string> {
-  const dates = Array.from({ length: 30 }, (_, i) => getOffsetDateString(i + 1, APP_TIMEZONE)).filter((d) => !isSundayDate(d));
-  const snap = await db.collection('menus').where('date', 'in', dates).get();
-  const served = snap.docs
-    .map((d) => d.data())
-    .filter((m) => m.isActive !== false && !m.isHoliday && m.mealId)
-    .map((m) => String(m.date))
-    .sort();
-  return served[0] || nextNonSundayDateString(APP_TIMEZONE);
-}
+import { getTodayString, APP_TIMEZONE } from '@/lib/utils';
+
+/** The next serving day (lib/serving-day.ts). */
+const nextMealDate = () => nextServingDay();
 
 let cachedStats: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 15000;

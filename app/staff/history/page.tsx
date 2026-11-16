@@ -7,6 +7,7 @@ import { formatServeTime } from '@/lib/service-dates';
 import { filterServeRows } from '@/lib/serve-filter';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import NotServedList from '@/components/NotServedList';
 
 type ServeRow = {
   key: string;
@@ -36,6 +37,7 @@ const meals = (list: Array<{ mealName: string; quantity: number }>) =>
 export default function StaffHistoryPage() {
   const today = getTodayString();
   const [date, setDate] = useState(today);
+  const [view, setView] = useState<'SERVED' | 'NOT_SERVED'>('SERVED');
   const [tab, setTab] = useState<'STUDENTS' | 'TEACHERS'>('STUDENTS');
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<ServeRow[]>([]);
@@ -132,8 +134,8 @@ export default function StaffHistoryPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-32">
-      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
+    <div className="max-w-2xl mx-auto pb-32 print:pb-0 print:max-w-none">
+      <div className="print:hidden sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-black text-slate-900">History</h1>
@@ -163,6 +165,22 @@ export default function StaffHistoryPage() {
             className="flex-1 min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-base"
           />
         </div>
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Show">
+          {(['SERVED', 'NOT_SERVED'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`min-h-[44px] rounded-xl text-sm font-bold border ${view === v ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-700 border-slate-300'}`}
+            >
+              {v === 'SERVED' ? 'Served' : 'Not served'}
+            </button>
+          ))}
+        </div>
+        {view === 'SERVED' && (
+        <>
         <div className="relative">
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -190,14 +208,18 @@ export default function StaffHistoryPage() {
             </button>
           ))}
         </div>
+        </>
+        )}
       </div>
 
       <div className="px-4 pt-3 space-y-3">
         {error && <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold">{error}</div>}
-        {!canUndo && <p className="text-sm text-slate-600">Past days can only be corrected by an administrator.</p>}
+        {!canUndo && view === 'SERVED' && <p className="text-sm text-slate-600">Past days can only be corrected by an administrator.</p>}
 
         {!loaded ? (
           <div className="h-32 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
+        ) : view === 'NOT_SERVED' ? (
+          <NotServedList date={date} rows={rows} teachers={teachers} />
         ) : tab === 'STUDENTS' ? (
           served.length === 0 ? (
             <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">Nobody served yet.</div>

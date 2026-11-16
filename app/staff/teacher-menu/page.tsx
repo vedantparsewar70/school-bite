@@ -19,7 +19,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import { formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
-import { broadcastSyncEvent } from '@/lib/client-sync';
+import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 
 interface TeacherMeal {
   id: string;
@@ -49,8 +49,8 @@ export default function StaffTeacherMenuPage() {
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const fetchMeals = async () => {
-    setLoading(true);
+  const fetchMeals = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await fetch('/api/staff/teacher-menu');
       if (res.ok) {
@@ -69,6 +69,13 @@ export default function StaffTeacherMenuPage() {
   useEffect(() => {
     fetchMeals();
   }, []);
+
+  // Changes from another phone appear quietly (no spinner), checked every 30 seconds.
+  useSyncWatcher({
+    pollIntervalMs: 30000,
+    onMenuUpdate: () => fetchMeals(true),
+    onTeacherOrdersUpdate: () => fetchMeals(true),
+  });
 
   const handleOpenAdd = () => {
     setEditingMeal(null);
@@ -218,8 +225,9 @@ export default function StaffTeacherMenuPage() {
         <div className="flex items-center gap-2.5">
           <Link
             href="/staff/kitchen"
-            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs"
+            className="w-11 h-11 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs"
             title="Back to Kitchen"
+            aria-label="Back"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
@@ -233,9 +241,10 @@ export default function StaffTeacherMenuPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchMeals}
+            onClick={() => fetchMeals()}
             disabled={loading}
-            className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
+            aria-label="Refresh"
+            className="w-11 h-11 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-500' : ''}`} />
@@ -243,7 +252,7 @@ export default function StaffTeacherMenuPage() {
 
           <button
             onClick={handleOpenAdd}
-            className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="min-h-[44px] px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Teacher Dish</span>
@@ -289,7 +298,7 @@ export default function StaffTeacherMenuPage() {
             return (
               <div
                 key={meal.id}
-                className={`bg-white p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 shadow-2xs ${
+                className={`bg-white p-4 sm:p-5 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
                   isAvail ? 'border-slate-200/90' : 'border-slate-200 bg-slate-50/60 opacity-60'
                 }`}
               >
@@ -305,7 +314,7 @@ export default function StaffTeacherMenuPage() {
                       </span>
                     )}
                   </div>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight break-words">
                     {meal.name}
                   </h3>
                   <div className="flex items-center gap-3 text-xs">
@@ -317,13 +326,13 @@ export default function StaffTeacherMenuPage() {
                 </div>
 
                 {/* Right controls: Toggle & Edit/Delete */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                   {/* Toggle Button */}
                   <button
                     type="button"
                     onClick={() => handleToggleAvailability(meal)}
                     disabled={isToggling}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                    className={`min-h-[44px] flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-xl text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
                       isAvail
                         ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
                         : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
@@ -343,8 +352,9 @@ export default function StaffTeacherMenuPage() {
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(meal)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                     title="Edit Item"
+                    aria-label={`Edit ${meal.name}`}
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -353,8 +363,9 @@ export default function StaffTeacherMenuPage() {
                   <button
                     type="button"
                     onClick={() => handleDeleteMeal(meal)}
-                    className="p-2 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Delete Item"
+                    aria-label={`Delete ${meal.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -398,7 +409,7 @@ export default function StaffTeacherMenuPage() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Veg Thali"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 
@@ -415,7 +426,7 @@ export default function StaffTeacherMenuPage() {
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                     placeholder="80"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
                   />
                 </div>
 
@@ -426,7 +437,7 @@ export default function StaffTeacherMenuPage() {
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-emerald-500"
                   >
                     <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
@@ -444,7 +455,7 @@ export default function StaffTeacherMenuPage() {
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="e.g. Dal, rice, 2 rotis"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 

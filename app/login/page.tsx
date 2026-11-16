@@ -164,12 +164,16 @@ function StaffOrAdminLoginForm() {
                 <input
                   type="email"
                   required
+                  autoComplete="username"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
                   onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                   placeholder="Enter your email address"
-                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all font-medium`}
+                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base min-h-[44px] focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all font-medium`}
                 />
               </div>
             </div>
@@ -183,10 +187,11 @@ function StaffOrAdminLoginForm() {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all`}
+                  className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base min-h-[44px] focus:outline-hidden focus:ring-2 ${themeColors.focusRing} focus:bg-white text-slate-900 transition-all`}
                 />
               </div>
             </div>

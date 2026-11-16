@@ -40,8 +40,10 @@ function currentDishId(menus: any[], date: string, category: string): string | n
 export default function AdminMenuPage() {
   const { showToast } = useToast();
   const [todayDate, setTodayDate] = useState(() => getTodayString());
-  const [tomorrowDate, setTomorrowDate] = useState(() => getOffsetDateString(1));
+  // The next date with brunch for any category (skips Sundays, holidays and unpublished days).
+  const [nextServingDate, setNextServingDate] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => getOffsetDateString(1));
+  const openingDate = React.useRef<string | null>(selectedDate);
   const [selectedStudentCategory, setSelectedStudentCategory] = useState<string>('ALL');
   const [currentDayMenus, setCurrentDayMenus] = useState<any[]>([]);
 
@@ -104,59 +106,38 @@ export default function AdminMenuPage() {
   useSyncWatcher({
     onMenuUpdate: () => {
       fetchData();
+      loadNextServingDay();
     },
   });
 
-  useEffect(() => {
-    // 1. Schedule exact timer at 12:00:00 AM midnight
-    let timeoutId: NodeJS.Timeout;
-    const scheduleMidnight = () => {
-      const now = new Date();
-      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 200);
-      const msUntilMidnight = Math.max(500, nextMidnight.getTime() - now.getTime());
-
-      timeoutId = setTimeout(() => {
-        const newToday = getTodayString();
-        const newTomorrow = getOffsetDateString(1);
-
-        setTodayDate(newToday);
-        setTomorrowDate(newTomorrow);
-        setSelectedMealIds([]);
-
-        showToast(
-          '12:00 AM Rollover: All meals unticked for the new day. Please select tomorrow\'s menu.',
-          'info'
-        );
-
-        fetchData(newTomorrow);
-        scheduleMidnight();
-      }, msUntilMidnight);
-    };
-
-    scheduleMidnight();
-
-    // 2. Periodic safety interval (every 15s)
-    const intervalId = setInterval(() => {
-      const currentToday = getTodayString();
-      if (currentToday !== todayDate) {
-        const newTomorrow = getOffsetDateString(1);
-        setTodayDate(currentToday);
-        setTomorrowDate(newTomorrow);
-        setSelectedMealIds([]);
-
-        showToast(
-          'New day: selection cleared. Choose the menu again.',
-          'info'
-        );
-
-        fetchData(newTomorrow);
+  const loadNextServingDay = async () => {
+    try {
+      const res = await fetch('/api/staff/next-serving-day', { cache: 'no-store' });
+      const next: string | null = res.ok ? (await res.json()).date || null : null;
+      setNextServingDate(next);
+      // The page opens on the next serving day (not a Sunday or holiday), unless a date was picked.
+      if (next && openingDate.current) {
+        const opening = openingDate.current;
+        openingDate.current = null;
+        setSelectedDate((current) => (current === opening ? next : current));
       }
-    }, 15000);
+    } catch {
+      // the button just stays hidden
+    }
+  };
 
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(intervalId);
-    };
+  useEffect(() => {
+    loadNextServingDay();
+  }, [todayDate]);
+
+  // New day in India (IST): the "Today" button moves on. The chosen date and dish are kept, so an
+  // admin working past midnight never loses an unsaved selection.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const nowToday = getTodayString();
+      if (nowToday !== todayDate) setTodayDate(nowToday);
+    }, 30000);
+    return () => clearInterval(id);
   }, [todayDate]);
 
   // One dish per date and category: picking a dish replaces the previous choice.
@@ -351,17 +332,6 @@ export default function AdminMenuPage() {
             <span className="text-xs font-bold text-slate-500">Date:</span>
             <button
               type="button"
-              onClick={() => setSelectedDate(tomorrowDate)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                selectedDate === tomorrowDate
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Tomorrow ({formatDatePretty(tomorrowDate).split(',')[0]})
-            </button>
-            <button
-              type="button"
               onClick={() => setSelectedDate(todayDate)}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 selectedDate === todayDate
@@ -371,6 +341,19 @@ export default function AdminMenuPage() {
             >
               Today ({formatDatePretty(todayDate).split(',')[0]})
             </button>
+            {nextServingDate && (
+              <button
+                type="button"
+                onClick={() => setSelectedDate(nextServingDate)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  selectedDate === nextServingDate
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Next serving day ({formatDatePretty(nextServingDate).split(',')[0]})
+              </button>
+            )}
             <input
               type="date"
               value={selectedDate}

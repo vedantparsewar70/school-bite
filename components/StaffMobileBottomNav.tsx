@@ -61,7 +61,7 @@ export default function StaffMobileBottomNav() {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-amber-200 px-2 py-1.5 shadow-lg shadow-amber-900/10 safe-area-bottom">
+      <nav className="print:hidden md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-amber-200 px-2 py-1.5 shadow-lg shadow-amber-900/10 safe-area-bottom">
         <div className="grid grid-cols-4 gap-1.5 max-w-md mx-auto">
           {main.map((link) => {
             const Icon = link.icon;

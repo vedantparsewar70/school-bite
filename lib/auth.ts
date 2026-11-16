@@ -43,21 +43,53 @@ export async function comparePassword(password: string, hash: string): Promise<b
   return bcrypt.compare(password, hash);
 }
 
+const DAY_SECONDS = 60 * 60 * 24;
+
+/**
+ * How long a sign-in lasts: canteen staff 30 days (renewed while in use, see /api/auth/me), so the
+ * shared counter phone is not signed out mid-service; everyone else 7 days.
+ */
+export function sessionMaxAgeSeconds(role: unknown): number {
+  return role === 'STAFF' ? 30 * DAY_SECONDS : 7 * DAY_SECONDS;
+}
+
+/** A staff session older than this is re-issued (sliding expiry). */
+export const STAFF_SESSION_RENEW_AFTER_SECONDS = DAY_SECONDS;
+
 export async function createSessionToken(payload: TokenPayload): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(`${sessionMaxAgeSeconds(payload.role)}s`)
     .sign(getJwtSecret());
 }
 
-export async function verifySessionToken(token: string): Promise<TokenPayload | null> {
+export async function verifySessionToken(token: string): Promise<(TokenPayload & { iat?: number; exp?: number }) | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
-    return payload as unknown as TokenPayload;
+    return payload as unknown as TokenPayload & { iat?: number; exp?: number };
   } catch {
     return null;
   }
+}
+
+/** The session token of a request: the cookie, else a Bearer header. */
+export async function readSessionToken(req?: Request): Promise<string | undefined> {
+  try {
+    const cookieStore = await cookies();
+    const fromStore = cookieStore.get(TOKEN_COOKIE_NAME)?.value;
+    if (fromStore) return fromStore;
+  } catch {
+    // outside a request (tests): read the headers below
+  }
+  if (!req) return undefined;
+  const cookieHeader = req.headers.get('cookie') || '';
+  for (const part of cookieHeader.split(';')) {
+    const [name, ...rest] = part.trim().split('=');
+    if (name === TOKEN_COOKIE_NAME && rest.length) return decodeURIComponent(rest.join('='));
+  }
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+  return authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : undefined;
 }
 
 /**

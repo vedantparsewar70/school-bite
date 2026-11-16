@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   ChefHat,
   Printer,
@@ -20,23 +21,39 @@ import {
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
-import { formatINR, formatDatePretty, getTodayString, getOffsetDateString, getOrderStatusColor } from '@/lib/utils';
-import { useToast } from '@/components/ToastContext';
+import { formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/utils';
+import { useSyncWatcher } from '@/lib/client-sync';
 
 function KitchenPageContent() {
   const searchParams = useSearchParams();
-  const tomorrowDateStr = getOffsetDateString(1);
+  // Today in India (IST), worked out on every render so it moves on after midnight.
   const todayDateStr = getTodayString();
-  const initialDate = searchParams.get('date') || tomorrowDateStr;
+  const requestedDate = searchParams.get('date');
 
-  const { showToast } = useToast();
-
-  const [date, setDate] = useState<string>(initialDate);
+  // Without ?date=, the page opens on the next serving day (skips Sundays, holidays, unpublished days).
+  const [date, setDate] = useState<string | null>(requestedDate);
+  const [nextServingDate, setNextServingDate] = useState<string | null>(null);
   const [kitchenData, setKitchenData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchKitchenData = async () => {
-    setLoading(true);
+  const loadNextServingDay = async () => {
+    try {
+      const res = await fetch('/api/staff/next-serving-day', { cache: 'no-store' });
+      const next = res.ok ? (await res.json()).date : null;
+      setNextServingDate(next);
+      setDate((current) => current || next || getTodayString());
+    } catch {
+      setDate((current) => current || getTodayString());
+    }
+  };
+
+  useEffect(() => {
+    loadNextServingDay();
+  }, [todayDateStr]);
+
+  const fetchKitchenData = async (quiet = false) => {
+    if (!date) return;
+    if (!quiet) setLoading(true);
     try {
       const res = await fetch(`/api/admin/kitchen?date=${date}`);
       if (res.ok) {
@@ -54,12 +71,35 @@ function KitchenPageContent() {
     fetchKitchenData();
   }, [date]);
 
+  // Quiet refresh: new orders, handovers and menu changes update the counts without a spinner.
+  useSyncWatcher({
+    pollIntervalMs: 30000,
+    onOrdersUpdate: () => fetchKitchenData(true),
+    onTeacherOrdersUpdate: () => fetchKitchenData(true),
+    onMenuUpdate: () => {
+      fetchKitchenData(true);
+      loadNextServingDay();
+    },
+  });
+
+  const holidays: Array<{ category: string; holidayReason: string | null }> = (kitchenData?.plan?.categories || []).filter(
+    (c: any) => c.state === 'HOLIDAY'
+  );
+
   const handlePrint = () => {
     window.print();
   };
 
-  const isTomorrow = date === tomorrowDateStr;
+  const isNextServingDay = Boolean(date && date === nextServingDate);
   const isToday = date === todayDateStr;
+
+  if (!date) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-12 space-y-6 print:p-0 print:m-0">
@@ -77,8 +117,14 @@ function KitchenPageContent() {
 
         {/* Date Selector & Refresh */}
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/not-served"
+            className="min-h-[44px] px-3.5 py-2 bg-white border border-slate-200 hover:border-amber-400 text-slate-800 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5"
+          >
+            <span>Not served list</span>
+          </Link>
           <button
-            onClick={fetchKitchenData}
+            onClick={() => fetchKitchenData()}
             disabled={loading}
             className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
             title="Refresh"
@@ -100,16 +146,6 @@ function KitchenPageContent() {
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs print:hidden">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setDate(tomorrowDateStr)}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-              isTomorrow
-                ? 'bg-amber-500 text-white shadow-md'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            Tomorrow ({formatDatePretty(tomorrowDateStr).split(',')[0]})
-          </button>
-          <button
             onClick={() => setDate(todayDateStr)}
             className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
               isToday
@@ -119,6 +155,18 @@ function KitchenPageContent() {
           >
             Today ({formatDatePretty(todayDateStr).split(',')[0]})
           </button>
+          {nextServingDate && (
+            <button
+              onClick={() => setDate(nextServingDate)}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                isNextServingDay
+                  ? 'bg-amber-500 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              Next serving day ({formatDatePretty(nextServingDate).split(',')[0]})
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -126,7 +174,7 @@ function KitchenPageContent() {
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
             className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-hidden"
           />
         </div>
@@ -138,7 +186,12 @@ function KitchenPageContent() {
           SCHOOL-BITE CANTEEN — KITCHEN PRODUCTION SHEET
         </h1>
         <p className="text-sm font-bold text-gray-700 mt-1">
-          Meal Date: {formatDatePretty(date)} | Total Portions: {kitchenData?.totalMeals || 0}
+          Meal Date: {formatDatePretty(date)} | Student portions: {kitchenData?.totalMeals || 0} | Teacher portions: {kitchenData?.teacherMealsTotal || 0}
+        </p>
+        <p className="text-sm font-bold text-gray-700">
+          {kitchenData?.cutoff === 'FINAL'
+            ? `Final (ordering closed at ${kitchenData?.deadline || '08:30'})`
+            : `Still open until ${kitchenData?.deadline || '08:30'}: numbers may still go up`}
         </p>
       </div>
 
@@ -153,7 +206,7 @@ function KitchenPageContent() {
             <div className="p-5 sm:p-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-100">
-                  {isTomorrow ? "TOMORROW'S PRODUCTION" : isToday ? "TODAY'S PRODUCTION" : 'MEAL PRODUCTION'}
+                  {isToday ? "TODAY'S PRODUCTION" : isNextServingDay ? 'NEXT SERVING DAY' : 'MEAL PRODUCTION'}
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black tracking-tight mt-0.5">
                   {formatDatePretty(date)}
@@ -162,6 +215,15 @@ function KitchenPageContent() {
                   Total food items to prepare: <strong className="text-white text-sm">{kitchenData?.totalMeals || 0}</strong> portions across <strong className="text-white text-sm">{kitchenData?.totalOrders || 0}</strong> orders.
                 </p>
               </div>
+              <span
+                className={`self-start sm:self-auto px-3 py-1.5 rounded-xl text-xs font-black border ${
+                  kitchenData?.cutoff === 'FINAL' ? 'bg-white text-emerald-800 border-white' : 'bg-amber-100 text-amber-900 border-amber-200'
+                }`}
+              >
+                {kitchenData?.cutoff === 'FINAL'
+                  ? `Final: ordering closed at ${kitchenData?.deadline || '08:30'}`
+                  : `Still open until ${kitchenData?.deadline || '08:30'}`}
+              </span>
             </div>
 
             {/* Production Summary Cards - Large, readable numbers for mobile kitchen staff */}
@@ -174,13 +236,13 @@ function KitchenPageContent() {
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2.5 py-1 bg-white border border-amber-200 text-amber-900 rounded-xl text-xs font-bold shadow-2xs">
-                      Pre-primary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown.PRE_PRIMARY || 0}</strong>
+                      Pre-primary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown['Pre-primary'] || 0}</strong>
                     </span>
                     <span className="px-2.5 py-1 bg-white border border-amber-200 text-amber-900 rounded-xl text-xs font-bold shadow-2xs">
-                      Primary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown.PRIMARY || 0}</strong>
+                      Primary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown['Primary'] || 0}</strong>
                     </span>
                     <span className="px-2.5 py-1 bg-white border border-amber-200 text-amber-900 rounded-xl text-xs font-bold shadow-2xs">
-                      Secondary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown.SECONDARY || 0}</strong>
+                      Secondary: <strong className="text-amber-600">{kitchenData.studentCategoryBreakdown['Secondary'] || 0}</strong>
                     </span>
                   </div>
                 </div>
@@ -259,6 +321,56 @@ function KitchenPageContent() {
               </div>
             )}
           </div>
+
+          {holidays.length > 0 && (
+            <div className="space-y-2">
+              {holidays.map((h) => (
+                <div key={h.category} className="px-4 py-3 rounded-2xl bg-rose-50 border border-rose-200 text-sm font-bold text-rose-900">
+                  No brunch for {h.category} ({h.holidayReason || 'holiday'})
+                </div>
+              ))}
+            </div>
+          )}
+
+          {kitchenData?.byCategory?.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-3 print:grid-cols-3">
+              {kitchenData.byCategory.map((group: any) => (
+                <section key={group.category} className="bg-white rounded-2xl border border-slate-200 p-4 break-inside-avoid">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="text-sm font-extrabold text-slate-900">{group.category}</h3>
+                    <span className="text-xl font-black text-amber-600 tabular-nums">{group.total}</span>
+                  </div>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {group.dishes.map((d: any) => (
+                      <li key={d.mealName} className="flex justify-between gap-2">
+                        <span className="text-slate-800 break-words min-w-0">{d.mealName}</span>
+                        <span className="font-black tabular-nums shrink-0">{d.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+
+          <section className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-4 sm:p-5 break-inside-avoid">
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="text-sm font-extrabold text-emerald-800 uppercase tracking-wide">Teacher meals (separate)</h3>
+              <span className="text-xl font-black tabular-nums">{kitchenData?.teacherMealsTotal || 0}</span>
+            </div>
+            {kitchenData?.teacherMeals?.length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {kitchenData.teacherMeals.map((m: any) => (
+                  <li key={m.mealName} className="flex justify-between gap-2">
+                    <span className="font-semibold text-slate-800">{m.mealName}</span>
+                    <span className="font-black tabular-nums">{m.quantity}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500 mt-1">No paid teacher orders for this date.</p>
+            )}
+          </section>
 
           {/* SECTION 2: Classroom & Student Distribution Roster */}
           {kitchenData?.studentList && kitchenData.studentList.length > 0 && (

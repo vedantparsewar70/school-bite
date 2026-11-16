@@ -42,7 +42,8 @@ import { displayMenuEntry } from '@/lib/menu-entries';
 function StaffKitchenContent() {
   const { showToast } = useToast();
   const [todayDateStr, setTodayDateStr] = useState(() => getTodayString());
-  const [tomorrowDateStr, setTomorrowDateStr] = useState(() => getOffsetDateString(1));
+  // The next date with brunch for any category (skips Sundays, holidays and unpublished days).
+  const [nextServingDate, setNextServingDate] = useState<string | null>(null);
   const [selectedDateStr, setSelectedDateStr] = useState(() => getTodayString());
   const [selectedStudentCategory, setSelectedStudentCategory] = useState<string>('ALL');
   const [currentDayMenus, setCurrentDayMenus] = useState<any[]>([]);
@@ -91,10 +92,10 @@ function StaffKitchenContent() {
   const [updatingMeal, setUpdatingMeal] = useState(false);
 
   // Fetch Master Menu Catalog & Active Database Menus for selected date & category
-  const fetchMenuData = async (targetDate?: string, targetCategory?: string) => {
+  const fetchMenuData = async (targetDate?: string, targetCategory?: string, quiet = false) => {
     const queryDate = targetDate || selectedDateStr;
     const queryCat = targetCategory !== undefined ? targetCategory : selectedStudentCategory;
-    setLoadingMeals(true);
+    if (!quiet) setLoadingMeals(true);
     try {
       const catParam = queryCat && queryCat !== 'ALL' ? `&category=${encodeURIComponent(queryCat)}` : '';
       const [mealsRes, menusRes] = await Promise.all([
@@ -126,56 +127,43 @@ function StaffKitchenContent() {
     fetchMenuData();
   }, [selectedDateStr, selectedStudentCategory]);
 
-  // Live real-time synchronization
+  // Live updates, quietly (no spinner): another phone's change, or every 30 seconds.
   useSyncWatcher({
+    pollIntervalMs: 30000,
     onMenuUpdate: () => {
-      fetchMenuData();
+      fetchMenuData(undefined, undefined, true);
+      loadNextServingDay();
     },
   });
 
-  // Safe date rollover handler
+  const loadNextServingDay = async () => {
+    try {
+      const res = await fetch('/api/staff/next-serving-day', { cache: 'no-store' });
+      if (res.ok) setNextServingDate((await res.json()).date || null);
+    } catch {
+      // the button just stays hidden
+    }
+  };
+
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    const scheduleMidnight = () => {
-      const now = new Date();
-      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 200);
-      const msUntilMidnight = Math.max(500, nextMidnight.getTime() - now.getTime());
+    loadNextServingDay();
+  }, [todayDateStr]);
 
-      timeoutId = setTimeout(() => {
-        const newToday = getTodayString();
-        const newTomorrow = getOffsetDateString(1);
-
-        setTodayDateStr(newToday);
-        setTomorrowDateStr(newTomorrow);
-
-        showToast('12:00 AM Rollover: New school day active.', 'info');
-        fetchMenuData(newToday);
-        scheduleMidnight();
-      }, msUntilMidnight);
-    };
-
-    scheduleMidnight();
-
-    const intervalId = setInterval(() => {
-      const currentToday = getTodayString();
-      if (currentToday !== todayDateStr) {
-        const newTomorrow = getOffsetDateString(1);
-        setTodayDateStr(currentToday);
-        setTomorrowDateStr(newTomorrow);
-        fetchMenuData(currentToday);
-      }
-    }, 15000);
-
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(intervalId);
-    };
+  // New day in India (IST): "Today" moves on, and a page left on the old today follows it.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const nowToday = getTodayString();
+      if (nowToday === todayDateStr) return;
+      setSelectedDateStr((selected) => (selected === todayDateStr ? nowToday : selected));
+      setTodayDateStr(nowToday);
+    }, 30000);
+    return () => clearInterval(id);
   }, [todayDateStr]);
 
   // Date status indicators
   const isPastDate = selectedDateStr < todayDateStr;
   const isToday = selectedDateStr === todayDateStr;
-  const isTomorrow = selectedDateStr === tomorrowDateStr;
+  const isNextServingDay = Boolean(nextServingDate && selectedDateStr === nextServingDate);
 
   // Authoritative entry from October 2026 Timetable
   const officialDayEntry = useMemo(() => {
@@ -440,8 +428,9 @@ function StaffKitchenContent() {
             type="button"
             onClick={() => fetchMenuData()}
             disabled={loadingMeals}
-            className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
             title="Refresh timetable data"
+            aria-label="Refresh"
           >
             <RefreshCw
               className={`w-4 h-4 ${loadingMeals ? 'animate-spin text-amber-500' : ''}`}
@@ -463,7 +452,7 @@ function StaffKitchenContent() {
             <button
               type="button"
               onClick={() => setSelectedDateStr(todayDateStr)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-black transition-all cursor-pointer ${
                 isToday
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -471,24 +460,26 @@ function StaffKitchenContent() {
             >
               Today
             </button>
-            <button
-              type="button"
-              onClick={() => setSelectedDateStr(tomorrowDateStr)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                isTomorrow
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Tomorrow
-            </button>
+            {nextServingDate && (
+              <button
+                type="button"
+                onClick={() => setSelectedDateStr(nextServingDate)}
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-black transition-all cursor-pointer ${
+                  isNextServingDay
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Next serving day ({formatDatePretty(nextServingDate).split(',')[0]})
+              </button>
+            )}
             <input
               type="date"
               value={selectedDateStr}
               min="2026-01-01"
               max={getOffsetDateString(120)}
-              onChange={(e) => setSelectedDateStr(e.target.value)}
-              className="text-xs font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:border-amber-500 cursor-pointer shadow-2xs"
+              onChange={(e) => e.target.value && setSelectedDateStr(e.target.value)}
+              className="min-h-[44px] text-base font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:border-amber-500 cursor-pointer shadow-2xs"
             />
             <span className="text-xs font-bold text-slate-500 hidden sm:inline ml-1">
               ({formatDatePretty(selectedDateStr)})
@@ -510,7 +501,7 @@ function StaffKitchenContent() {
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedStudentCategory(cat.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-black transition-all shrink-0 cursor-pointer ${
                   selectedStudentCategory === cat.id
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -775,14 +766,14 @@ function StaffKitchenContent() {
                 setAssignDate(e.target.value);
                 setAssignMessage(null);
               }}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 text-base"
             />
           </label>
           <div className="flex flex-col sm:flex-row gap-2">
             <select
               value={assignCategory}
               onChange={(e) => setAssignCategory(e.target.value as StudentCategory | 'ALL')}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 text-base"
             >
               <option value="ALL">All categories</option>
               <option value="Pre-primary">Pre-primary</option>
@@ -792,7 +783,7 @@ function StaffKitchenContent() {
             <select
               value={assignMealId}
               onChange={(e) => setAssignMealId(e.target.value)}
-              className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+              className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900 text-base"
             >
               <option value="">Choose a recipe…</option>
               {[...allMeals]
@@ -883,7 +874,7 @@ function StaffKitchenContent() {
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
                   placeholder="Search recipe catalog by dish name..."
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-amber-500 rounded-xl text-xs sm:text-sm font-semibold focus:outline-hidden text-slate-900 transition-all placeholder:text-slate-400"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-amber-500 rounded-xl text-base sm:text-sm font-semibold focus:outline-hidden text-slate-900 transition-all placeholder:text-slate-400"
                 />
                 {catalogSearch && (
                   <button
@@ -951,7 +942,7 @@ function StaffKitchenContent() {
 
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-[11px] font-extrabold text-slate-700">
-                        Authorized Rate: ₹{formatINR(meal.price || 80)}
+                        Rate: {formatINR(meal.price || 80)}
                       </span>
                       <button
                         type="button"
@@ -1150,7 +1141,7 @@ function StaffKitchenContent() {
                   value={newMealName}
                   onChange={(e) => setNewMealName(e.target.value)}
                   placeholder="e.g. Vegetable Khichdi + Curd"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                 />
               </div>
 
@@ -1166,7 +1157,7 @@ function StaffKitchenContent() {
                     step="1"
                     value={newMealPrice}
                     onChange={(e) => setNewMealPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   />
                 </div>
 
@@ -1177,7 +1168,7 @@ function StaffKitchenContent() {
                   <select
                     value={newMealCategory}
                     onChange={(e) => setNewMealCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   >
                     <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
@@ -1257,7 +1248,7 @@ function StaffKitchenContent() {
                   required
                   value={editMealName}
                   onChange={(e) => setEditMealName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                 />
               </div>
 
@@ -1273,7 +1264,7 @@ function StaffKitchenContent() {
                     step="1"
                     value={editMealPrice}
                     onChange={(e) => setEditMealPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   />
                 </div>
 
@@ -1284,7 +1275,7 @@ function StaffKitchenContent() {
                   <select
                     value={editMealCategory}
                     onChange={(e) => setEditMealCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500"
                   >
                     <option value="LUNCH">Brunch</option>
                     <option value="BREAKFAST">Breakfast</option>
