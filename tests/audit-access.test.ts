@@ -267,7 +267,10 @@ test('BUG: with default settings a meal matching the child\'s allergy is sold (s
   assert.equal(items.length, 1);
   assert.equal(items[0].hasAllergyAlert, true, 'order accepted, only flagged');
 
-  // With the school policy switched off it is blocked server-side.
+  // With the school policy switched off it is blocked server-side. (The first order is cancelled
+  // first: the child may only have one brunch per day.)
+  const first = fs.list('orders')[0];
+  fs.seed('orders', first.id, { ...first, orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED' });
   await setSystemSetting('ALLOW_ALLERGY_ORDERS', 'false');
   const blocked = await checkout([{ studentId: 'stu_mine', mealId: 'meal_paneer', date: MON, quantity: 1 }]);
   assert.equal(blocked.status, 400);

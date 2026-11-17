@@ -10,6 +10,7 @@ const REASON_LABEL: Record<string, string> = {
   PAID_AFTER_CUTOFF: 'Payment completed after the ordering cutoff',
   SERVICE_UNAVAILABLE: 'Meal no longer served that day (holiday or menu disabled)',
   AMOUNT_MISMATCH: 'Paid amount differs from order total',
+  ALREADY_ORDERED: 'Already ordered for that child and day (refunded automatically)',
 };
 
 const STATE_LABEL: Record<string, { text: string; tone: string }> = {

@@ -556,6 +556,21 @@ export async function POST(req: Request) {
       );
     }
 
+    // One brunch per child per day across all orders (and the extras limit): refused before paying.
+    {
+      const { cartConflict, paidLinesForChildren } = await import('@/lib/child-orders');
+      const earlier = await paidLinesForChildren(
+        (t) => t.get(),
+        db,
+        cartItemsWithCategory.map((it) => String(it.studentId || '')),
+        cartItemsWithCategory.map((it) => String(it.date || ''))
+      );
+      const conflict = cartConflict(cartItemsWithCategory as any[], earlier);
+      if (conflict) {
+        return NextResponse.json({ error: conflict.message, code: 'ALREADY_ORDERED' }, { status: 400 });
+      }
+    }
+
     // Authoritative Server-side Price & Allergy Evaluation
     let totalAmount = 0;
     const evaluatedCartItems = cartItemsWithCategory.map((item, index) => {

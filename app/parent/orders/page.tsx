@@ -62,6 +62,7 @@ const ISSUE_REASON: Record<string, string> = {
   SERVICE_UNAVAILABLE: 'The meal is no longer being served that day.',
   STOCK_UNAVAILABLE: 'A meal sold out before the payment completed.',
   AMOUNT_MISMATCH: 'The amount paid did not match the order total.',
+  ALREADY_ORDERED: 'This meal was already ordered for your child in another order.',
 };
 
 const SERVICE_LABEL: Record<string, string> = {
