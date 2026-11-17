@@ -546,6 +546,8 @@ export async function POST(req: Request) {
         {
           error: availabilityResult.errorMessage || `Meal "${unavail.mealName}" is not available for ${unavail.date}.`,
           unavailableItem: {
+            // Which child's line: siblings can have the same dish on the same day.
+            studentId: cartItemsWithCategory[availabilityResult.items.indexOf(unavail)]?.studentId || null,
             mealId: unavail.mealId,
             mealName: unavail.mealName,
             date: unavail.date,
