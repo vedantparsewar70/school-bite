@@ -199,6 +199,7 @@ function MenuPageContent() {
 
   // Real-time synchronization
   useSyncWatcher({
+    pollIntervalMs: 30000,
     onMenuUpdate: () => {
       fetchMenuForDate(true);
       loadSchedule(activeStudentCategory);
