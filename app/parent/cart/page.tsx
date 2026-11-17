@@ -219,8 +219,10 @@ export default function CartPage() {
 
       let res = await submit(checkoutKeyFor(signature));
       let data = await res.json();
-      if (res.status === 409 && data.code === 'CHECKOUT_EXPIRED') {
-        // The previous payment window closed unpaid: start a new one.
+      if (res.status === 409 && (data.code === 'CHECKOUT_EXPIRED' || data.code === 'PAYMENT_EXCEPTION')) {
+        // The previous payment window closed unpaid, or that payment ended as an exception (refunded or
+        // under review): start a new checkout. It is checked again in full (stock, deadline, one brunch
+        // per child), so it can never charge twice for the same meal.
         res = await submit(checkoutKeyFor(signature, true));
         data = await res.json();
       }
