@@ -1,14 +1,21 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress, getLegalOperatorString } from '@/lib/business-config';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
   const formattedAddress = getFormattedAddress();
+  // Parent, staff and admin pages have a fixed bottom bar on phones: leave room so the footer's last
+  // row of links is never hidden behind it.
+  const pathname = usePathname() || '';
+  const hasBottomBar = /^\/(parent|staff|admin)(\/|$)/.test(pathname);
 
   return (
-    <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 mt-auto">
+    <footer className={`bg-slate-950 text-slate-400 border-t border-slate-800 mt-auto ${hasBottomBar ? 'pb-24 md:pb-0' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           {/* Brand & Description (5 cols) */}
