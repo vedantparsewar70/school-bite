@@ -131,7 +131,7 @@ export default function ProfilePage() {
               </form>
             )}
             {phoneError && <p className="text-rose-600 font-medium">{phoneError}</p>}
-            <p className="text-slate-400">Required by Cashfree for online payments.</p>
+            <p className="text-slate-400">Needed for online payments and so the canteen can reach you.</p>
           </div>
 
           <div className="flex items-center justify-between py-3">

@@ -375,7 +375,7 @@ export class FirestoreDbAdapter {
         const parentObj = cleanDoc({
           id: parentId,
           userId,
-          walletBalance: parentCreate.create.walletBalance ?? 500,
+          walletBalance: parentCreate.create.walletBalance ?? 0,
           createdAt: now,
           updatedAt: now,
         });

@@ -141,14 +141,9 @@ export async function GET(req: Request) {
         };
       }
 
-      const mealObj = item.meal || {
-        id: item.mealId,
-        name: 'Scheduled Brunch',
-        description: 'Freshly prepared wholesome school brunch.',
-        category: 'LUNCH',
-        price: 80,
-        isVegetarian: true,
-      };
+      // An entry whose dish was deleted is not shown at all (never a made-up dish or price).
+      if (!item.meal) return null;
+      const mealObj = item.meal;
 
       const allergensList = ((mealObj as any).mealAllergens || []).map((ma: any) => ma.allergen?.name).filter(Boolean);
       if ((mealObj as any).allergens && allergensList.length === 0) {
@@ -190,7 +185,7 @@ export async function GET(req: Request) {
         },
         allergyEvaluation,
       };
-    });
+    }).filter((m): m is NonNullable<typeof m> => m !== null);
 
     // Optional extras for one date and class, shown under the main brunch (lib/menu-extras.ts).
     let extras: any[] = [];

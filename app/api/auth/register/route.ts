@@ -103,7 +103,7 @@ export async function POST(req: Request) {
         role: 'PARENT',
         parent: {
           create: {
-            walletBalance: 500.0, // Welcome credit ₹500
+            walletBalance: 0,
           },
         },
       },

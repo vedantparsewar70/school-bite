@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const meal = cleanDoc({
       id,
       name: cleanName,
-      description: (typeof description === 'string' ? description.trim() : '') || `${cleanName} - Freshly prepared for staff and teachers`,
+      description: typeof description === 'string' ? description.trim() : '',
       category: String(category || 'LUNCH').toUpperCase().trim(),
       price: Math.round(numPrice * 100) / 100,
       isVegetarian: Boolean(isVegetarian),
