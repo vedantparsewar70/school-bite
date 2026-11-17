@@ -8,7 +8,7 @@ import {
   isMockPaymentAllowed,
 } from './cashfree';
 import { collectMenuStockInTransaction } from './menu-stock';
-import { isPartlyServed, orderServiceDates, serviceStatesFor } from './service-dates';
+import { isPartlyServed, itemServedAt, orderServiceDates, serviceStatesFor } from './service-dates';
 
 export type RefundPaymentStatus = 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED';
 
@@ -212,7 +212,9 @@ export async function cancelOrderWithRefund(
       throw new OrderCancellationError('This meal was already handed over. Only an administrator can cancel and refund it.', 403);
     }
     // A full refund of a multi-date order would also refund the days already served.
-    const servedDates = dates.filter((d) => states[d].collectedAt);
+    // A day counts as handed over only while a child on it is still served (an undone tap leaves the
+    // old collectedAt behind, which must not block a refund).
+    const servedDates = dates.filter((d) => items.some((it: any) => it.date === d && itemServedAt(order, d, String(it.id))));
     if (servedDates.length > 0 && servedDates.length < dates.length) {
       throw new OrderCancellationError(
         `Part of this order was already handed over (${servedDates.join(', ')}). Cancelling it would refund those meals too, and partial refunds are not supported yet. Nothing was changed.`,

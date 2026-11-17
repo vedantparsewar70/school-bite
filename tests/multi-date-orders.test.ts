@@ -124,17 +124,27 @@ test('cancelling a single day is refused and changes nothing; no refund is start
   assert.equal(fs.getDoc('menus', `menu_${TUE}_primary`)?.availableQuantity, 10, 'stock untouched');
 });
 
-test('once one day was handed over, the whole order cannot be cancelled and refunded, even by an admin', async () => {
+test('while one day is handed over, the whole order cannot be cancelled and refunded, even by an admin', async () => {
+  seedMultiDateOrder();
+  await give(MON);
+
+  const byAdmin = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, admin);
+  assert.ok([400, 409].includes(byAdmin.status), `refused (got ${byAdmin.status})`);
+  const byStaff = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, staff);
+  assert.equal(byStaff.status, 403);
+  assert.equal(fs.getDoc('orders', 'ORD-M')?.paymentStatus, 'PAID');
+});
+
+test('CHANGED (C1): a handover that was undone no longer blocks the admin from cancelling the multi-day order', async () => {
   seedMultiDateOrder();
   await give(MON);
   await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CONFIRMED', date: MON }, admin);
 
-  const byAdmin = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, admin);
-  assert.equal(byAdmin.status, 409);
-  assert.match((await byAdmin.json()).error, /already handed over/);
   const byStaff = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, staff);
-  assert.equal(byStaff.status, 403);
-  assert.equal(fs.getDoc('orders', 'ORD-M')?.paymentStatus, 'PAID');
+  assert.equal(byStaff.status, 403, 'staff still cannot cancel');
+  const byAdmin = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'CANCELLED' }, admin);
+  assert.equal(byAdmin.status, 200);
+  assert.equal(fs.getDoc('orders', 'ORD-M')?.orderStatus, 'CANCELLED');
 });
 
 test('a multi-day order cancelled before anything was served is refunded in full exactly once', async () => {
