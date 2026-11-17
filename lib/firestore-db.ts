@@ -751,9 +751,18 @@ export class FirestoreDbAdapter {
 
   // Meal
   meal = {
-    findMany: async ({ include, orderBy }: any = {}): Promise<DbMeal[]> => {
-      const snap = await db.collection('meals').get();
-      let list = snap.docs.map((d) => docData(d));
+    findMany: async ({ where, include, orderBy }: any = {}): Promise<DbMeal[]> => {
+      // Specific dishes (checkout, cart check, extras): read exactly those, fresh, instead of the whole
+      // collection. Same records and order (by document ID) as reading everything and picking them.
+      let docs: any[];
+      if (Array.isArray(where?.id?.in)) {
+        const ids = Array.from(new Set((where.id.in as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)));
+        const snaps = ids.length ? await db.getAll(...ids.map((id) => db.collection('meals').doc(id))) : [];
+        docs = snaps.filter((s) => s.exists).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      } else {
+        docs = (await db.collection('meals').get()).docs;
+      }
+      let list = docs.map((d) => docData(d));
       for (const m of list) {
         if (!m.mealAllergens) m.mealAllergens = [];
       }
@@ -921,12 +930,30 @@ export class FirestoreDbAdapter {
   // Menu
   menu = {
     findMany: async ({ where, include, orderBy }: any = {}): Promise<DbMenu[]> => {
-      let query: Query = db.collection('menus');
+      // Dates are filtered in Firestore (one field, so no composite index): a single date, a list of
+      // dates (in chunks of 30, Firestore's limit) or a range. Results keep the order of a full read
+      // (by document ID), and the in-memory filters below still apply, so callers see the same list.
+      const menus = db.collection('menus');
+      let docs: any[];
       if (typeof where?.date === 'string') {
-        query = query.where('date', '==', where.date);
+        docs = (await menus.where('date', '==', where.date).get()).docs;
+      } else if (Array.isArray(where?.date?.in)) {
+        const dates = Array.from(new Set((where.date.in as unknown[]).filter((d): d is string => typeof d === 'string')));
+        const seen = new Map<string, any>();
+        for (let i = 0; i < dates.length; i += 30) {
+          for (const d of (await menus.where('date', 'in', dates.slice(i, i + 30)).get()).docs) seen.set(d.id, d);
+        }
+        docs = Array.from(seen.values());
+      } else if (where?.date && typeof where.date === 'object' && (where.date.gte || where.date.lte)) {
+        let q: Query = menus;
+        if (where.date.gte) q = q.where('date', '>=', where.date.gte);
+        if (where.date.lte) q = q.where('date', '<=', where.date.lte);
+        docs = (await q.get()).docs;
+      } else {
+        docs = (await menus.get()).docs;
       }
-      const snap = await query.get();
-      let list = snap.docs.map((d) => docData(d));
+      docs.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      let list = docs.map((d) => docData(d));
 
       if (where?.date) {
         if (typeof where.date === 'string') {

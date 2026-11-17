@@ -161,7 +161,9 @@ class FakeQuery {
       if (value.length === 0 || value.length > 30) throw new Error(`Firestore 'in' filters take 1 to 30 values (got ${value.length})`);
       test = (v) => value.includes(v);
     }
-    else throw new Error(`FakeFirestore only supports '==' and 'in' filters (got ${op})`);
+    else if (op === '>=') test = (v) => v !== undefined && v !== null && (v as any) >= (value as any);
+    else if (op === '<=') test = (v) => v !== undefined && v !== null && (v as any) <= (value as any);
+    else throw new Error(`FakeFirestore only supports '==', 'in', '>=' and '<=' filters (got ${op})`);
     return new FakeQuery(this.store, this.collectionName, [...this.filters, [field, test]]);
   }
   limit(_count: number) {
