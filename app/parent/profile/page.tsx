@@ -112,7 +112,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPhoneInput(e.target.value)}
                   placeholder="10-digit mobile number"
                   autoFocus
-                  className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
+                  className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
                 />
                 <button
                   type="submit"

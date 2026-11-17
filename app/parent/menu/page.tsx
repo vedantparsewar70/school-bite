@@ -467,7 +467,7 @@ function MenuPageContent() {
               onChange={(e) => {
                 if (e.target.value) setSelectedDate(e.target.value);
               }}
-              className="px-2.5 py-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-hidden focus:border-amber-500"
+              className="px-2.5 py-1 text-base sm:text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-hidden focus:border-amber-500"
             />
           </div>
         </div>

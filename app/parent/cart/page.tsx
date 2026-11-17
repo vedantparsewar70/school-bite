@@ -537,7 +537,7 @@ export default function CartPage() {
                 placeholder="e.g. a note for the canteen"
                 rows={2}
                 disabled={processing}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none placeholder:text-slate-400"
+                className="w-full text-base sm:text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none placeholder:text-slate-400"
               />
             </div>
 

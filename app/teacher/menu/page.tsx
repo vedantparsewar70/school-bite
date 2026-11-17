@@ -559,7 +559,7 @@ export default function TeacherMenuPage() {
                     value={teacherName}
                     onChange={(e) => setTeacherName(e.target.value)}
                     placeholder="e.g. Pooja Sharma, Rajiv Verma"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
                     Tell this name at the canteen counter to collect your food.
@@ -575,7 +575,7 @@ export default function TeacherMenuPage() {
                     value={teacherPhone}
                     onChange={(e) => setTeacherPhone(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
 
@@ -588,7 +588,7 @@ export default function TeacherMenuPage() {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g. Less spicy"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
               </div>

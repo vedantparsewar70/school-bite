@@ -235,7 +235,7 @@ export default function AdminUsersPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Student name, ID, parent..."
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -246,7 +246,7 @@ export default function AdminUsersPage() {
                 <select
                   value={allergyFilter}
                   onChange={(e: any) => setAllergyFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold text-base"
                 >
                   <option value="ALL">All Students ({students.length})</option>
                   <option value="HAS_ALLERGIES">Has Allergies ({allergyRecordedCount})</option>
@@ -260,7 +260,7 @@ export default function AdminUsersPage() {
                 <select
                   value={specificAllergy}
                   onChange={(e) => setSpecificAllergy(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-base"
                 >
                   <option value="">Any Allergen</option>
                   {ALLERGY_FILTERS.map((alg) => (
@@ -277,7 +277,7 @@ export default function AdminUsersPage() {
                 <select
                   value={gradeFilter}
                   onChange={(e) => setGradeFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-base"
                 >
                   <option value="">All Classes</option>
                   {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((g) => (

@@ -139,7 +139,7 @@ export default function PaymentsPage() {
             type="date"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
           />
           {dateFilter && (
             <button
