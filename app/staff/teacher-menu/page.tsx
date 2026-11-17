@@ -20,6 +20,7 @@ import VegBadge from '@/components/VegBadge';
 import { formatINR } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 interface TeacherMeal {
   id: string;
@@ -36,6 +37,7 @@ export default function StaffTeacherMenuPage() {
 
   const [meals, setMeals] = useState<TeacherMeal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,6 +55,11 @@ export default function StaffTeacherMenuPage() {
     if (!quiet) setLoading(true);
     try {
       const res = await fetch('/api/staff/teacher-menu');
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('the teacher menu', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setMeals(data.meals || []);
@@ -60,6 +67,7 @@ export default function StaffTeacherMenuPage() {
         showToast('Failed to load teacher menu items', 'error');
       }
     } catch {
+      setLoadError(loadFailedMessage('the teacher menu'));
       showToast('Network error loading menu', 'error');
     } finally {
       setLoading(false);
@@ -281,6 +289,8 @@ export default function StaffTeacherMenuPage() {
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : loadError && meals.length === 0 ? (
+        <LoadError message={loadError} onRetry={() => fetchMeals()} />
       ) : meals.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-2">
           <UtensilsCrossed className="w-10 h-10 mx-auto text-slate-300" />

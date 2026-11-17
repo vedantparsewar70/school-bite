@@ -218,7 +218,7 @@ export default function StaffHistoryPage() {
 
         {!loaded ? (
           <div className="h-32 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
-        ) : view === 'NOT_SERVED' ? (
+        ) : error && rows.length === 0 && teachers.length === 0 ? null : view === 'NOT_SERVED' ? (
           <NotServedList date={date} rows={rows} teachers={teachers} />
         ) : tab === 'STUDENTS' ? (
           served.length === 0 ? (

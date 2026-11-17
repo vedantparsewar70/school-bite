@@ -28,6 +28,7 @@ import { useAuth } from '@/components/AuthContext';
 import { INVALID_PHONE_MESSAGE, normalizeIndianMobile, TEACHER_PHONE_REQUIRED_MESSAGE } from '@/lib/phone';
 import { loadCashfreeSdk } from '@/lib/cashfree-client';
 import { useSyncWatcher } from '@/lib/client-sync';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 interface TeacherMeal {
   id: string;
@@ -52,6 +53,7 @@ export default function TeacherMenuPage() {
 
   const [meals, setMeals] = useState<TeacherMeal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   // Cart state: mealId -> CartEntry
@@ -79,11 +81,17 @@ export default function TeacherMenuPage() {
     if (!isBackground) setLoading(true);
     try {
       const res = await fetch('/api/teacher/menu', { cache: 'no-store' });
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('the menu', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setMeals(data.meals || []);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('the menu'));
       console.error('Failed to load teacher menu:', err);
     } finally {
       if (!isBackground) setLoading(false);
@@ -380,6 +388,8 @@ export default function TeacherMenuPage() {
           <div className="min-h-[40vh] flex items-center justify-center">
             <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : loadError && meals.length === 0 ? (
+          <LoadError message={loadError} onRetry={() => fetchMenu()} />
         ) : filteredMeals.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-2">
             <UtensilsCrossed className="w-10 h-10 mx-auto text-slate-300" />

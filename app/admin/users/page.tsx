@@ -18,6 +18,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { formatINR } from '@/lib/utils';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const ALLERGY_FILTERS = [
   'Milk',
@@ -36,6 +37,7 @@ export default function AdminUsersPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Filters
   const [search, setSearch] = useState('');
@@ -50,12 +52,17 @@ export default function AdminUsersPage() {
     async function loadData() {
       try {
         const res = await fetch('/api/admin/users');
+        if (!res.ok) {
+          setLoadError(loadFailedMessage('users', res.status));
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           setStudents(data.students || []);
           setParents(data.parents || []);
         }
       } catch (err) {
+        setLoadError(loadFailedMessage('users'));
         console.error('Failed to load users:', err);
       } finally {
         setLoading(false);
@@ -111,6 +118,14 @@ export default function AdminUsersPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && students.length === 0 && parents.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => window.location.reload()} />
       </div>
     );
   }

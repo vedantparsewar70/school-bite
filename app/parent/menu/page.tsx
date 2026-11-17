@@ -43,6 +43,7 @@ import {
   getStudentCategory,
   StudentCategory,
 } from '@/lib/october-2026-timetable';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const SCHEDULE_DAYS_AHEAD = 45;
 
@@ -109,6 +110,7 @@ function MenuPageContent() {
   const [extras, setExtras] = useState<any[]>([]);
   const [allowAllergyOrders, setAllowAllergyOrders] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [timetableCategoryTab, setTimetableCategoryTab] = useState<StudentCategory>('Primary');
@@ -141,6 +143,11 @@ function MenuPageContent() {
       queryParams.append('category', activeStudentCategory);
 
       const res = await fetch(`/api/menu?${queryParams.toString()}`, { cache: 'no-store' });
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('the menu', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setMenus(data.menus || []);
@@ -148,6 +155,7 @@ function MenuPageContent() {
         setAllowAllergyOrders(data.policy?.allowAllergyOrders !== false);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('the menu'));
       console.error('Failed to fetch menu:', err);
     } finally {
       if (!isBackground) setLoading(false);
@@ -516,6 +524,8 @@ function MenuPageContent() {
           <div className="min-h-[30vh] flex items-center justify-center">
             <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : loadError && menus.length === 0 ? (
+          <LoadError message={loadError} onRetry={() => fetchMenuForDate()} />
         ) : menus.length === 0 ? (
           <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-10 text-center space-y-3 max-w-md mx-auto">
             <Clock className="w-10 h-10 text-slate-300 mx-auto" />

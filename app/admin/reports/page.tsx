@@ -15,20 +15,28 @@ import {
 import { formatINR, formatDatePretty } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
 import { csvCell } from '@/lib/not-served';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 export default function AdminReportsPage() {
   const { showToast } = useToast();
   const [reports, setReports] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const fetchReports = async () => {
     try {
       const res = await fetch('/api/admin/reports');
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('reports', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setReports(data);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('reports'));
       console.error('Failed to fetch reports:', err);
     } finally {
       setLoading(false);
@@ -94,6 +102,14 @@ export default function AdminReportsPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && !reports) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); fetchReports(); }} />
       </div>
     );
   }

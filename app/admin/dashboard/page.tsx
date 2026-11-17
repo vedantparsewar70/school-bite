@@ -18,12 +18,14 @@ import {
 import VegBadge from '@/components/VegBadge';
 import { formatINR, formatDatePretty, nextNonSundayDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [tomorrowProduction, setTomorrowProduction] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const { showToast } = useToast();
 
   // The next meal date comes from the server (skips Sundays and holidays); until it loads, the next non-Sunday date.
@@ -32,6 +34,11 @@ export default function AdminDashboardPage() {
   const fetchStats = async () => {
     try {
       const res = await fetch('/api/admin/stats');
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('the dashboard', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);
@@ -39,6 +46,7 @@ export default function AdminDashboardPage() {
         setRecentOrders(data.recentOrders || []);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('the dashboard'));
       console.error('Failed to fetch admin stats:', err);
     } finally {
       setLoading(false);
@@ -53,6 +61,14 @@ export default function AdminDashboardPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && !stats) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); fetchStats(); }} />
       </div>
     );
   }

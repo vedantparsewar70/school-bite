@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatINR, formatDateTimePretty } from '@/lib/utils';
 import { PaymentData } from '@/types';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   SUCCESS: 'Paid',
@@ -29,6 +30,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('');
 
@@ -41,11 +43,17 @@ export default function PaymentsPage() {
       if (params.toString()) url += `?${params.toString()}`;
 
       const res = await fetch(url);
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('your payments', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setPayments(data.payments || []);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('your payments'));
       console.error('Failed to fetch payments:', err);
     } finally {
       setLoading(false);
@@ -149,6 +157,8 @@ export default function PaymentsPage() {
         <div className="min-h-[30vh] flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : loadError && payments.length === 0 ? (
+        <LoadError message={loadError} onRetry={() => fetchPayments()} />
       ) : payments.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3 max-w-md mx-auto">
           <CreditCard className="w-12 h-12 text-slate-300 mx-auto" />

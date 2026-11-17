@@ -23,6 +23,7 @@ import ChildAvatar from '@/components/ChildAvatar';
 import MealIcon from '@/components/MealIcon';
 import { formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/utils';
 import { useSyncWatcher } from '@/lib/client-sync';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 function KitchenPageContent() {
   const searchParams = useSearchParams();
@@ -35,6 +36,7 @@ function KitchenPageContent() {
   const [nextServingDate, setNextServingDate] = useState<string | null>(null);
   const [kitchenData, setKitchenData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const loadNextServingDay = async () => {
     try {
@@ -56,11 +58,19 @@ function KitchenPageContent() {
     if (!quiet) setLoading(true);
     try {
       const res = await fetch(`/api/admin/kitchen?date=${date}`);
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('kitchen numbers', res.status));
+        if (!quiet) setKitchenData(null);
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setKitchenData(data);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('kitchen numbers'));
+        if (!quiet) setKitchenData(null);
       console.error('Failed to fetch kitchen data:', err);
     } finally {
       setLoading(false);
@@ -195,7 +205,9 @@ function KitchenPageContent() {
         </p>
       </div>
 
-      {loading ? (
+      {loadError && !kitchenData ? (
+        <LoadError message={loadError} onRetry={() => fetchKitchenData()} />
+      ) : loading ? (
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>

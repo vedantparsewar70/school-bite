@@ -25,6 +25,7 @@ import {
   getOrderStatusColor,
 } from '@/lib/utils';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const PAYMENT_BADGE: Record<string, { label: string; tone: string }> = {
   PAID: { label: 'Paid', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -80,17 +81,24 @@ function OrdersPageContent() {
   const [orders, setOrders] = useState<any[]>([]);
   const [paymentIssues, setPaymentIssues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const fetchOrders = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
       const res = await fetch('/api/parent/orders', { cache: 'no-store' });
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('your orders', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || []);
         setPaymentIssues(data.paymentIssues || []);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('your orders'));
       console.error('Failed to fetch orders:', err);
     } finally {
       if (!isBackground) setLoading(false);
@@ -150,6 +158,8 @@ function OrdersPageContent() {
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : loadError && orders.length === 0 ? (
+        <LoadError message={loadError} onRetry={() => fetchOrders()} />
       ) : orders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-4 max-w-md mx-auto">
           <FileText className="w-12 h-12 text-slate-300 mx-auto" />
