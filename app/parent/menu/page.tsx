@@ -306,7 +306,20 @@ function MenuPageContent() {
       return;
     }
 
-    executeAddToCart(menuItem, date, false, []);
+    // Allergy check, the same as for extras: blocked when the school policy says so, otherwise the
+    // parent confirms. The server checks again at payment.
+    const allergy = menuItem.allergyEvaluation;
+    const matching: string[] = Array.isArray(allergy?.matchingAllergens) ? allergy.matchingAllergens : [];
+    if (allergy?.hasConflict) {
+      const first = selectedChild.name.split(' ')[0];
+      if (!allowAllergyOrders) {
+        showToast(`${menuItem.meal?.name || 'This meal'} conflicts with ${first}'s allergy profile.`, 'error');
+        return;
+      }
+      if (!window.confirm(`${menuItem.meal?.name || 'This meal'} contains ${matching.join(', ')}, which is on ${first}'s allergy list. Add it anyway?`)) return;
+    }
+
+    executeAddToCart(menuItem, date, Boolean(allergy?.hasConflict), matching);
   };
 
   // Filter menus based on search
