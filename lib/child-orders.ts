@@ -1,4 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
+import { MAX_EXTRA_PER_CHILD } from './menu-extras';
 
 /**
  * One brunch per child per day, and at most 3 of each extra per child per day, across ALL of a
@@ -49,6 +50,20 @@ export function cartConflict(cart: CartLineLike[], earlier: any[]): { detail: st
       return {
         detail: `child ${l.studentId} already has a paid brunch on ${l.date}`,
         message: `${name(l)} already has a paid brunch on ${l.date}. Please remove it from the cart.`,
+      };
+    }
+  }
+  const totals = new Map<string, number>();
+  for (const e of earlier) if (e.kind === 'EXTRA') totals.set(`${e.studentId}|${e.date}|${e.mealId}`, (totals.get(`${e.studentId}|${e.date}|${e.mealId}`) || 0) + (Number(e.quantity) || 1));
+  for (const l of cart) {
+    if (l.kind !== 'EXTRA') continue;
+    const key = `${l.studentId}|${l.date}|${l.mealId}`;
+    const total = (totals.get(key) || 0) + (Number(l.quantity) || 1);
+    totals.set(key, total);
+    if (total > MAX_EXTRA_PER_CHILD) {
+      return {
+        detail: `more than ${MAX_EXTRA_PER_CHILD} of extra ${l.mealId} for child ${l.studentId} on ${l.date}`,
+        message: `At most ${MAX_EXTRA_PER_CHILD} ${l.mealName || 'of each extra'} per child per day.`,
       };
     }
   }
