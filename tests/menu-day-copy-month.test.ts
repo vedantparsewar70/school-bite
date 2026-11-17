@@ -50,22 +50,24 @@ test('Edit for this day: a copy is used on that day and class only; other days a
   const copied = fs.getDoc('meals', mealId)!;
   assert.deepEqual([copied.dayOnly, copied.dayOnlyDate, copied.copyOf, copied.allergens], [true, WED, 'meal_soya', 'Soy'], 'allergens are kept');
 
-  assert.deepEqual(await parentSees(WED, 'Primary'), [['Soyabean Masala + Chapati + Salad', 70]]);
-  assert.deepEqual(await parentSees(WED, 'Secondary'), [['Soyabean Masala + Dal + Chapati + Salad', 80]], 'other class unchanged');
-  assert.deepEqual(await parentSees(THU, 'Primary'), [['Soyabean Masala + Dal + Chapati + Salad', 80]], 'other day unchanged');
+  // The brunch price is the class price (Primary ₹75, Secondary ₹90), whatever the dish.
+  assert.deepEqual(await parentSees(WED, 'Primary'), [['Soyabean Masala + Chapati + Salad', 75]]);
+  assert.deepEqual(await parentSees(WED, 'Secondary'), [['Soyabean Masala + Dal + Chapati + Salad', 90]], 'other class unchanged');
+  assert.deepEqual(await parentSees(THU, 'Primary'), [['Soyabean Masala + Dal + Chapati + Salad', 75]], 'other day unchanged');
   assert.equal(fs.getDoc('meals', 'meal_soya')?.price, 80, 'the original dish is unchanged');
 
   // Editing the copy again changes it in place (no second copy).
-  const again = await copy({ date: WED, studentCategory: 'Primary', mealId, name: 'Soyabean Masala + Chapati + Salad', price: 65, isVegetarian: true });
+  const again = await copy({ date: WED, studentCategory: 'Primary', mealId, name: 'Soyabean Masala + Chapati', isVegetarian: true });
   assert.equal((await again.json()).mealId, mealId);
   assert.equal(fs.list('meals').filter((m) => m.dayOnly).length, 1);
-  assert.deepEqual(await parentSees(WED, 'Primary'), [['Soyabean Masala + Chapati + Salad', 65]]);
+  assert.deepEqual(await parentSees(WED, 'Primary'), [['Soyabean Masala + Chapati', 75]]);
 });
 
-test('a same-name copy (price only) is allowed, and the monthly import never matches day-only copies', async () => {
-  const res = await copy({ date: WED, studentCategory: 'ALL', mealId: 'meal_soya', name: 'Soyabean Masala + Dal + Chapati + Salad', price: 60, isVegetarian: true });
+test('a same-name copy (no price: set by class) is allowed, and the monthly import never matches day-only copies', async () => {
+  const res = await copy({ date: WED, studentCategory: 'ALL', mealId: 'meal_soya', name: 'Soyabean Masala + Dal + Chapati + Salad', isVegetarian: false });
   assert.equal(res.status, 200);
-  for (const c of ['Pre-primary', 'Primary', 'Secondary']) assert.deepEqual(await parentSees(WED, c), [['Soyabean Masala + Dal + Chapati + Salad', 60]]);
+  const prices: Record<string, number> = { 'Pre-primary': 60, Primary: 75, Secondary: 90 };
+  for (const c of ['Pre-primary', 'Primary', 'Secondary']) assert.deepEqual(await parentSees(WED, c), [['Soyabean Masala + Dal + Chapati + Salad', prices[c]]]);
 
   const plan: MonthlyMenuPlan = {
     title: null, month: '2026-11', issues: [],

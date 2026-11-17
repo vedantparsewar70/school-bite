@@ -59,13 +59,26 @@ test('an explicit allergen update replaces the allergens, including clearing the
 
 test('invalid prices, empty names and unknown meals are rejected without changes', async () => {
   const staff = await signedInAs(fs, 'STAFF');
-  for (const body of [{ price: 0 }, { price: -5 }, { price: 'abc' }, { price: '' }, { price: null }, { name: '  ' }]) {
+  for (const body of [{ price: 0 }, { price: -5 }, { price: 'abc' }, { name: '  ' }]) {
     const res = await updateMeal(jsonRequest('/api/admin/meals', 'PUT', { id: 'meal_chikki', ...body }, staff));
     assert.equal(res.status, 400, JSON.stringify(body));
   }
   assert.equal((await updateMeal(jsonRequest('/api/admin/meals', 'PUT', { id: 'meal_nope', price: 10 }, staff))).status, 404);
   assert.equal(fs.getDoc('meals', 'meal_chikki')!.price, 30);
   assert.equal(fs.list('meals').length, 1, 'no stray meal document created');
+});
+
+test('the (extra) price can be cleared on a dish that is not an extra, never on an extra', async () => {
+  const staff = await signedInAs(fs, 'STAFF');
+  fs.seed('meals', 'meal_extra', { id: 'meal_extra', name: 'Banana', price: 10, isExtra: true });
+  for (const price of ['', null]) {
+    const res = await updateMeal(jsonRequest('/api/admin/meals', 'PUT', { id: 'meal_extra', price }, staff));
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /sold as an extra/);
+  }
+  assert.equal(fs.getDoc('meals', 'meal_extra')!.price, 10);
+  assert.equal((await updateMeal(jsonRequest('/api/admin/meals', 'PUT', { id: 'meal_chikki', price: '' }, staff))).status, 200);
+  assert.equal(fs.getDoc('meals', 'meal_chikki')!.price, null, 'no extra price: the brunch price is set by class');
 });
 
 test('parents and signed-out users cannot edit meals', async () => {

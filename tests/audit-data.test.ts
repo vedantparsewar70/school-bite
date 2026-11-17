@@ -322,8 +322,9 @@ test('BUG (minor): a removed child still in the cart gives "Unauthorized child s
 test('FIXED: after a price change the cart shows the price checkout will charge', async () => {
   const { serverPricesFrom, displayCartTotal, displayUnitPrice } = await import('../lib/cart-pricing');
   seedMenu(D);
-  fs.seed('meals', 'meal_dal', { ...fs.getDoc('meals', 'meal_dal'), price: 100 });
-  const inCart = cartLine({ mealPrice: 80, quantity: 2 }); // saved in the cart at the old price
+  // The main brunch costs the class price (Riya: Primary); it changes from ₹75 to ₹100.
+  fs.seed('systemSettings', 'BRUNCH_PRICES', { key: 'BRUNCH_PRICES', prices: { 'Pre-primary': 60, Primary: 100, Secondary: 90 } });
+  const inCart = cartLine({ mealPrice: 80, quantity: 2 }); // saved in the cart at an old price
   const v = await (await validateCart(jsonRequest('/api/parent/cart/validate', 'POST', { cartItems: [inCart] }, parent))).json();
   const prices = serverPricesFrom(v.items);
   assert.equal(displayUnitPrice(inCart as any, prices), 100);

@@ -30,6 +30,7 @@ import { formatDatePretty, formatINR, getTodayString } from '@/lib/utils';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import VegBadge from '@/components/VegBadge';
+import { DEFAULT_BRUNCH_PRICES, MAX_BRUNCH_PRICE, priceChanges, validateBrunchPrices, type BrunchPrices } from '@/lib/brunch-prices';
 
 /**
  * Student Menu editor (Staff → Student Menu and Admin → Menu). What each class can order on each
@@ -81,7 +82,8 @@ type MenuDay = {
 type Dish = {
   id: string;
   name: string;
-  price: number;
+  /** Extra price: used only when the dish is sold as an extra (the brunch price is set by class). */
+  price: number | null;
   isVegetarian: boolean;
   description?: string | null;
   category?: string;
@@ -475,6 +477,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
 
       {tab === 'MENU' ? (
         <>
+          <BrunchPricesCard />
+
           {/* Date strip: scrolls sideways on its own; the page never does. */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 sm:p-3 space-y-2" aria-label="Choose a day">
             <div className="flex items-center gap-1">
@@ -789,6 +793,143 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
 
 // --- Pieces ----------------------------------------------------------------------------------
 
+/**
+ * Brunch prices by class (staff and admin). The server validates and stores them
+ * (/api/admin/menus/brunch-prices); before saving, the old → new price of each changed class is
+ * shown for confirmation so a typo (₹90 → ₹900) is caught.
+ */
+function BrunchPricesCard() {
+  const [saved, setSaved] = useState<BrunchPrices | null>(null);
+  const [form, setForm] = useState<Record<ClassName, string>>({ 'Pre-primary': '', Primary: '', Secondary: '' });
+  const [loadError, setLoadError] = useState('');
+  const [problem, setProblem] = useState('');
+  const [message, setMessage] = useState('');
+  const [confirm, setConfirm] = useState<{ prices: BrunchPrices; lines: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const show = (p: BrunchPrices) => {
+    setSaved(p);
+    setForm({ 'Pre-primary': String(p['Pre-primary']), Primary: String(p.Primary), Secondary: String(p.Secondary) });
+  };
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout('/api/admin/menus/brunch-prices');
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.prices) {
+        setLoadError(body.error || 'Could not load the brunch prices.');
+        return;
+      }
+      setLoadError('');
+      show(body.prices as BrunchPrices);
+    } catch {
+      setLoadError('Could not load the brunch prices. Check the connection.');
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const review = () => {
+    setMessage('');
+    if (!saved) return;
+    const v = validateBrunchPrices(form);
+    if (!v.ok) return setProblem(v.error);
+    setProblem('');
+    const lines = priceChanges(saved, v.prices);
+    if (lines.length === 0) return setMessage('No change: the prices are the same.');
+    setConfirm({ prices: v.prices, lines });
+  };
+
+  const save = async () => {
+    if (!confirm || busy) return;
+    setBusy(true);
+    try {
+      const r = await send('/api/admin/menus/brunch-prices', 'PUT', { prices: confirm.prices });
+      if (r.ok && r.data.prices) {
+        show(r.data.prices as BrunchPrices);
+        setMessage(r.data.message || 'Brunch prices saved. They apply to new orders only.');
+        setConfirm(null);
+        broadcastSyncEvent('MENU_UPDATED');
+      } else {
+        setProblem(r.data.error || 'The prices could not be saved. Please try again.');
+        setConfirm(null);
+      }
+    } catch {
+      setProblem('Not saved: no connection. Please try again.');
+      setConfirm(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3" aria-labelledby="brunch-prices-title">
+      <div>
+        <h2 id="brunch-prices-title" className="text-lg font-black text-slate-900">Brunch prices by class</h2>
+        <p className="text-sm text-slate-600">Every main brunch costs the class price, whatever the dish. Changes apply to new orders only.</p>
+      </div>
+      {loadError ? (
+        <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold flex items-center justify-between gap-3">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => load()} className="min-h-[44px] px-3 rounded-lg bg-white border border-rose-300 font-bold shrink-0">
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {CLASSES.map((c) => (
+              <label key={c} className="block">
+                <span className="text-sm font-bold text-slate-700">{c} (₹)</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={MAX_BRUNCH_PRICE}
+                  step={1}
+                  disabled={!saved || busy}
+                  value={form[c]}
+                  placeholder={String(DEFAULT_BRUNCH_PRICES[c])}
+                  onChange={(e) => setForm((f) => ({ ...f, [c]: e.target.value }))}
+                  className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
+                />
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">Whole rupees, ₹1 to ₹{MAX_BRUNCH_PRICE}. Extras and the teacher menu keep their own prices.</p>
+          {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
+          {message && <p role="status" className="text-base font-semibold text-emerald-800">{message}</p>}
+          <button type="button" disabled={!saved || busy} onClick={review} className={`${PRIMARY_BTN} w-full sm:w-auto px-6`}>
+            Save prices
+          </button>
+        </>
+      )}
+      {confirm && (
+        <BottomSheet title="Change brunch prices?" subtitle="Changes apply to new orders only." onClose={() => setConfirm(null)}>
+          <ul className="space-y-1.5" aria-label="Price changes">
+            {confirm.lines.map((line) => (
+              <li key={line} className="text-lg font-bold text-slate-900">
+                {line}
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-slate-600">Orders already paid keep the price they were bought at.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setConfirm(null)} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
+              Go back
+            </button>
+            <button type="button" disabled={busy} onClick={save} className={`${PRIMARY_BTN} min-h-[48px]`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save new prices
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+    </section>
+  );
+}
+
 const PRIMARY_BTN =
   'min-h-[48px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-base font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 transition-colors';
 const SECONDARY_BTN =
@@ -879,7 +1020,10 @@ function ClassCardView({
             <div className="space-y-1">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-lg font-black text-slate-900 leading-snug break-words min-w-0">{c.mealName}</p>
-                <span className="text-lg font-black text-slate-900 shrink-0">{c.price !== null ? formatINR(c.price) : ''}</span>
+                <span className="text-lg font-black text-slate-900 shrink-0 text-right leading-tight">
+                  {c.price !== null ? formatINR(c.price) : ''}
+                  {c.price !== null && <span className="block text-[11px] font-semibold text-slate-500">class price</span>}
+                </span>
               </div>
               {c.isVegetarian !== null && <VegBadge isVegetarian={c.isVegetarian} size="sm" showLabel />}
             </div>
@@ -1098,12 +1242,15 @@ function DishPicker({
   onSelect,
   onNew,
   emptyText = 'No dish matches.',
+  showPrice = true,
 }: {
   dishes: Dish[];
   selectedId: string;
   onSelect: (id: string) => void;
   onNew: () => void;
   emptyText?: string;
+  /** Extras show each dish's (extra) price; a main brunch is priced by class, so no dish price. */
+  showPrice?: boolean;
 }) {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
@@ -1145,7 +1292,7 @@ function DishPicker({
                     {d.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}
                   </span>
                 </span>
-                <span className="text-base font-bold text-slate-800 shrink-0">{formatINR(d.price)}</span>
+                {showPrice && <span className="text-base font-bold text-slate-800 shrink-0">{d.price !== null && d.price !== undefined ? formatINR(d.price) : 'No price'}</span>}
               </button>
             </li>
           );
@@ -1220,6 +1367,7 @@ function DishSheet({
       {creating ? (
         <DishFields
           submitLabel="Add dish"
+          priceMode="extra-optional"
           busy={busy}
           onCancel={() => setCreating(false)}
           onSubmit={async (v) => {
@@ -1238,7 +1386,8 @@ function DishSheet({
         />
       ) : (
         <>
-          <DishPicker dishes={choices} selectedId={mealId} onSelect={setMealId} onNew={() => setCreating(true)} />
+          <p className="text-sm text-slate-600">{BRUNCH_PRICE_NOTE}</p>
+          <DishPicker dishes={choices} selectedId={mealId} onSelect={setMealId} onNew={() => setCreating(true)} showPrice={false} />
           <ApplyTo name="apply" category={category} value={applyAll} onChange={setApplyAll} />
           <label className="block">
             <span className="text-sm font-bold text-slate-700">Portions {applyAll ? '(each class)' : ''}</span>
@@ -1279,7 +1428,18 @@ function SheetActions({ busy, onCancel, onSave, saveLabel, danger = false }: { b
   );
 }
 
-type DishValues = { name: string; price: number; isVegetarian: boolean; description: string };
+/** price: the extra price (null = none); left out when the sheet has no price field. */
+type DishValues = { name: string; price?: number | null; isVegetarian: boolean; description: string };
+
+const BRUNCH_PRICE_NOTE = 'Brunch price is set by class.';
+const EXTRA_PRICE_LABEL = 'Extra price (₹), used only when this dish is sold as an extra. Brunch price is set by class.';
+
+/**
+ * extra-optional: "Edit everywhere" and "New dish": optional extra price.
+ * extra-required: a new dish made from "Add extra" (an extra needs a price).
+ * none: "Edit for this day" on a main brunch: no price (set by class).
+ */
+type PriceMode = 'extra-optional' | 'extra-required' | 'none';
 
 function DishFields({
   initial,
@@ -1289,8 +1449,10 @@ function DishFields({
   cancelLabel = 'Back',
   onSubmit,
   notes,
+  priceMode,
 }: {
   initial?: Partial<Dish>;
+  priceMode: PriceMode;
   submitLabel: string;
   busy: boolean;
   onCancel?: () => void;
@@ -1299,7 +1461,7 @@ function DishFields({
   notes?: React.ReactNode;
 }) {
   const [name, setName] = useState(initial?.name || '');
-  const [price, setPrice] = useState(initial?.price !== undefined ? String(initial.price) : '');
+  const [price, setPrice] = useState(initial?.price !== undefined && initial?.price !== null ? String(initial.price) : '');
   const [veg, setVeg] = useState(initial?.isVegetarian !== false);
   const [description, setDescription] = useState(cleanDescription(initial?.description));
   const [problem, setProblem] = useState('');
@@ -1308,9 +1470,14 @@ function DishFields({
     const clean = name.trim().replace(/\s+/g, ' ');
     const p = Number(price);
     if (clean.length < 2) return setProblem('Please write the dish name (at least 2 letters).');
-    if (!price.trim() || !Number.isFinite(p) || p <= 0 || p > 10000) return setProblem('Please enter a price above ₹0 (up to ₹10,000).');
+    if (priceMode === 'none') {
+      setProblem('');
+      return onSubmit({ name: clean, isVegetarian: veg, description: description.trim() });
+    }
+    if (!price.trim() && priceMode === 'extra-required') return setProblem('An extra needs a price. Please enter the extra price.');
+    if (price.trim() && (!Number.isFinite(p) || p <= 0 || p > 10000)) return setProblem('Please enter an extra price above ₹0 (up to ₹10,000), or leave it empty.');
     setProblem('');
-    onSubmit({ name: clean, price: p, isVegetarian: veg, description: description.trim() });
+    onSubmit({ name: clean, price: price.trim() ? p : null, isVegetarian: veg, description: description.trim() });
   };
 
   return (
@@ -1320,11 +1487,23 @@ function DishFields({
         <span className="text-sm font-bold text-slate-700">Dish name</span>
         <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900" />
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      {priceMode === 'none' ? (
+        <p className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">{BRUNCH_PRICE_NOTE}</p>
+      ) : (
         <label className="block">
-          <span className="text-sm font-bold text-slate-700">Price (₹)</span>
-          <input type="number" inputMode="decimal" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <span className="text-sm font-bold text-slate-700">{EXTRA_PRICE_LABEL}</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={1}
+            value={price}
+            placeholder={priceMode === 'extra-required' ? 'Needed for an extra' : 'Optional'}
+            onChange={(e) => setPrice(e.target.value)}
+            className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
+          />
         </label>
+      )}
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <span className="text-sm font-bold text-slate-700">Type</span>
           <div className="mt-1 grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100" role="radiogroup" aria-label="Veg or non-veg">
@@ -1383,6 +1562,7 @@ function DishForm({ title, initial, busy, onClose, onSave }: { title: string; in
     <BottomSheet title={title} subtitle={initial ? initial.name : undefined} onClose={onClose}>
       <DishFields
         initial={initial}
+        priceMode="extra-optional"
         submitLabel="Save"
         busy={busy}
         onCancel={onClose}
@@ -1392,7 +1572,7 @@ function DishForm({ title, initial, busy, onClose, onSave }: { title: string; in
           initial ? (
             <Note tone="amber">
               <p className="font-bold">Edits this dish everywhere it&apos;s used.</p>
-              <p>Price changes apply to new orders only, on every day this dish is on sale.</p>
+              <p>Extra price changes apply to new orders only, on every day this dish is sold as an extra.</p>
               <p>The monthly menu file finds dishes by name. If you rename this dish, use the new name in future monthly files too, or the import will create a separate dish.</p>
             </Note>
           ) : null
@@ -1525,7 +1705,7 @@ function DishesTab({
           {d.isExtra && <span className="ml-1.5 align-middle text-[11px] font-black uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Extra</span>}
         </p>
         <p className="text-sm text-slate-600">
-          {formatINR(d.price)}
+          {d.price !== null && d.price !== undefined ? `Extra price ${formatINR(d.price)}` : 'No extra price'}
           {d.dayOnly && d.dayOnlyDate ? ` · only on ${formatDatePretty(d.dayOnlyDate)}` : ''}
         </p>
       </div>
@@ -1558,7 +1738,7 @@ function DishesTab({
         </button>
       </div>
       <p className="text-sm text-slate-600">
-        {main.length} {main.length === 1 ? 'dish' : 'dishes'}. Dishes marked <span className="font-bold text-amber-800">Extra</span> are used as optional add-ons.
+        {main.length} {main.length === 1 ? 'dish' : 'dishes'}. Dishes marked <span className="font-bold text-amber-800">Extra</span> are used as optional add-ons. {BRUNCH_PRICE_NOTE}
       </p>
       <ul className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-2xl shadow-sm lg:grid lg:grid-cols-2 lg:divide-y-0 lg:[&>li]:border-b lg:[&>li]:border-slate-100 lg:[&>li:nth-child(odd)]:border-r">
         {main.map(row)}
@@ -1593,15 +1773,15 @@ function DayEditSheet({
   // Default: every class that has this same dish today (usually all 3).
   const same = day.classes.filter((c) => c.editable && c.mealId === card.mealId);
   const [applyAll, setApplyAll] = useState(same.length === 3);
-  const initial = dish || { id: card.mealId || '', name: card.mealName || '', price: card.price || 0, isVegetarian: card.isVegetarian !== false };
+  const initial = dish || { id: card.mealId || '', name: card.mealName || '', isVegetarian: card.isVegetarian !== false };
   return (
     <BottomSheet title="Edit for this day" subtitle={`${formatDatePretty(day.date)} · ${card.mealName || ''}`} onClose={onClose}>
       <Note>
         <p className="font-bold">Changes this dish for this date only. Other days remain unchanged.</p>
-        <p>Parents see the new name and price for {formatDatePretty(day.date)}.</p>
+        <p>Parents see the new name for {formatDatePretty(day.date)}. {BRUNCH_PRICE_NOTE}</p>
       </Note>
       <ApplyTo name="day-edit-apply" category={card.category} value={applyAll} onChange={setApplyAll} />
-      <DishFields initial={initial} submitLabel="Save for this day" busy={busy} onCancel={onClose} cancelLabel="Cancel" onSubmit={(v) => onSave(applyAll, v)} />
+      <DishFields initial={initial} priceMode="none" submitLabel="Save for this day" busy={busy} onCancel={onClose} cancelLabel="Cancel" onSubmit={(v) => onSave(applyAll, v)} />
     </BottomSheet>
   );
 }
@@ -1649,6 +1829,7 @@ function ExtraSheet({
       {creating ? (
         <DishFields
           submitLabel="Add dish"
+          priceMode="extra-required"
           busy={busy}
           onCancel={() => setCreating(false)}
           onSubmit={async (v) => {
@@ -1668,6 +1849,7 @@ function ExtraSheet({
         <>
           <Note tone="amber">
             <p>Extras are optional add-ons. Parents can add up to 3 of each extra per child, only with that day&apos;s brunch.</p>
+            <p>An extra is sold at the dish&apos;s own extra price.</p>
           </Note>
           <DishPicker dishes={choices} selectedId={mealId} onSelect={setMealId} onNew={() => setCreating(true)} />
           <ApplyTo name="extra-apply" category={category} value={applyAll} onChange={setApplyAll} allFirst={false} />

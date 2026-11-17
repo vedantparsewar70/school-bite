@@ -32,9 +32,9 @@ const NOVEMBER_DISHES = [
   'Kofta Curry + Dal + Rice + Chapati + Salad',
 ];
 
-/** Staff decisions for every new dish. Values here are test inputs, not real school prices. */
+/** Staff decisions for every new dish (no price: the main brunch is priced by class). */
 const allDishDecisions = () =>
-  Object.fromEntries(NOVEMBER_DISHES.map((d) => [dishKey(d), { price: 80, isVegetarian: true, noAllergens: true }]));
+  Object.fromEntries(NOVEMBER_DISHES.map((d) => [dishKey(d), { isVegetarian: true, noAllergens: true }]));
 
 function upload(action: 'preview' | 'publish', options: Record<string, unknown> = {}, file = november2026Workbook(), headers = staff) {
   const form = new FormData();
@@ -65,19 +65,19 @@ test('the November 2026 sheet parses exactly: holidays, merged ranges, category 
   assert.ok(plan.days.every((d) => d.weekday!.toLowerCase().startsWith(d.dayLabel.toLowerCase())), 'weekdays match dates');
 });
 
-test('preview lists every new dish as needing a price and allergen decision, and writes nothing', async () => {
+test('preview lists every new dish as needing a veg and allergen decision (no price), and writes nothing', async () => {
   const res = await upload('preview');
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.ok, false);
   assert.equal(body.dishes.length, 14);
-  assert.ok(body.dishes.every((d: any) => !d.existing && d.price === null && d.problems.includes('Price needed')));
+  assert.ok(body.dishes.every((d: any) => !d.existing && d.price === null && !d.problems.includes('Price needed') && d.problems.includes('Allergens needed (or confirm none)')));
   assert.equal(body.counts.create, 90);
   assert.equal(fs.list('menus').length, 0);
   assert.equal(fs.list('meals').length, 0);
 });
 
-test('publishing without prices is refused; with staff decisions it creates the month, idempotently', async () => {
+test('publishing without staff decisions is refused; with them it creates the month, idempotently', async () => {
   assert.equal((await upload('publish')).status, 422);
   assert.equal(fs.list('menus').length, 0);
 
@@ -161,7 +161,7 @@ test('allergens typed by staff are stored and linked; parents and signed-out use
   await upload('publish', { dishes: decisions });
   const paneer = fs.list('meals').find((m) => m.name === 'Paneer butter Masala+Dal+Chapati+Rice')!;
   assert.equal(paneer.allergens, 'Milk, Wheat');
-  assert.equal(paneer.price, 90);
+  assert.equal(paneer.price, null, 'a price sent by an older screen is ignored: the brunch is priced by class');
   assert.equal(fs.list('mealAllergens').filter((l) => l.mealId === paneer.id).length, 2);
 
   const parent = await signedInAs(fs, 'PARENT');

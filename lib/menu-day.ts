@@ -16,6 +16,8 @@ import {
   withLineClasses,
 } from './menu-orders';
 import { extrasOn, isExtraLine, paidExtrasRefusal, switchOffExtras } from './menu-extras';
+import { brunchPriceFor, dishPrice } from './brunch-prices';
+import { getBrunchPrices } from './brunch-prices-server';
 import { APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
 
 /**
@@ -242,6 +244,7 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
   const start = Date.parse(`${from}T00:00:00Z`);
   const dates = Array.from({ length: days }, (_, i) => new Date(start + i * 86400000).toISOString().slice(0, 10));
 
+  const brunchPrices = await getBrunchPrices(firestore);
   const [menuSnap, itemSnap, extras] = await Promise.all([
     firestore.collection('menus').where('date', 'in', dates).get(),
     firestore.collection('orderItems').where('date', 'in', dates).get(),
@@ -294,7 +297,8 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
         entryId: live?.id ?? null,
         mealId: onSale ? live!.mealId || null : null,
         mealName: meal?.name ? String(meal.name) : onSale ? 'Dish' : null,
-        price: meal && Number.isFinite(Number(meal.price)) ? Number(meal.price) : null,
+        // Main brunch: the class price (not the dish's), shown whenever a dish is on sale.
+        price: onSale ? brunchPriceFor(category, brunchPrices) : null,
         isVegetarian: meal ? meal.isVegetarian !== false : null,
         holidayReason: holiday ? live!.holidayReason || 'Holiday' : null,
         ordered: lines.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0),
@@ -314,7 +318,7 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
             return {
               mealId: e.mealId,
               mealName: m?.name ? String(m.name) : 'Extra',
-              price: m && Number.isFinite(Number(m.price)) ? Number(m.price) : null,
+              price: dishPrice(m),
               isVegetarian: m ? m.isVegetarian !== false : null,
               maxQuantity: Number(e.maxQuantity ?? 0),
               availableQuantity: Number(e.availableQuantity ?? 0),

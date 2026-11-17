@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * "Edit for this day" (staff and admin): a copy of the dish used only on that date for the chosen
- * classes. Body: { date, studentCategory ('ALL' or a class), mealId, name, price, isVegetarian, description? }
+ * classes. Body: { date, studentCategory ('ALL' or a class), mealId, name, isVegetarian, description?, price? } (price optional: the brunch price is set by class)
  */
 export async function POST(req: Request) {
   try {

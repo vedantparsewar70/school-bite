@@ -49,7 +49,7 @@ beforeEach(async () => {
   });
   parentAuth = { authorization: `Bearer ${await createSessionToken({ userId: 'usr_p1', email: 'p1@example.com', name: 'P', role: 'PARENT', parentId: 'par_1' })}` };
 
-  cf = { status: 'ACTIVE', amount: 80 };
+  cf = { status: 'ACTIVE', amount: 75 };
   createdOrders = [];
   refundsCreated = [];
   refundStatus = 'PENDING';
@@ -105,7 +105,7 @@ test('checkout sends the server price and a payment expiry to Cashfree', async (
   const res = await startCheckout();
   assert.equal(res.status, 200);
   const sent = createdOrders[0];
-  assert.equal(sent.order_amount, 80, 'client price of 1 ignored');
+  assert.equal(sent.order_amount, 75, 'Primary class price (not the client price of 1 or the dish price of 80)');
   const expiresInMin = (Date.parse(sent.order_expiry_time) - Date.now()) / 60000;
   assert.ok(expiresInMin >= 15 && expiresInMin <= 60, `expiry ${expiresInMin} min ahead`);
   assert.match(sent.order_expiry_time, /\+05:30$/);
@@ -120,7 +120,7 @@ test('pressing Pay again for the same cart reuses the payment; nothing is charge
   assert.equal(createdOrders.length, 1, 'one Cashfree order only');
 
   // The earlier attempt was actually paid: the retry confirms it instead of opening a new payment.
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-01T10:01:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-01T10:01:00+05:30' };
   const paidRetry = await (await startCheckout()).json();
   assert.equal(paidRetry.alreadyPaid, true);
   assert.equal(paidRetry.paymentSessionId, undefined);
@@ -132,7 +132,7 @@ test('pressing Pay again for the same cart reuses the payment; nothing is charge
 test('an expired unpaid attempt asks the browser to start a fresh checkout', async () => {
   at('2026-11-01T10:00');
   await startCheckout();
-  cf = { status: 'EXPIRED', amount: 80 };
+  cf = { status: 'EXPIRED', amount: 75 };
   const res = await startCheckout();
   assert.equal(res.status, 409);
   assert.equal((await res.json()).code, 'CHECKOUT_EXPIRED');
@@ -156,7 +156,7 @@ test('verification reports pending and unpaid truthfully and never creates an or
   const pending = await verifyOrder(orderId);
   assert.equal(pending.state, 'PENDING');
   assert.match(pending.message, /Do not pay again/);
-  cf = { status: 'EXPIRED', amount: 80 };
+  cf = { status: 'EXPIRED', amount: 75 };
   assert.equal((await verifyOrder(orderId)).state, 'NOT_PAID');
   assert.equal(fs.list('orders').length, 0);
 });
@@ -184,7 +184,7 @@ async function latePayment() {
   at('2026-11-02T08:20');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:05');
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T09:04:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T09:04:00+05:30' };
   return orderId as string;
 }
 
@@ -217,7 +217,7 @@ test('a payment completed after the cutoff goes to admin review: no order, no au
 
   // Parent and admin see the same state.
   const issues: Array<{ orderId: string; state: string; paidAmount: number }> = await parentIssues();
-  assert.deepEqual(issues.map((i) => [i.orderId, i.state, i.paidAmount]), [[orderId, 'PENDING_REVIEW', 80]]);
+  assert.deepEqual(issues.map((i) => [i.orderId, i.state, i.paidAmount]), [[orderId, 'PENDING_REVIEW', 75]]);
   const admin = await (await listExceptions(jsonRequest('/api/admin/payment-exceptions', 'GET', undefined, adminAuth))).json();
   assert.equal(admin.exceptions[0].refundState, 'MANUAL_REVIEW');
   assert.equal(admin.exceptions[0].needsAttention, true);
@@ -253,7 +253,7 @@ test('admin refunds a late payment once; it can then never be accepted, and the 
   const refund = await (await resolve(orderId, 'refund')).json();
   assert.equal(refund.refundState, 'REFUND_PENDING');
   assert.equal(refundsCreated.length, 1);
-  assert.equal(refundsCreated[0].refund_amount, 80);
+  assert.equal(refundsCreated[0].refund_amount, 75);
   assert.equal(fs.getDoc('payment_exceptions', orderId)?.resolution, 'REFUNDED_BY_ADMIN');
   assert.equal((await parentIssues())[0].state, 'REFUND_PENDING');
 
@@ -300,7 +300,7 @@ test('a payment made before the deadline is honoured even if confirmation arrive
   at('2026-11-02T08:20');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
   const result = await verifyOrder(orderId);
   assert.equal(result.state, 'PAID');
   assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CONFIRMED');
@@ -310,7 +310,7 @@ test('if Cashfree payment details cannot be read, a payment made before the cuto
   at('2026-11-02T08:20');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
   paymentsDown = true;
 
   // Verify cannot tell when the parent paid: it asks them to refresh and records nothing.
@@ -335,7 +335,7 @@ test('once Cashfree payment details are readable again, verification confirms th
   at('2026-11-02T08:20');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
   paymentsDown = true;
   assert.equal((await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parentAuth))).status, 503);
 
@@ -348,7 +348,7 @@ test('a menu disabled (or turned into a holiday) after checkout makes the paymen
   at('2026-11-01T10:00');
   const { orderId } = await (await startCheckout()).json();
   fs.seed('menus', 'menu_2026-11-02_primary', { ...fs.getDoc('menus', 'menu_2026-11-02_primary'), isHoliday: true });
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-01T10:02:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-01T10:02:00+05:30' };
   const result = await verifyOrder(orderId);
   assert.equal(result.state, 'EXCEPTION');
   assert.equal(result.issueState, 'PENDING_REVIEW');
@@ -366,7 +366,7 @@ test("a parent cannot verify or view another parent's order", async () => {
   const res = await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, other));
   assert.equal(res.status, 404);
 
-  cf = { status: 'PAID', amount: 80, paidAt: '2026-11-01T10:02:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-01T10:02:00+05:30' };
   await verifyOrder(orderId);
   const theirs = await (await listOrders(jsonRequest(`/api/parent/orders?id=${orderId}`, 'GET', undefined, other))).json();
   assert.deepEqual(theirs.orders, []);

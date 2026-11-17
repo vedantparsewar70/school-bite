@@ -68,9 +68,7 @@ test('invalid input is refused with a clear message and nothing is saved', async
     [recipe({ price: 0 }), /valid rate/],
     [recipe({ price: -5 }), /valid rate/],
     [recipe({ price: 'abc' }), /valid rate/],
-    [recipe({ price: '' }), /valid rate/],
     [recipe({ price: 10001 }), /valid rate/],
-    [recipe({ price: undefined }), /valid rate/],
     [recipe({ category: 'DINNER' }), /category/],
     [recipe({ isVegetarian: 'yes' }), /Vegetarian/],
   ];
@@ -84,6 +82,14 @@ test('invalid input is refused with a clear message and nothing is saved', async
   }));
   assert.equal(malformed.status, 400);
   assert.equal(fs.list('meals').length, 1, 'nothing saved');
+});
+
+test('a recipe needs no price (the brunch price is set by class); an empty extra price is saved as none', async () => {
+  for (const [name, price] of [['Veg Pulao + Raita', undefined], ['Poha Plate', '']] as const) {
+    const res = await add(recipe({ name, price }));
+    assert.equal(res.status, 201, name);
+    assert.equal(fs.list('meals').find((m) => m.name === name)?.price, null);
+  }
 });
 
 test('only staff and admins can add recipes', async () => {

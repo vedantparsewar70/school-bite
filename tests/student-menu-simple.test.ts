@@ -89,7 +89,7 @@ afterEach(() => {
 
 // --- Shows what parents see -------------------------------------------------------------------
 
-test('each class card shows the same entry as the parent menu, with the dish price, portions and paid orders only', async () => {
+test('each class card shows the same entry as the parent menu, with the class price, portions and paid orders only', async () => {
   for (const c of CLASSES) menu(WED, c);
   // An older duplicate for Primary that parents do not see, and an older "all classes" entry on Thursday.
   fs.seed('menus', `meal_egg_${WED}`, { id: `meal_egg_${WED}`, date: WED, studentCategory: 'Primary', mealId: 'meal_egg', isActive: true, availableQuantity: 10, updatedAt: '2020-01-01' });
@@ -101,7 +101,7 @@ test('each class card shows the same entry as the parent menu, with the dish pri
   const primary = await card(WED, 'Primary');
   assert.equal(primary.state, 'ON_SALE');
   assert.equal(primary.mealName, 'Dal Khichdi');
-  assert.equal(primary.price, 80);
+  assert.equal(primary.price, 75, 'the Primary class price, not the dish price');
   assert.equal(primary.isVegetarian, true);
   assert.equal(primary.ordered, 3, 'paid, not cancelled portions');
   assert.equal(primary.children, 2);
@@ -119,7 +119,7 @@ test('each class card shows the same entry as the parent menu, with the dish pri
   const thu = await card(THU, 'Secondary');
   assert.equal(thu.shared, true);
   assert.equal(thu.mealName, 'Poha');
-  assert.equal(thu.price, 60);
+  assert.equal(thu.price, 90, 'an older entry shared by all classes still shows the Secondary class price');
 });
 
 test('day status: all on sale / some / none / holiday / Sunday; past and closed days are view-only', async () => {
@@ -298,7 +298,7 @@ test('Staff → Student Menu and Admin → Menu use the same editor; Delete is a
   for (const gone of ['Publish a catalog recipe', 'Timetable Reference', 'Saved Menu', 'October 2026 timetable', 'OCTOBER_2026']) {
     assert.ok(!editor.includes(gone) && !staffPage.includes(gone), `removed: ${gone}`);
   }
-  for (const text of ['Price changes apply to new orders only, on every day this dish is on sale.', "Edits this dish everywhere it&apos;s used.", 'Save for the other classes only', 'Remove {sheet.card.mealName} from']) {
+  for (const text of ['Extra price changes apply to new orders only, on every day this dish is sold as an extra.', "Edits this dish everywhere it&apos;s used.", 'Save for the other classes only', 'Remove {sheet.card.mealName} from']) {
     assert.ok(editor.includes(text), `shows: ${text}`);
   }
   // Every text input on the editor is 16px.

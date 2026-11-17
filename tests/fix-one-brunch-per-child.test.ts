@@ -46,7 +46,7 @@ async function payAndVerify(orderId: string, amount: number) {
 
 test('a child who already has a paid brunch that day cannot be booked again at checkout; a sibling still can', async () => {
   const first = await (await start([brunch()], 'K1')).json();
-  assert.equal((await payAndVerify(first.orderId, 80)).state, 'PAID');
+  assert.equal((await payAndVerify(first.orderId, 75)).state, 'PAID');
 
   const again = await start([brunch()], 'K2');
   assert.equal(again.status, 400);
@@ -62,19 +62,19 @@ test('two open payments for the same child and day: only one brunch is booked, t
   const a = await (await start([brunch()], 'K1')).json();
   const b = await (await start([brunch(), brunch('stu_2', 'Arjun Sharma')], 'K2')).json();
   assert.equal(cf.created.length, 2);
-  assert.equal((await payAndVerify(a.orderId, 80)).state, 'PAID');
-  const second = await payAndVerify(b.orderId, 160);
+  assert.equal((await payAndVerify(a.orderId, 75)).state, 'PAID');
+  const second = await payAndVerify(b.orderId, 150);
   assert.notEqual(second.state, 'PAID');
   assert.equal(fs.list('orderItems').filter((i) => i.studentId === 'stu_1' && i.date === DAY).length, 1);
   assert.equal(fs.getDoc('payment_exceptions', b.orderId)?.reason, 'ALREADY_ORDERED');
   const refunded = cf.refunds.filter((r) => r.orderId === b.orderId);
   assert.equal(refunded.length, 1, 'refunded once');
-  assert.equal(refunded[0].refund_amount, 160, 'in full');
+  assert.equal(refunded[0].refund_amount, 150, 'in full');
 });
 
 test('a cancelled earlier order does not block booking the child again', async () => {
   const first = await (await start([brunch()], 'K1')).json();
-  await payAndVerify(first.orderId, 80);
+  await payAndVerify(first.orderId, 75);
   fs.seed('orders', first.orderId, { ...fs.getDoc('orders', first.orderId), orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED' });
   assert.equal((await start([brunch()], 'K2')).status, 200);
 });

@@ -51,7 +51,7 @@ test('two open checkouts (3 and 2 bananas): only the first is booked, the second
   // The child's brunch is already paid. Then two extras-only checkouts start before either is paid,
   // so each passes the checkout check on its own.
   const brunch = await (await start([line('meal_dal')], 'K0')).json();
-  cf.paid[brunch.orderId] = 80;
+  cf.paid[brunch.orderId] = 75;
   assert.equal((await (await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId: brunch.orderId }, parent))).json()).state, 'PAID');
   const a = await (await start([line('meal_banana', 3, 'EXTRA')], 'K1')).json();
   // (A different cart, so it is a separate payment; an identical cart would reuse the open one.)
@@ -73,7 +73,7 @@ test('two open checkouts (3 and 2 bananas): only the first is booked, the second
 
 test('checkout still refuses a 4th banana once 3 are paid', async () => {
   const a = await (await start([line('meal_dal'), line('meal_banana', 3, 'EXTRA')], 'K1')).json();
-  cf.paid[a.orderId] = 110;
+  cf.paid[a.orderId] = 105;
   await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId: a.orderId }, parent));
   const more = await start([line('meal_banana', 1, 'EXTRA')], 'K2');
   assert.equal(more.status, 400);

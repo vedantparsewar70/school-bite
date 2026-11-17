@@ -56,7 +56,7 @@ test('a new catalog recipe is not on sale until staff publish it for a date; the
   assert.equal(seen.length, 1);
   assert.equal(seen[0].mealId, mealId);
   assert.equal(seen[0].isAvailable, true);
-  assert.equal(seen[0].meal.price, 85);
+  assert.equal(seen[0].meal.price, 75, 'parents see the Primary class price, not the dish price');
 
   const cart = await validateCartAvailability([{ mealId, date: DAY, quantity: 1, studentCategory: 'Primary' } as never]);
   assert.equal(cart.valid, true, 'checkout accepts it');

@@ -8,7 +8,6 @@ import { formatDatePretty } from '@/lib/utils';
 type Outcome = 'create' | 'unchanged' | 'replace' | 'conflict-has-orders' | 'conflict-differs' | 'conflict-shared' | 'skip-past' | 'skip-blank' | 'skip-error';
 
 interface DishDecision {
-  price: string;
   isVegetarian: '' | 'yes' | 'no';
   allergens: string;
   noAllergens: boolean;
@@ -45,7 +44,6 @@ export default function MonthlyMenuImportPage() {
       const dishes: Record<string, unknown> = {};
       for (const [key, d] of Object.entries(decisions)) {
         dishes[key] = {
-          price: d.price === '' ? undefined : Number(d.price),
           isVegetarian: d.isVegetarian === '' ? undefined : d.isVegetarian === 'yes',
           allergens: d.allergens,
           noAllergens: d.noAllergens,
@@ -71,7 +69,7 @@ export default function MonthlyMenuImportPage() {
     }
   };
 
-  const decisionFor = (key: string): DishDecision => decisions[key] || { price: '', isVegetarian: '', allergens: '', noAllergens: false };
+  const decisionFor = (key: string): DishDecision => decisions[key] || { isVegetarian: '', allergens: '', noAllergens: false };
   const setDecision = (key: string, patch: Partial<DishDecision>) => setDecisions((prev) => ({ ...prev, [key]: { ...decisionFor(key), ...patch } }));
 
   const errors = (result?.issues || []).filter((i: any) => i.severity === 'error');
@@ -165,7 +163,7 @@ export default function MonthlyMenuImportPage() {
             <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
               <h2 className="font-bold text-slate-900">2. New dishes ({newDishes.length})</h2>
               <p className="text-sm text-slate-600">
-                New dishes: enter the price and allergens for each one.
+                New dishes: choose veg or non-veg and enter the allergens for each one. No price is needed: the brunch price is set by class on the Student Menu page.
               </p>
               <div className="space-y-3">
                 {newDishes.map((d: any) => {
@@ -177,18 +175,7 @@ export default function MonthlyMenuImportPage() {
                         <p className="font-bold text-slate-900 text-sm">{d.name}</p>
                         <p className="text-xs text-slate-500">{d.categories.join(', ')} · {d.dates.length} day(s)</p>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <label className="text-xs font-semibold text-slate-700">
-                          Price (₹)
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="1"
-                            value={v.price}
-                            onChange={(e) => setDecision(d.key, { price: e.target.value })}
-                            className="mt-1 w-full px-3 py-2.5 rounded-lg border border-slate-300 text-base"
-                          />
-                        </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <label className="text-xs font-semibold text-slate-700">
                           Vegetarian?
                           <select

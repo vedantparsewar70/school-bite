@@ -8,6 +8,8 @@ import { displayMenuEntry, type MenuEntryLike } from '@/lib/menu-entries';
 import { extrasOn, MAX_EXTRA_PER_CHILD } from '@/lib/menu-extras';
 import { deadlineFor, type MenuEntry } from '@/lib/menu-orders';
 import { normalizeStudentCategory } from '@/lib/menu-stock';
+import { brunchPriceFor, dishPrice } from '@/lib/brunch-prices';
+import { getBrunchPrices } from '@/lib/brunch-prices-server';
 
 export function clearMenuCache() {
   // Authoritative database querying is always real-time
@@ -42,6 +44,7 @@ export async function GET(req: Request) {
     }
 
     const allowAllergyOrdersSettingPromise = getSystemSetting('ALLOW_ALLERGY_ORDERS', 'true');
+    const brunchPricesPromise = getBrunchPrices();
 
     // Optimize: Fetch child allergies and student category
     let studentAllergiesList: string[] = [];
@@ -115,6 +118,12 @@ export async function GET(req: Request) {
 
     const allowAllergyOrdersSetting = await allowAllergyOrdersSettingPromise;
     const allowAllergyOrders = allowAllergyOrdersSetting === 'true';
+    const brunchPrices = await brunchPricesPromise;
+    // The main brunch price is the class price: the child's class, else the requested class, else the
+    // entry's own class (an older entry shared by 'ALL' classes has no single price without a class).
+    const viewCategory = filterCategory ? normalizeStudentCategory(filterCategory) : null;
+    const mainPriceFor = (entryCategory: unknown) =>
+      brunchPriceFor(viewCategory && viewCategory !== 'ALL' ? viewCategory : normalizeStudentCategory(String(entryCategory || 'ALL')), brunchPrices);
 
     const evaluatedMenus = menus.map((item) => {
       const isHoliday = Boolean((item as any).isHoliday);
@@ -180,6 +189,7 @@ export async function GET(req: Request) {
         isDeadlinePassed: deadlinePassed,
         meal: {
           ...mealObj,
+          price: mainPriceFor((item as any).studentCategory),
           allergensList,
           imageUrl: null, // No photo
         },
@@ -202,7 +212,8 @@ export async function GET(req: Request) {
         const deadline = deadlineFor(allMenus as unknown as MenuEntry[], date, cat);
         const deadlinePassed = date < todayStr || isDeadlinePassed(date, deadline);
         extras = onDay
-          .filter((e) => byId.has(e.mealId))
+          // An extra is sold at its dish's own price; a dish with no price is not offered.
+          .filter((e) => byId.has(e.mealId) && dishPrice(byId.get(e.mealId)) !== null)
           .map((e) => {
             const meal: any = byId.get(e.mealId);
             const allergensList = (meal.mealAllergens || []).map((ma: any) => ma.allergen?.name).filter(Boolean);
@@ -230,7 +241,7 @@ export async function GET(req: Request) {
               meal: {
                 id: meal.id,
                 name: meal.name,
-                price: Number(meal.price),
+                price: dishPrice(meal),
                 category: meal.category,
                 isVegetarian: meal.isVegetarian !== false,
                 description: meal.description || null,

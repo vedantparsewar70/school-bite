@@ -298,11 +298,11 @@ test('4e: two parents buy the LAST portion: no reservation at checkout; second p
   assert.equal(ex.reason, 'STOCK_UNAVAILABLE');
   assert.equal(ex.refundState, 'REFUND_PENDING', 'refund requested automatically');
   assert.equal(refundsCreated.length, 1);
-  assert.equal(refundsCreated[0].refund_amount, 80);
+  assert.equal(refundsCreated[0].refund_amount, 75);
   const v = await verifyOrder(loser, loserAuth);
   assert.equal(v.state, 'EXCEPTION');
   assert.match(v.message, /sold out/);
-  assert.match(v.message, /refund of ₹80 has been started/);
+  assert.match(v.message, /refund of ₹75 has been started/);
   assert.equal((await parentIssues(loserAuth))[0].state, 'REFUND_PENDING');
 });
 
@@ -444,7 +444,7 @@ test('11: refund API down during an automatic sold-out refund: webhook returns 2
   assert.equal(needsAttention(ex, Date.now() + 16 * 60 * 1000), true);
   // Parent is told the refund "has been started", although none exists at the gateway yet.
   const v = await verifyOrder(orderId);
-  assert.match(v.message, /refund of ₹80 has been started/);
+  assert.match(v.message, /refund of ₹75 has been started/);
 
   // Recovery: a verify after the 2-minute lease retries it (no scheduler does this by itself).
   refundApiDown = false;

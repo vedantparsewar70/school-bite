@@ -6,6 +6,7 @@ import { effectiveMenuEntry } from './menu-entries';
 import { menuCategorySlug, normalizeStudentCategory } from './menu-stock';
 import { closedMessage, deadlineFor, hasOrdersMessage, menuEntriesFor, orderingClosed, type MenuEntry } from './menu-orders';
 import { APP_TIMEZONE, getTodayString, isDeadlinePassed, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import { dishPrice } from './brunch-prices';
 
 /**
  * EXTRAS: optional add-ons (Banana, Buttermilk…) on top of a class's main brunch for a day.
@@ -15,7 +16,8 @@ import { APP_TIMEZONE, getTodayString, isDeadlinePassed, isSundayDate, SUNDAY_CL
  * reads or writes extras. An extra entry is one dish for one class on one date:
  *   menuExtras/extra_<date>_<class>_<mealId> { date, studentCategory, mealId, isActive,
  *     maxQuantity, availableQuantity, orderingDeadline, updatedAt, updatedBy }
- * Name, price, veg flag and allergens come from the dish, as for the main dish. Order lines for an
+ * Name, price, veg flag and allergens come from the dish (an extra keeps its dish price; the main
+ * brunch is priced by class, lib/brunch-prices.ts). Order lines for an
  * extra carry kind: 'EXTRA' and menuExtraId (menuId null); main lines are unchanged.
  *
  * Rules: an extra is ordered only for a child who has that day's main brunch (same cart or an
@@ -114,6 +116,8 @@ export async function addExtra(
   const mealSnap = await firestore.collection('meals').doc(mealId).get();
   const meal = mealSnap.data();
   if (!mealSnap.exists || !meal?.name || mealId === 'meal_holiday_no_brunch') return { status: 404, body: { error: 'That dish is not in the dish list.' } };
+  // An extra is sold at the dish's own price (the main brunch is priced by class).
+  if (dishPrice(meal) === null) return { status: 400, body: { error: `Set ${meal.name}'s extra price first (Dishes → Edit everywhere).`, code: 'NO_EXTRA_PRICE' } };
 
   const entries = await menuEntriesFor((t) => t.get(), firestore, date);
   for (const cat of classes) {

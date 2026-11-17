@@ -2,6 +2,8 @@ import prisma from '@/lib/prisma';
 import { isDeadlinePassed, APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from '@/lib/utils';
 import { effectiveMenuEntry } from '@/lib/menu-entries';
 import { checkExtraLines, isExtraLine } from '@/lib/menu-extras';
+import { mainOrExtraPrice } from '@/lib/brunch-prices';
+import { getBrunchPrices } from '@/lib/brunch-prices-server';
 
 export interface MealItemAvailability {
   mealId: string;
@@ -11,7 +13,12 @@ export interface MealItemAvailability {
   isActive: boolean;
   isDeadlinePassed: boolean;
   availableQuantity: number;
+  /** Main brunch: the child's class price; extra: the dish's price (0 when it cannot be priced). */
   serverPrice: number;
+  /** The cart line's child (prices differ by class, so the cart keys prices per child). */
+  studentId?: string | null;
+  /** 'EXTRA' for an extra line (an extra and a main brunch are priced differently). */
+  kind?: 'EXTRA';
   menuId?: string | null;
   /** Extra lines (kind EXTRA): the menuExtras entry; menuId stays null. */
   menuExtraId?: string | null;
@@ -66,6 +73,7 @@ export async function validateCartAvailability(
     where: { id: { in: mealIds } },
   });
   const mealsMap = new Map(meals.map((m: any) => [m.id, m]));
+  const brunchPrices = await getBrunchPrices();
 
   // 2. Fetch date-specific menu entries for all requested dates
   const dateMenuRecords = await prisma.menu.findMany({
@@ -113,7 +121,7 @@ export async function validateCartAvailability(
   for (const item of cartItems) {
     const meal = mealsMap.get(item.mealId);
     const mealName = meal?.name || item.mealName || 'Selected Meal';
-    const serverPrice = Number(meal?.price || 0);
+    const serverPrice = mainOrExtraPrice({ kind: item.kind, studentCategory: normalizeCat(item.studentCategory) }, meal, brunchPrices) ?? 0;
 
     // Validate date format & past date
     if (!item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) {
@@ -328,6 +336,12 @@ export async function validateCartAvailability(
       menuId: menuRecord.id || null,
     });
   }
+
+  // One result per cart line, in order: tag each with its child (prices are per class).
+  itemResults.forEach((r, i) => {
+    r.studentId = cartItems[i]?.studentId ? String(cartItems[i].studentId) : null;
+    if (isExtraLine(cartItems[i])) r.kind = 'EXTRA';
+  });
 
   const firstUnavailable = itemResults.find((it) => !it.isAvailable) || null;
   const valid = !firstUnavailable;

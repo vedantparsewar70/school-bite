@@ -41,7 +41,7 @@ const pay = (key: string) => checkout(jsonRequest('/api/parent/orders', 'POST', 
 test('the old key answers PAYMENT_EXCEPTION; a new key opens a fresh, fully checked payment', async () => {
   const first = await (await pay('K1')).json();
   fs.seed('menus', MENU, { ...fs.getDoc('menus', MENU), availableQuantity: 0 }); // sold out meanwhile
-  cf.paid[first.orderId] = 80;
+  cf.paid[first.orderId] = 75;
   await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId: first.orderId }, parent));
   assert.equal(fs.getDoc('payment_exceptions', first.orderId)?.reason, 'STOCK_UNAVAILABLE');
 

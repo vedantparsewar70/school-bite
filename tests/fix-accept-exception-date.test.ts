@@ -51,7 +51,7 @@ async function latePayment(): Promise<string> {
   }, parent));
   const { orderId } = await res.json();
   at(`${TUE}T08:40`);
-  cf.paid[orderId] = 80;
+  cf.paid[orderId] = 75;
   await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parent));
   assert.equal(fs.getDoc('payment_exceptions', orderId)?.reason, 'PAID_AFTER_CUTOFF');
   return orderId;

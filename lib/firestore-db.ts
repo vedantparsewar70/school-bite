@@ -87,7 +87,8 @@ export interface DbMeal {
   ingredients?: string | null;
   allergens?: string | null;
   calories?: number | null;
-  price: number;
+  /** Extra price (used only when sold as an extra; a main brunch is priced by class). Null = none. */
+  price: number | null;
   imageUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;

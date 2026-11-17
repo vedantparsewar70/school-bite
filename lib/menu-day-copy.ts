@@ -8,12 +8,15 @@ import { closedMessage, hasOrdersMessage, menuEntriesFor, orderingClosed, paidOr
 import { publishDish } from './menu-publish';
 import { invalidateStaticCache } from './firestore-db';
 import { isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import { dishPrice } from './brunch-prices';
 
 /**
- * "Edit for this day": a copy of the dish (new name, price or veg flag) used only on one date for the
+ * "Edit for this day": a copy of the dish (new name or veg flag) used only on one date for the
  * chosen classes. Other days keep the original. Same rules as Change dish (refused while paid orders
  * exist; not on closed days, holidays or Sundays). Copies are marked dayOnly, so the monthly import
  * never matches them by name and they stay out of the normal dish lists.
+ * A main brunch is priced by class (lib/brunch-prices.ts), so the price is optional: when it is left
+ * out the copy keeps the original dish's price (an older client may still send one; it is checked).
  */
 
 type Result = { status: number; body: Record<string, unknown> };
@@ -24,7 +27,7 @@ export async function editDishForDay(
     studentCategory: unknown;
     mealId: unknown;
     name: unknown;
-    price: unknown;
+    price?: unknown;
     isVegetarian: unknown;
     description?: unknown;
     actorId: string;
@@ -43,8 +46,9 @@ export async function editDishForDay(
   if (classes.length === 0) return { status: 400, body: { error: 'Please choose Pre-primary, Primary, Secondary or all classes.' } };
   const name = typeof input.name === 'string' ? input.name.trim().replace(/\s+/g, ' ') : '';
   if (name.length < 2 || name.length > 100) return { status: 400, body: { error: 'Please write the dish name (2 to 100 characters).' } };
+  const priceGiven = input.price !== undefined && input.price !== null && input.price !== '';
   const price = Number(input.price);
-  if (!Number.isFinite(price) || price <= 0 || price > 10000) return { status: 400, body: { error: 'Please enter a price above ₹0 (up to ₹10,000).' } };
+  if (priceGiven && (!Number.isFinite(price) || price <= 0 || price > 10000)) return { status: 400, body: { error: 'Please enter a price above ₹0 (up to ₹10,000).' } };
   if (typeof input.isVegetarian !== 'boolean') return { status: 400, body: { error: 'Veg or non-veg must be chosen.' } };
   const description = typeof input.description === 'string' ? input.description.trim().slice(0, 300) : '';
   if (typeof mealId !== 'string' || !mealId) return { status: 400, body: { error: 'Please choose the dish to copy.' } };
@@ -81,7 +85,7 @@ export async function editDishForDay(
   }
 
   const now = new Date().toISOString();
-  const fields = { name, price, isVegetarian: input.isVegetarian, description: description || null, updatedAt: now, updatedBy: actorId };
+  const fields = { name, ...(priceGiven ? { price } : {}), isVegetarian: input.isVegetarian, description: description || null, updatedAt: now, updatedBy: actorId };
 
   // Already a copy for this day, used by exactly these classes: edit it in place.
   const usingSource = STUDENT_CATEGORIES.filter((cat) => (effectiveMenuEntry(entries, date, cat) as MenuEntry | null)?.mealId === mealId);
@@ -101,6 +105,7 @@ export async function editDishForDay(
   await firestore.collection('meals').doc(copyId).set({
     id: copyId,
     ...fields,
+    ...(priceGiven ? {} : { price: dishPrice(source) }),
     category: source.category || 'LUNCH',
     allergens: source.allergens || null,
     ingredients: source.ingredients || null,

@@ -23,6 +23,8 @@ import { savePendingParentOrder, fulfillParentOrder, generateParentOrderId } fro
 import { isAutoRefundReason, listOwnPaymentIssues, refundPaymentException } from '@/lib/payment-exceptions';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
+import { mainOrExtraPrice } from '@/lib/brunch-prices';
+import { getBrunchPrices } from '@/lib/brunch-prices-server';
 import { MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
 
 /** An error whose message is written for the parent and safe to show. */
@@ -581,7 +583,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Authoritative Server-side Price & Allergy Evaluation
+    // Authoritative Server-side Price & Allergy Evaluation.
+    // Main brunch: the price of the child's class (from the student record). Extra: the dish's own price.
+    const brunchPrices = await getBrunchPrices();
     let totalAmount = 0;
     const evaluatedCartItems = cartItemsWithCategory.map((item, index) => {
       const meal = mealsMap.get(item.mealId);
@@ -589,7 +593,10 @@ export async function POST(req: Request) {
         throw new CheckoutError(`${item.mealName || 'A dish'} in your cart is no longer on the menu. Please remove it and try again.`);
       }
 
-      const serverUnitPrice = Number(meal.price || 0);
+      const serverUnitPrice = mainOrExtraPrice(item, meal, brunchPrices);
+      if (serverUnitPrice === null) {
+        throw new CheckoutError(`${meal.name || 'A dish'} in your cart has no price yet. Please remove it and try again.`);
+      }
       const itemQuantity = Math.max(1, parseInt(String(item.quantity), 10) || 1);
       totalAmount += serverUnitPrice * itemQuantity;
 
