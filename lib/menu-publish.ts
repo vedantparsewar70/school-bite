@@ -21,7 +21,7 @@ export { hasOrdersMessage, paidChildrenFor, paidOrdersFor };
  * The single way to put a catalog dish on the menu for one date: Staff → Kitchen, Admin → Menu and
  * the older menu API all call this, and it runs the monthly import's rules for that day. So every
  * tool keeps one menu per date and student category:
- * - the recipe's own ID and price are used (no new recipe);
+ * - the recipe's own ID is used (no new recipe); the brunch price comes from the class (lib/brunch-prices.ts);
  * - entries created by any tool are checked, not just the standard ID;
  * - an entry with orders is never changed;
  * - a different entry without orders is replaced only when `replace` is true (others are switched

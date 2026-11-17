@@ -229,7 +229,7 @@ test('one payment for brunch + extras: server prices, stock taken from the extra
   const orderId = await payFor([line('meal_dal'), line('meal_banana', 2, 'EXTRA'), line('meal_buttermilk', 1, 'EXTRA')]);
 
   assert.equal(created.length, 1, 'one Cashfree order');
-  assert.equal(created[0].order_amount, 80 + 2 * 10 + 15, 'server prices, not the cart price of ₹1');
+  assert.equal(created[0].order_amount, 75 + 2 * 10 + 15, 'server prices (Primary class price + extra dish prices), not the cart price of ₹1');
   const items = fs.list('orderItems').filter((it) => it.orderId === orderId);
   const banana = items.find((it) => it.mealId === 'meal_banana')!;
   assert.deepEqual([banana.kind, banana.menuExtraId, banana.menuId, banana.unitPrice, banana.quantity], ['EXTRA', BANANA, null, 10, 2]);
@@ -282,7 +282,7 @@ test('sold-out, switched-off and late extras are refused before any payment', as
   // A checkout without extras is exactly as before.
   const plain = await startCheckout([line('meal_dal')]);
   assert.equal(plain.status, 200);
-  assert.equal(created[0].order_amount, 80);
+  assert.equal(created[0].order_amount, 75);
 });
 
 test('an extra cannot be added after the main-dish deadline of the class, even with the brunch already paid', async () => {
@@ -335,7 +335,7 @@ test('Prepare lists extras separately; Serve shows them and one tick serves ever
   assert.equal(fs.getDoc('orders', orderId)?.serviceDates?.[DAY]?.status, 'COLLECTED');
 
   const r = await (await reports(jsonRequest('/api/admin/reports', 'GET', undefined, admin))).json();
-  assert.equal(r.summary.totalRevenue, 80 + 20 + 80, 'revenue includes extras');
+  assert.equal(r.summary.totalRevenue, 75 + 20 + 75, 'revenue includes extras');
   assert.equal(r.summary.totalMealsSold, 2);
   assert.equal(r.summary.totalExtrasSold, 2);
   assert.deepEqual(r.mostOrderedExtras.map((e: any) => [e.mealName, e.count]), [['Banana', 2]]);
@@ -352,7 +352,7 @@ test('cancelling an order with extras refunds the whole amount and puts both sto
   };
   await cancelOrderWithRefund({ orderId, cancelledBy: 'usr_admin', blockedStatuses: ['COLLECTED'] }, fs.asFirestore(), refunds);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].amount, 80 + 30, 'the whole order, extras included');
+  assert.equal(calls[0].amount, 75 + 30, 'the whole order, extras included');
   assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CANCELLED');
   assert.equal(fs.getDoc('menuExtras', BANANA)?.availableQuantity, 10);
   assert.equal(fs.getDoc('menus', MAIN)?.availableQuantity, 50);

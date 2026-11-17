@@ -107,9 +107,9 @@ test('the monthly import appears in the editor exactly as parents see it (dishes
 
   const monday = await day(MON);
   assert.deepEqual(monday.classes.map((c: any) => [c.mealName, c.price, c.ordered, c.maxQuantity, c.availableQuantity]), [
-    [SOYA, 80, 0, 50, 50],
-    [SOYA, 80, 0, 50, 50],
-    [SOYA, 80, 0, 50, 50],
+    [SOYA, 60, 0, 50, 50],
+    [SOYA, 75, 0, 50, 50],
+    [SOYA, 90, 0, 50, 50],
   ]);
   await sameForParents(MON);
   await sameForParents('2026-11-05');
@@ -133,20 +133,22 @@ test('Change dish, Edit for this day and Edit everywhere each have their own eff
   assert.equal(copy.status, 200);
   const copyId = (await copy.json()).mealId;
   assert.deepEqual((await day(MON)).classes.map((c: any) => [c.mealName, c.price]), [
-    [SOYA, 80],
+    [SOYA, 60],
     ['Veg Pulao + Raita', 75],
-    ['Soyabean Masala + Chapati + Salad', 70],
+    ['Soyabean Masala + Chapati + Salad', 90],
   ]);
-  assert.equal(fs.getDoc('meals', soya)?.price, 80, 'catalogue dish unchanged');
-  assert.deepEqual((await parentSees(WED, 'Primary')).map((x) => [x.name, x.price]), [[SOYA, 80]], 'other day keeps the original dish');
+  assert.equal(fs.getDoc('meals', soya)?.price, null, 'catalogue dish unchanged (an imported dish has no extra price)');
+  assert.deepEqual((await parentSees(WED, 'Primary')).map((x) => [x.name, x.price]), [[SOYA, 75]], 'other day keeps the original dish');
   await sameForParents(MON);
 
   // Edit everywhere (catalogue dish): every day using it changes, but not the day-only copy.
-  assert.equal((await editMeal(jsonRequest('/api/admin/meals', 'PUT', { id: soya, name: SOYA, price: 85, isVegetarian: true }, staff))).status, 200);
-  assert.equal((await card(MON, 'Pre-primary')).price, 85);
-  assert.equal((await card(MON, 'Secondary')).price, 70, 'the day-only copy keeps its own price');
-  assert.deepEqual((await parentSees(WED, 'Primary')).map((x) => x.price), [85], 'every other day using the dish changes too');
-  assert.equal((await card(WED, 'Primary')).price, 85);
+  // Its price is only the extra price now: the brunch keeps the class price.
+  assert.equal((await editMeal(jsonRequest('/api/admin/meals', 'PUT', { id: soya, name: SOYA, price: 85, isVegetarian: false }, staff))).status, 200);
+  assert.deepEqual([(await card(MON, 'Pre-primary')).isVegetarian, (await card(MON, 'Pre-primary')).price], [false, 60]);
+  assert.deepEqual([(await card(MON, 'Secondary')).isVegetarian, (await card(MON, 'Secondary')).price], [true, 90], 'the day-only copy keeps its own dish');
+  assert.deepEqual((await parentSees(WED, 'Primary')).map((x) => x.price), [75], 'still the class price');
+  assert.equal((await card(WED, 'Primary')).isVegetarian, false, 'every other day using the dish changes too');
+  assert.equal(fs.getDoc('meals', soya)?.price, 85, 'saved as the extra price');
   assert.equal(fs.getDoc('meals', copyId)?.price, 70);
   await sameForParents(MON);
 });

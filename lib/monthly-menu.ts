@@ -20,7 +20,8 @@ import type { XlsxSheet } from './xlsx-reader';
  * - a blank cell (not part of a merged range) stays unfilled and is flagged, never bookable;
  * - merged cells apply their value to every cell they cover, as Excel displays them;
  * - weekday/date mismatches, invalid or duplicate dates are errors and block publishing;
- * - new dishes need a price and an explicit allergen decision from staff before publishing.
+ * - new dishes need a veg/non-veg and an explicit allergen decision from staff before publishing;
+ * - no prices are asked: the main brunch is priced by class (lib/brunch-prices.ts).
  */
 
 import { STUDENT_CATEGORIES, type StudentCategory } from './student-category';
@@ -202,6 +203,7 @@ export function parseMonthlyMenu(sheet: XlsxSheet): MonthlyMenuPlan {
 // ---------------------------------------------------------------------------------------------
 
 export interface NewDishInput {
+  /** Ignored (older clients may still send it): the main brunch is priced by class. */
   price?: number | string;
   isVegetarian?: boolean;
   /** Comma-separated allergens, as staff typed them. */
@@ -237,6 +239,7 @@ export interface DishSummary {
   name: string;
   mealId: string;
   existing: boolean;
+  /** The dish's own (extra) price, if any; not used for the main brunch, which is priced by class. */
   price: number | null;
   allergens: string | null;
   isVegetarian: boolean | null;
@@ -272,7 +275,7 @@ function newMealId(name: string): string {
 
 /**
  * Computes (and unless dryRun, writes) the menus for a plan. Writes happen only when the plan
- * has no errors and every new dish has a valid price and an allergen decision. Existing menus
+ * has no errors and every new dish has a veg and allergen decision. Existing menus
  * that already have orders are never changed.
  */
 export async function applyMonthlyMenu(
@@ -307,7 +310,7 @@ export async function applyMonthlyMenu(
       if (!dish) {
         const existing = cell.mealId ? mealsById.get(cell.mealId) : mealsByKey.get(key);
         const input = options.dishes?.[key] || {};
-        const price = existing ? Number(existing.price) : Number(input.price);
+        const price = existing ? Number(existing.price) : NaN;
         const typedAllergens = typeof input.allergens === 'string' ? input.allergens.split(/[,;]/).map((a) => a.trim()).filter(Boolean).join(', ') : '';
         dish = {
           key,
@@ -322,13 +325,8 @@ export async function applyMonthlyMenu(
           problems: [],
         };
         if (!existing) {
-          if (input.price === undefined || input.price === '' || !(Number(input.price) > 0) || Number(input.price) > 10000) {
-            dish.problems.push('Price needed');
-          }
           if (!typedAllergens && input.noAllergens !== true) dish.problems.push('Allergens needed (or confirm none)');
           if (typeof input.isVegetarian !== 'boolean') dish.problems.push('Confirm vegetarian or not');
-        } else if (!(dish.price && dish.price > 0)) {
-          dish.problems.push('Existing meal has no valid price; set it in Meals first');
         }
         dishes.set(key, dish);
       }
@@ -522,7 +520,7 @@ export async function applyMonthlyMenu(
         name: dish.name,
         description: dish.name,
         category: 'LUNCH',
-        price: Math.round(Number(input.price) * 100) / 100,
+        price: null, // no extra price: the main brunch is priced by class
         isVegetarian: input.isVegetarian === true,
         allergens: dish.allergens,
         ingredients: null,

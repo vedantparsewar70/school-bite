@@ -7,6 +7,11 @@ const MEAL_CATEGORIES = ['BREAKFAST', 'LUNCH', 'SNACK', 'BEVERAGE', 'BRUNCH'];
 /** Recipe names are compared without case or repeated spaces, so "Veg Pulao" and "veg  pulao" match. */
 const recipeNameKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
+/** An empty price (no extra price set). */
+function noPrice(price: unknown): boolean {
+  return price === null || price === undefined || (typeof price === 'string' && price.trim() === '');
+}
+
 function isValidMealPrice(price: unknown): boolean {
   const value = Number(price);
   return price !== null && price !== '' && Number.isFinite(value) && value > 0 && value <= 10000;
@@ -76,8 +81,10 @@ export async function POST(req: Request) {
     if (name.length < 2 || name.length > 100) {
       return NextResponse.json({ error: 'Please enter a recipe name (2-100 characters).' }, { status: 400 });
     }
-    if (!isValidMealPrice(price)) {
-      return NextResponse.json({ error: 'Please enter a valid rate greater than ₹0 (up to ₹10,000).' }, { status: 400 });
+    // The price is the EXTRA price (used only when the dish is sold as an extra); a main brunch is
+    // priced by class (lib/brunch-prices.ts), so a dish may have no price.
+    if (!noPrice(price) && !isValidMealPrice(price)) {
+      return NextResponse.json({ error: 'Please enter a valid rate greater than ₹0 (up to ₹10,000), or leave it empty.' }, { status: 400 });
     }
     const category = typeof rawCategory === 'string' ? rawCategory.toUpperCase().trim() : '';
     if (!MEAL_CATEGORIES.includes(category)) {
@@ -116,7 +123,7 @@ export async function POST(req: Request) {
         ingredients: typeof ingredients === 'string' && ingredients.trim() ? ingredients.trim() : null,
         allergens: finalAllergens.join(', ') || null,
         calories: calories ? Number(calories) : null,
-        price: Number(price),
+        price: noPrice(price) ? null : Number(price),
         imageUrl: null,
       },
     });
@@ -184,7 +191,8 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Meal ID is required' }, { status: 400 });
     }
 
-    if (price !== undefined && !isValidMealPrice(price)) {
+    const clearPrice = price !== undefined && noPrice(price);
+    if (price !== undefined && !clearPrice && !isValidMealPrice(price)) {
       return NextResponse.json({ error: 'Price must be a number greater than 0' }, { status: 400 });
     }
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
@@ -205,6 +213,10 @@ export async function PUT(req: Request) {
     if (!existing) {
       return NextResponse.json({ error: 'Meal not found' }, { status: 404 });
     }
+    // A dish sold as an extra keeps a price (an extra without one could not be ordered).
+    if (clearPrice && (existing as { isExtra?: boolean }).isExtra === true) {
+      return NextResponse.json({ error: 'This dish is sold as an extra, so it needs an extra price.' }, { status: 400 });
+    }
 
     const updated = await prisma.meal.update({
       where: { id },
@@ -216,7 +228,7 @@ export async function PUT(req: Request) {
         ingredients: ingredients !== undefined ? ingredients?.trim() || null : undefined,
         allergens: allergensSupplied ? finalAllergens.join(', ') || null : undefined,
         calories: calories !== undefined ? (calories ? Number(calories) : null) : undefined,
-        price: price !== undefined ? Number(price) : undefined,
+        price: price === undefined ? undefined : clearPrice ? null : Number(price),
       },
     });
 
