@@ -7,7 +7,7 @@ import { setFirestoreForTesting } from '../lib/firebase-admin';
 import { validateCartAvailability } from '../lib/availability';
 import { applyMonthlyMenu, type MonthlyMenuPlan } from '../lib/monthly-menu';
 import { POST as staffPublish } from '../app/api/admin/menus/assign/route';
-import { POST as adminPublish } from '../app/api/admin/menus/publish/route';
+import { POST as adminUnpublish } from '../app/api/admin/menus/unpublish/route';
 import { PATCH as legacyBatchPublish } from '../app/api/admin/menus/route';
 import { GET as parentMenu } from '../app/api/menu/route';
 
@@ -42,8 +42,11 @@ afterEach(() => setFirestoreForTesting(null));
 
 const viaStaff = (studentCategory: string, mealId: string, replace?: boolean) =>
   staffPublish(jsonRequest('/api/admin/menus/assign', 'POST', { date: DAY, studentCategory, mealId, replace }, staff));
-const viaAdmin = (studentCategory: string, selectedMealIds: string[], replace?: boolean) =>
-  adminPublish(jsonRequest('/api/admin/menus/publish', 'POST', { date: DAY, studentCategory, selectedMealIds, replace }, admin));
+// Admin → Menu uses the same assign/unpublish routes (the old /api/admin/menus/publish was removed).
+const viaAdmin = (studentCategory: string, selectedMealIds: [] | [string], replace?: boolean) =>
+  selectedMealIds.length === 0
+    ? adminUnpublish(jsonRequest('/api/admin/menus/unpublish', 'POST', { date: DAY, studentCategory }, admin))
+    : staffPublish(jsonRequest('/api/admin/menus/assign', 'POST', { date: DAY, studentCategory, mealId: selectedMealIds[0], replace }, admin));
 const viaImport = (cells: Partial<Record<'Pre-primary' | 'Primary' | 'Secondary', string>>, replaceUnordered = false) => {
   const cell = (dish?: string) => (dish ? { kind: 'MEAL' as const, dish, merged: false } : { kind: 'BLANK' as const });
   const plan: MonthlyMenuPlan = {
@@ -141,11 +144,6 @@ test('an Excel day that retires a shared entry still gives every category its ow
 });
 
 test('Admin → Menu, Staff → Kitchen and Excel all respect each other', async () => {
-  const many = await viaAdmin('Primary', ['meal_dal', 'meal_pulao']);
-  assert.equal(many.status, 400);
-  assert.equal((await many.json()).code, 'ONE_DISH_PER_DAY');
-  assert.equal(fs.list('menus').length, 0);
-
   assert.equal((await viaStaff('Primary', 'meal_dal')).status, 200);
   const adminTry = await viaAdmin('Primary', ['meal_pulao']);
   assert.equal(adminTry.status, 409);
