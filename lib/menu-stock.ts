@@ -2,7 +2,7 @@ import type { DocumentData, DocumentReference, Firestore, Transaction } from 'fi
 
 /**
  * Category slug used in timetable menu document IDs.
- * Matches scripts/apply-october-2026-menu.ts, e.g. "Pre-primary" -> "pre_primary".
+ * e.g. "Pre-primary" -> "pre_primary" (menu_2026-11-18_pre_primary).
  */
 export function menuCategorySlug(category?: string | null): string {
   return String(category || 'all').toLowerCase().replace(/[^a-z0-9]/g, '_');
