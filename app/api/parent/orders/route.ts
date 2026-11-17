@@ -23,6 +23,7 @@ import { savePendingParentOrder, fulfillParentOrder, generateParentOrderId } fro
 import { isAutoRefundReason, listOwnPaymentIssues, refundPaymentException } from '@/lib/payment-exceptions';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
+import { MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -385,6 +386,10 @@ export async function POST(req: Request) {
       notes?: string;
       idempotencyKey?: string;
     } = body;
+
+    if (notes != null && (typeof notes !== 'string' || tooLong(notes, MAX_NOTES_LENGTH))) {
+      return NextResponse.json({ error: `Order notes must be at most ${MAX_NOTES_LENGTH} characters.` }, { status: 400 });
+    }
 
     // Order IDs are always generated on the server; the idempotency key only makes retries deterministic.
     const hasIdempotencyKey = typeof idempotencyKey === 'string' && idempotencyKey.length > 0;

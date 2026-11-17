@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { hashPassword, createSessionToken, TOKEN_COOKIE_NAME } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { INVALID_PHONE_MESSAGE, normalizeIndianMobile } from '@/lib/phone';
+import { MAX_NAME_LENGTH, MIN_PASSWORD_LENGTH, secureCookie, tooLong } from '@/lib/input-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,9 +40,17 @@ export async function POST(req: Request) {
       );
     }
 
-    if (password.length < 6) {
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
+    }
+
+    if (tooLong(name, MAX_NAME_LENGTH)) {
+      return NextResponse.json({ error: `Name must be at most ${MAX_NAME_LENGTH} characters` }, { status: 400 });
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters long' },
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long` },
         { status: 400 }
       );
     }
@@ -119,7 +128,7 @@ export async function POST(req: Request) {
     });
 
     const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
-    const isHttps = proto === 'https';
+    const isHttps = secureCookie(proto === 'https');
 
     try {
       const cookieStore = await cookies();

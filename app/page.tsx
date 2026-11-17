@@ -149,8 +149,8 @@ function HomePageContent() {
       return;
     }
 
-    if (registerPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (registerPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
       return;
     }
 
@@ -423,7 +423,7 @@ function HomePageContent() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Create Password (min. 6 chars)
+                  Create Password (min. 8 chars)
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
