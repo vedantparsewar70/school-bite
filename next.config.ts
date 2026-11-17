@@ -5,10 +5,7 @@ const isVercel = Boolean(process.env.VERCEL);
 const nextConfig: NextConfig = {
   // Use standalone only when not on Vercel (e.g. Docker VPS builds)
   ...(isVercel ? {} : { output: "standalone" }),
-  serverExternalPackages: ["firebase-admin", "@prisma/client", "prisma"],
-  outputFileTracingIncludes: {
-    '/**': ['./node_modules/.prisma/client/**/*', './prisma/**/*'],
-  },
+  serverExternalPackages: ["firebase-admin"],
   // Baseline security headers. The site (incl. admin, staff and payment pages) may not be framed
   // by other sites. A full script CSP is intentionally not set here: the Cashfree checkout SDK
   // must be verified against it in Preview first.
