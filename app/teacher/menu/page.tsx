@@ -280,7 +280,7 @@ export default function TeacherMenuPage() {
   return (
     <div className="min-h-screen bg-slate-50/60 pb-32">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-amber-100 shadow-2xs">
+      <header className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-amber-100 shadow-2xs">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Link
