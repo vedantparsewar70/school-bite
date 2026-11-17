@@ -2,9 +2,10 @@ import crypto from 'crypto';
 import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { db } from './firebase-admin';
 import { cleanDoc, generateId } from './firestore-db';
-import { collectMenuStockInTransaction } from './menu-stock';
+import { collectMenuStockInTransaction, normalizeStudentCategory } from './menu-stock';
 import { cartConflict, paidLinesForChildren } from './child-orders';
-import { isDeadlinePassed } from './utils';
+import { APP_TIMEZONE, getTodayString, isDeadlinePassed, isSundayDate } from './utils';
+import { effectiveMenuEntry, type MenuEntryLike } from './menu-entries';
 import {
   isAcceptableReason,
   PAYMENT_EXCEPTIONS,
@@ -435,6 +436,23 @@ export async function acceptPaymentException(
     };
     if (checkPaidAmount(payment, pending.totalAmount)) {
       throw new PaymentReviewError('The paid amount does not match the order total; refund it instead.');
+    }
+
+    // The meal must still be servable: never accept a payment for a day that has passed, a Sunday, or
+    // a holiday for that child's class (the money would be kept for a meal that cannot be handed over).
+    const today = getTodayString(APP_TIMEZONE);
+    const cart = (pending.cartItems || []) as Array<{ date?: string; studentCategory?: string | null }>;
+    for (const date of Array.from(new Set(cart.map((it) => String(it.date || ''))))) {
+      if (!date || date < today) throw new PaymentReviewError(`The meal date ${date || '(unknown)'} has passed; refund it instead.`);
+      if (isSundayDate(date)) throw new PaymentReviewError(`${date} is a Sunday (canteen closed); refund it instead.`);
+      const daySnap = await transaction.get(firestore.collection('menus').where('date', '==', date));
+      const entries = daySnap.docs.map((d) => ({ ...(d.data() as MenuEntryLike), id: d.id }));
+      for (const it of cart.filter((x) => x.date === date)) {
+        const cat = normalizeStudentCategory(it.studentCategory || null);
+        if (cat !== 'ALL' && effectiveMenuEntry(entries, date, cat)?.isHoliday) {
+          throw new PaymentReviewError(`${date} is a holiday for ${cat}; refund it instead.`);
+        }
+      }
     }
 
     const menuStock = await collectMenuStockInTransaction(transaction, firestore, stockLines(pending.cartItems || []));

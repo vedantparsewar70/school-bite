@@ -59,7 +59,9 @@ export default function PaymentExceptionsPage() {
   const resolve = async (item: any, action: 'refund' | 'accept') => {
     const question =
       action === 'accept'
-        ? `Accept ${item.orderId} as a normal order? The kitchen will serve it and no refund will be made.`
+        ? `Accept ${item.orderId} as a normal order for ${
+            Array.from(new Set((item.items || []).map((it: any) => it.date).filter(Boolean))).join(', ') || 'its meal date'
+          }? The kitchen will serve it on that day and no refund will be made.`
         : `Request a refund of ${formatINR(item.paidAmount)} for ${item.orderId}? It goes back to the original payment method.`;
     if (!window.confirm(question)) return;
     setWorking(item.orderId);
