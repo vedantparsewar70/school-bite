@@ -55,3 +55,7 @@ firebase-admin-key.json
 *backup*.json
 prisma/*backup*.json
 
+
+# Data cleanup tool output (contains personal data)
+test-data-review*.csv
+test-data-backup-*.json

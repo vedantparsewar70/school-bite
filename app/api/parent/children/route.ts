@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase-admin';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getTodayString } from '@/lib/utils';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
+import { MAX_NAME_LENGTH, MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
 
 /** True when the child has a paid, not-cancelled meal today or later that has not been handed over. */
 async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
@@ -152,6 +153,12 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    if (tooLong(name, MAX_NAME_LENGTH) || tooLong(notes, MAX_NOTES_LENGTH)) {
+      return NextResponse.json(
+        { error: `Name must be at most ${MAX_NAME_LENGTH} characters and notes at most ${MAX_NOTES_LENGTH}.` },
+        { status: 400 }
+      );
+    }
 
     if (!studentCategory) {
       return NextResponse.json(
@@ -277,6 +284,12 @@ export async function PUT(req: Request) {
 
     if (name !== undefined && !String(name ?? '').trim()) {
       return NextResponse.json({ error: 'Student name cannot be empty' }, { status: 400 });
+    }
+    if (tooLong(name, MAX_NAME_LENGTH) || tooLong(notes, MAX_NOTES_LENGTH)) {
+      return NextResponse.json(
+        { error: `Name must be at most ${MAX_NAME_LENGTH} characters and notes at most ${MAX_NOTES_LENGTH}.` },
+        { status: 400 }
+      );
     }
 
     // Allergies are only replaced when the request includes them. The parent edit form does not

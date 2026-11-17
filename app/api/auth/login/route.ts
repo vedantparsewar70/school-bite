@@ -6,6 +6,7 @@ import { comparePassword, hashPassword, createSessionToken, sessionMaxAgeSeconds
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { clearLoginFailures, getTrustedClientIp, loginLockRemainingMs, recordLoginFailure } from '@/lib/login-throttle';
 import { UserRole } from '@/types';
+import { secureCookie } from '@/lib/input-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -224,7 +225,7 @@ export async function POST(req: Request) {
 
     step = '7_SESSION_COOKIE';
     const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https://') ? 'https' : 'http');
-    const isHttps = proto === 'https';
+    const isHttps = secureCookie(proto === 'https');
 
     // Safely attempt next/headers cookie store
     try {

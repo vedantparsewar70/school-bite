@@ -83,6 +83,7 @@ export default function ParentDashboard() {
   // Menu changes refresh the dashboard. Order changes do not: the shared "orders changed" signal
   // fires for every parent's order, which would reload every open dashboard during the rush.
   useSyncWatcher({
+    pollIntervalMs: 30000,
     onMenuUpdate: () => {
       loadDashboardData(true);
     },

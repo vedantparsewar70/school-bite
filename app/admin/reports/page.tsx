@@ -14,20 +14,29 @@ import {
 } from 'lucide-react';
 import { formatINR, formatDatePretty } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import { csvCell } from '@/lib/not-served';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 export default function AdminReportsPage() {
   const { showToast } = useToast();
   const [reports, setReports] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const fetchReports = async () => {
     try {
       const res = await fetch('/api/admin/reports');
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('reports', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setReports(data);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('reports'));
       console.error('Failed to fetch reports:', err);
     } finally {
       setLoading(false);
@@ -60,32 +69,32 @@ export default function AdminReportsPage() {
       'Status',
     ];
 
+    // Every cell quoted and escaped, and formulas neutralised (lib/not-served.ts csvCell): names are
+    // typed by parents. Downloaded as a Blob so characters like '#' never cut the file short.
     const rows = reports.exportRows.map((r: any) => [
-      `"${r.orderId}"`,
+      r.orderId,
       r.date,
-      `"${r.parentName}"`,
-      `"${r.parentPhone}"`,
-      `"${r.studentName}"`,
-      `"${r.studentId}"`,
-      `"${r.classDivision}"`,
+      r.parentName,
+      r.parentPhone,
+      r.studentName,
+      r.studentId,
+      r.classDivision,
       r.rollNo,
-      `"${r.mealName}${r.itemType === 'Extra' ? ' (extra)' : ''}"`,
+      `${r.mealName}${r.itemType === 'Extra' ? ' (extra)' : ''}`,
       r.quantity,
       r.unitPrice,
       r.totalPrice,
       r.orderStatus,
     ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e: any) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers, ...rows].map((cells) => cells.map(csvCell).join(',')).join('\r\n') + '\r\n';
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `school-canteen-sales-report-${Date.now()}.csv`);
+    link.href = url;
+    link.download = `school-canteen-sales-report-${Date.now()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     showToast('Report exported.', 'success');
   };
 
@@ -93,6 +102,14 @@ export default function AdminReportsPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && !reports) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); fetchReports(); }} />
       </div>
     );
   }

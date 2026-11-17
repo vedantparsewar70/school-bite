@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getTodayString, APP_TIMEZONE, isDeadlinePassed } from '@/lib/utils';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { getCurrentUser } from '@/lib/auth';
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { displayMenuEntry, type MenuEntryLike } from '@/lib/menu-entries';
 import { extrasOn, MAX_EXTRA_PER_CHILD } from '@/lib/menu-extras';
 import { deadlineFor, type MenuEntry } from '@/lib/menu-orders';
@@ -141,14 +141,9 @@ export async function GET(req: Request) {
         };
       }
 
-      const mealObj = item.meal || {
-        id: item.mealId,
-        name: 'Scheduled Brunch',
-        description: 'Freshly prepared wholesome school brunch.',
-        category: 'LUNCH',
-        price: 80,
-        isVegetarian: true,
-      };
+      // An entry whose dish was deleted is not shown at all (never a made-up dish or price).
+      if (!item.meal) return null;
+      const mealObj = item.meal;
 
       const allergensList = ((mealObj as any).mealAllergens || []).map((ma: any) => ma.allergen?.name).filter(Boolean);
       if ((mealObj as any).allergens && allergensList.length === 0) {
@@ -190,7 +185,7 @@ export async function GET(req: Request) {
         },
         allergyEvaluation,
       };
-    });
+    }).filter((m): m is NonNullable<typeof m> => m !== null);
 
     // Optional extras for one date and class, shown under the main brunch (lib/menu-extras.ts).
     let extras: any[] = [];

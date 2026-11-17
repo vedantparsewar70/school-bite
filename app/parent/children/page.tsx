@@ -335,7 +335,7 @@ export default function ChildrenPage() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Aarav Sharma"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
                 />
               </div>
 
@@ -348,7 +348,7 @@ export default function ChildrenPage() {
                   type="date"
                   value={formDob}
                   onChange={(e) => setFormDob(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white"
                 />
               </div>
 
@@ -360,7 +360,7 @@ export default function ChildrenPage() {
                   required
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value as StudentCategory)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 cursor-pointer"
                 >
                   <option value="" disabled>Select Class / Category</option>
                   <option value="Pre-primary">Pre-primary</option>

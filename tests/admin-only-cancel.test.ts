@@ -104,7 +104,10 @@ test('staff cannot cancel or refund an order, but can still update its preparati
   assert.equal(fs.getDoc('orders', 'ORD-1')?.orderStatus, 'CONFIRMED');
   assert.deepEqual(cashfreeCalls, []);
 
-  const preparing = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'PREPARING' }, staff);
+  // Staff change only today's orders here (HIGH 8); this order is for another day, so an admin does it.
+  const byStaff = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'PREPARING' }, staff);
+  assert.equal(byStaff.status, 403);
+  const preparing = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'PREPARING' }, admin);
   assert.equal(preparing.status, 200);
 });
 

@@ -62,39 +62,23 @@ Scripts run with `tsx` do not load `.env` automatically. Pass it explicitly, e.g
 
 ---
 
-## 🚀 Step 5: Verify & Seed the Database
+## 🚀 Step 5: Verify the Connection
 
 Once your key is placed:
 
 1. **Verify the connection**:
    ```bash
-   npm run db:verify-firestore
+   npx tsx --env-file=.env.local scripts/verify-firebase.ts
    ```
    *You should see a green checkmark indicating successful connection to Firestore.*
 
-2. **Populate the database with initial data (Users, Meals, Menus, Students)**:
-   ```bash
-   npm run db:seed-firestore
-   ```
-
-3. **Start the development server**:
+2. **Start the development server**:
    ```bash
    npm run dev
    ```
    Visit [http://localhost:3000](http://localhost:3000).
 
----
-
-## 🔐 Default Demo Accounts
-
-Once seeded, you can log in immediately with:
-
-| Account | Email | Password | Role / Access |
-| :--- | :--- | :--- | :--- |
-| **Parent** | `parent@example.com` | `Parent123` | 2 children pre-linked, ₹500 wallet balance |
-| **Admin** | `admin@school.com` | `Admin123` | Full canteen admin & kitchen display system |
-
-*(Quick-fill buttons are also available directly on the login screen).*
+Admin and staff accounts come from `ADMIN_EMAIL`/`ADMIN_PASS` and `STAFF_EMAIL`/`STAFF_PASS`; parents register in the app. There are no demo accounts.
 
 ---
 
@@ -122,10 +106,9 @@ Records created by older code in `login_attempts` (keyed by email only, without 
 
 ## 📁 Project Firebase File Architecture
 
-- [lib/firebase-admin.ts](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/lib/firebase-admin.ts): Singleton Firebase Admin SDK initialization & credentials loader.
-- [lib/firestore-db.ts](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/lib/firestore-db.ts): Complete Firestore database adapter providing query, mutation, and relational operations.
-- [lib/prisma.ts](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/lib/prisma.ts): Re-exports the Firestore adapter so that all existing API routes communicate directly with Firestore.
-- [scripts/seed-firestore.ts](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/scripts/seed-firestore.ts): Migration seed script to populate Firestore with sample Indian school meals, menus, and users.
-- [scripts/verify-firebase.ts](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/scripts/verify-firebase.ts): Diagnostics script to test your Firestore connection.
-- [firestore.rules](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/firestore.rules): Security rules configuration.
-- [firebase.json](file:///c:/Users/Vaibhav/Downloads/projects/school-bite/firebase.json): Firebase project CLI configuration.
+- [lib/firebase-admin.ts](lib/firebase-admin.ts): Singleton Firebase Admin SDK initialization & credentials loader.
+- [lib/firestore-db.ts](lib/firestore-db.ts): Complete Firestore database adapter providing query, mutation, and relational operations.
+- [lib/prisma.ts](lib/prisma.ts): Re-exports the Firestore adapter so that all existing API routes communicate directly with Firestore.
+- [scripts/verify-firebase.ts](scripts/verify-firebase.ts): Diagnostics script to test your Firestore connection.
+- [firestore.rules](firestore.rules): Security rules configuration.
+- [firebase.json](firebase.json): Firebase project CLI configuration.

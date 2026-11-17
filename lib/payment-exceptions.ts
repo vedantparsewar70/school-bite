@@ -30,7 +30,9 @@ export const PAYMENT_EXCEPTIONS = 'payment_exceptions';
  * admin; accepting and refunding are mutually exclusive transitions out of MANUAL_REVIEW.
  */
 export function isAutoRefundReason(reason: unknown): boolean {
-  return reason === 'STOCK_UNAVAILABLE';
+  // ALREADY_ORDERED: a second brunch for the same child and day, or too many of one extra, paid by
+  // two checkouts at once. The meal cannot be sold twice, so the payment is refunded like a sold-out one.
+  return reason === 'STOCK_UNAVAILABLE' || reason === 'ALREADY_ORDERED';
 }
 
 /** Reasons an admin may resolve by accepting the payment as a normal order. */
@@ -38,7 +40,7 @@ export function isAcceptableReason(reason: unknown): boolean {
   return reason === 'PAID_AFTER_CUTOFF' || reason === 'SERVICE_UNAVAILABLE';
 }
 
-export type ExceptionReason = 'STOCK_UNAVAILABLE' | 'PAID_AFTER_CUTOFF' | 'SERVICE_UNAVAILABLE' | 'AMOUNT_MISMATCH';
+export type ExceptionReason = 'STOCK_UNAVAILABLE' | 'PAID_AFTER_CUTOFF' | 'SERVICE_UNAVAILABLE' | 'AMOUNT_MISMATCH' | 'ALREADY_ORDERED';
 
 export type ExceptionRefundState =
   | 'NOT_REQUESTED'

@@ -18,12 +18,14 @@ import {
 import VegBadge from '@/components/VegBadge';
 import { formatINR, formatDatePretty, nextNonSundayDateString } from '@/lib/utils';
 import { useToast } from '@/components/ToastContext';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [tomorrowProduction, setTomorrowProduction] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const { showToast } = useToast();
 
   // The next meal date comes from the server (skips Sundays and holidays); until it loads, the next non-Sunday date.
@@ -32,6 +34,11 @@ export default function AdminDashboardPage() {
   const fetchStats = async () => {
     try {
       const res = await fetch('/api/admin/stats');
+      if (!res.ok) {
+        setLoadError(loadFailedMessage('the dashboard', res.status));
+        return;
+      }
+      setLoadError('');
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);
@@ -39,6 +46,7 @@ export default function AdminDashboardPage() {
         setRecentOrders(data.recentOrders || []);
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('the dashboard'));
       console.error('Failed to fetch admin stats:', err);
     } finally {
       setLoading(false);
@@ -53,6 +61,14 @@ export default function AdminDashboardPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && !stats) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); fetchStats(); }} />
       </div>
     );
   }
@@ -156,7 +172,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.totalOrders || 0}</p>
-          <p className="text-[11px] text-slate-400 font-medium">Active confirmed orders</p>
+          <p className="text-[11px] text-slate-500 font-medium">All time · paid, not cancelled</p>
         </div>
 
         {/* Card 2: Students Ordered */}
@@ -168,19 +184,21 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.studentsOrdered || 0}</p>
-          <p className="text-[11px] text-slate-400 font-medium">Unique children receiving brunch</p>
+          <p className="text-[11px] text-slate-500 font-medium">Today + {formatDatePretty(tomorrowStr)} · different children</p>
         </div>
 
         {/* Card 3: Total Food Items Ordered */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Food Items</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Brunches</span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <UtensilsCrossed className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900">{stats?.totalItems || 0}</p>
-          <p className="text-[11px] text-amber-700 font-medium">Next meal date: {stats?.tomorrowTotalMeals || 0} portions</p>
+          <p className="text-[11px] text-amber-700 font-medium">
+            Today {stats?.todayTotalMeals || 0} + {formatDatePretty(tomorrowStr)} {stats?.tomorrowTotalMeals || 0}
+          </p>
         </div>
 
         {/* Card 4: Total Order Value */}
@@ -192,7 +210,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-emerald-700">{formatINR(stats?.totalOrderValue || 0)}</p>
-          <p className="text-[11px] text-slate-400 font-medium">Paid meal revenue</p>
+          <p className="text-[11px] text-slate-500 font-medium">All time · paid, not cancelled</p>
         </div>
       </div>
 

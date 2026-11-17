@@ -10,7 +10,8 @@ import { GET as kitchen } from '../app/api/admin/kitchen/route';
 import { GET as stats } from '../app/api/admin/stats/route';
 import { GET as reports } from '../app/api/admin/reports/route';
 import { PUT as editMeal, DELETE as deleteMeal } from '../app/api/admin/meals/route';
-import { POST as adminPublish } from '../app/api/admin/menus/publish/route';
+import { POST as assignDish } from '../app/api/admin/menus/assign/route';
+import { POST as unpublishDish } from '../app/api/admin/menus/unpublish/route';
 import { DELETE as removeChild } from '../app/api/parent/children/route';
 import { GET as parentOrders, POST as placeOrder } from '../app/api/parent/orders/route';
 import { POST as validateCart } from '../app/api/parent/cart/validate/route';
@@ -145,7 +146,7 @@ test('CHANGED: a dish with paid orders cannot be switched off (unpublish rule); 
   seedMenu(D);
   seedOrder('ORD-A', [{ date: D }]);
 
-  const off = await adminPublish(jsonRequest('/api/admin/menus/publish', 'POST', { date: D, studentCategory: 'Primary', selectedMealIds: [] }, admin));
+  const off = await unpublishDish(jsonRequest('/api/admin/menus/unpublish', 'POST', { date: D, studentCategory: 'Primary' }, admin));
   assert.equal(off.status, 409);
   assert.match((await off.json()).error, /already ordered this\. Ask the admin to cancel and refund those orders first\./);
   assert.equal(fs.getDoc('menus', `menu_${D}_primary`)?.isActive, true);
@@ -156,8 +157,8 @@ test('CHANGED: a dish with paid orders cannot be switched off (unpublish rule); 
   assert.equal((await staffListOn(D)).length, 1);
   assert.equal((await parentHistory()).length, 1);
 
-  const swap = await adminPublish(
-    jsonRequest('/api/admin/menus/publish', 'POST', { date: D, studentCategory: 'Primary', selectedMealIds: ['meal_pulao'], replace: true }, admin)
+  const swap = await assignDish(
+    jsonRequest('/api/admin/menus/assign', 'POST', { date: D, studentCategory: 'Primary', mealId: 'meal_pulao', replace: true }, admin)
   );
   assert.equal(swap.status, 409);
   assert.equal((await swap.json()).code, 'HAS_ORDERS');
@@ -167,8 +168,8 @@ test('CHANGED: a dish with paid orders cannot be switched off (unpublish rule); 
 test('OK: changing the dish of a date that already has orders is refused', async () => {
   seedMenu(D);
   seedOrder('ORD-A', [{ date: D }]);
-  const res = await adminPublish(
-    jsonRequest('/api/admin/menus/publish', 'POST', { date: D, studentCategory: 'Primary', selectedMealIds: ['meal_pulao'], replace: true }, admin)
+  const res = await assignDish(
+    jsonRequest('/api/admin/menus/assign', 'POST', { date: D, studentCategory: 'Primary', mealId: 'meal_pulao', replace: true }, admin)
   );
   assert.equal(res.status, 409);
   assert.equal((await kitchenOn(D)).mealCounts[0].mealName, 'Dal Khichdi');

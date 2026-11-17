@@ -6,7 +6,7 @@ import { FakeFirestore } from './helpers/fake-firestore';
 import { jsonRequest, signedInAs, useFakeFirestore } from './helpers/session';
 import { setFirestoreForTesting } from '../lib/firebase-admin';
 import { setSystemSetting } from '../lib/allergy';
-import { getStudentCategory } from '../lib/october-2026-timetable';
+import { getStudentCategory } from '../lib/student-category';
 import { TEACHER_ORDER_ACCESS, teacherGuestCookieName } from '../lib/teacher-orders';
 import * as parentOrders from '../app/api/parent/orders/route';
 import * as parentChildren from '../app/api/parent/children/route';
@@ -167,7 +167,7 @@ test('OK: staff cannot mark Collected an unpaid, cancelled, wrong-date or alread
   seedPaidOrder('ORD-CXL-PAID', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }], { orderStatus: 'CANCELLED' });
   seedPaidOrder('ORD-TUE', 'par_usr_parent', [{ studentId: 'stu_mine', date: TUE }]);
   seedPaidOrder('ORD-OK', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }]);
-  const give = (orderId: string, date = MON) => adminOrders.PATCH(jsonRequest('/api/admin/orders', 'PATCH', { orderId, orderStatus: 'COLLECTED', date }, staff));
+  const give = (orderId: string, date = MON) => adminOrders.PATCH(jsonRequest('/api/admin/orders', 'PATCH', { orderId, orderStatus: 'COLLECTED', date }, admin));
 
   assert.equal((await give('ORD-UNPAID')).status, 400);
   assert.equal((await give('ORD-CXL')).status, 400);
@@ -181,8 +181,10 @@ test('OK: staff cannot mark Collected an unpaid, cancelled, wrong-date or alread
 test('the admin whole-order "Collected" button still gives every child on that date (staff use per-child Serve)', async () => {
   // Riya (3-A) and her brother Arjun (8-B) paid in one checkout for Monday.
   seedPaidOrder('ORD-SIBS', 'par_usr_parent', [{ studentId: 'stu_mine', date: MON }, { studentId: 'stu_sib', date: MON }]);
-  // Only Riya comes to the counter; the staff screen sends exactly this.
-  const res = await adminOrders.PATCH(jsonRequest('/api/admin/orders', 'PATCH', { orderId: 'ORD-SIBS', orderStatus: 'COLLECTED', date: MON }, staff));
+  // Staff can't give a whole order here (HIGH 8): they serve one child at a time on the Serve screen.
+  const byStaff = await adminOrders.PATCH(jsonRequest('/api/admin/orders', 'PATCH', { orderId: 'ORD-SIBS', orderStatus: 'COLLECTED', date: MON }, staff));
+  assert.equal(byStaff.status, 403);
+  const res = await adminOrders.PATCH(jsonRequest('/api/admin/orders', 'PATCH', { orderId: 'ORD-SIBS', orderStatus: 'COLLECTED', date: MON }, admin));
   assert.equal(res.status, 200);
   const order = fs.getDoc('orders', 'ORD-SIBS');
   assert.equal(order?.serviceDates?.[MON]?.status, 'COLLECTED', "Arjun's meal is now also marked given");
@@ -267,7 +269,10 @@ test('BUG: with default settings a meal matching the child\'s allergy is sold (s
   assert.equal(items.length, 1);
   assert.equal(items[0].hasAllergyAlert, true, 'order accepted, only flagged');
 
-  // With the school policy switched off it is blocked server-side.
+  // With the school policy switched off it is blocked server-side. (The first order is cancelled
+  // first: the child may only have one brunch per day.)
+  const first = fs.list('orders')[0];
+  fs.seed('orders', first.id, { ...first, orderStatus: 'CANCELLED', paymentStatus: 'REFUNDED' });
   await setSystemSetting('ALLOW_ALLERGY_ORDERS', 'false');
   const blocked = await checkout([{ studentId: 'stu_mine', mealId: 'meal_paneer', date: MON, quantity: 1 }]);
   assert.equal(blocked.status, 400);

@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const finalDesc = (typeof description === 'string' && description.trim()) || `${name} - Freshly prepared at school canteen`;
+    const finalDesc = typeof description === 'string' ? description.trim() : '';
 
     // Build unified allergens array
     let finalAllergens: string[] = [];

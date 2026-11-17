@@ -23,6 +23,7 @@ import { resolveCheckoutPhone } from '@/lib/phone';
 import { getTodayString } from '@/lib/utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
 import { getCurrentUser } from '@/lib/auth';
+import { secureCookie } from '@/lib/input-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -232,7 +233,7 @@ export async function POST(req: Request) {
       name: teacherGuestCookieName(orderId),
       value: guestAccess.token,
       httpOnly: true,
-      secure: new URL(req.url).protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https',
+      secure: secureCookie(new URL(req.url).protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'),
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7,

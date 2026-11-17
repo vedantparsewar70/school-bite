@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { CartItem, PaymentMethod } from '@/types';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { db } from '@/lib/firebase-admin';
@@ -23,6 +23,10 @@ import { savePendingParentOrder, fulfillParentOrder, generateParentOrderId } fro
 import { isAutoRefundReason, listOwnPaymentIssues, refundPaymentException } from '@/lib/payment-exceptions';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
+import { MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
+
+/** An error whose message is written for the parent and safe to show. */
+class CheckoutError extends Error {}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -386,6 +390,10 @@ export async function POST(req: Request) {
       idempotencyKey?: string;
     } = body;
 
+    if (notes != null && (typeof notes !== 'string' || tooLong(notes, MAX_NOTES_LENGTH))) {
+      return NextResponse.json({ error: `Order notes must be at most ${MAX_NOTES_LENGTH} characters.` }, { status: 400 });
+    }
+
     // Order IDs are always generated on the server; the idempotency key only makes retries deterministic.
     const hasIdempotencyKey = typeof idempotencyKey === 'string' && idempotencyKey.length > 0;
     const orderId = generateParentOrderId(parentId, hasIdempotencyKey ? idempotencyKey : null);
@@ -546,6 +554,8 @@ export async function POST(req: Request) {
         {
           error: availabilityResult.errorMessage || `Meal "${unavail.mealName}" is not available for ${unavail.date}.`,
           unavailableItem: {
+            // Which child's line: siblings can have the same dish on the same day.
+            studentId: cartItemsWithCategory[availabilityResult.items.indexOf(unavail)]?.studentId || null,
             mealId: unavail.mealId,
             mealName: unavail.mealName,
             date: unavail.date,
@@ -556,12 +566,27 @@ export async function POST(req: Request) {
       );
     }
 
+    // One brunch per child per day across all orders (and the extras limit): refused before paying.
+    {
+      const { cartConflict, paidLinesForChildren } = await import('@/lib/child-orders');
+      const earlier = await paidLinesForChildren(
+        (t) => t.get(),
+        db,
+        cartItemsWithCategory.map((it) => String(it.studentId || '')),
+        cartItemsWithCategory.map((it) => String(it.date || ''))
+      );
+      const conflict = cartConflict(cartItemsWithCategory as any[], earlier);
+      if (conflict) {
+        return NextResponse.json({ error: conflict.message, code: 'ALREADY_ORDERED' }, { status: 400 });
+      }
+    }
+
     // Authoritative Server-side Price & Allergy Evaluation
     let totalAmount = 0;
     const evaluatedCartItems = cartItemsWithCategory.map((item, index) => {
       const meal = mealsMap.get(item.mealId);
       if (!meal) {
-        throw new Error(`Meal not found: ${item.mealName || item.mealId}`);
+        throw new CheckoutError(`${item.mealName || 'A dish'} in your cart is no longer on the menu. Please remove it and try again.`);
       }
 
       const serverUnitPrice = Number(meal.price || 0);
@@ -820,8 +845,18 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Error placing order:', error);
-    const userMessage = error?.message || 'Failed to process order';
-    return NextResponse.json({ error: userMessage }, { status: 400 });
+    // Only messages written for parents are shown; anything else (database, gateway, bugs) gets a
+    // friendly generic message, and the details stay in the server log.
+    if (error instanceof CheckoutError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Your order could not be read. Please refresh the page and try again.' }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: 'We could not place your order just now. Please try again in a moment.' },
+      { status: 500 }
+    );
   } finally {
     if (gatewayLock) {
       await releaseParentGatewayLock(gatewayLock.parentId, gatewayLock.token);

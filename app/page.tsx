@@ -149,8 +149,8 @@ function HomePageContent() {
       return;
     }
 
-    if (registerPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (registerPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
       return;
     }
 
@@ -215,7 +215,7 @@ function HomePageContent() {
         {/* Brand Icon */}
         <div className="inline-block">
           <img
-            src="/logo.png"
+            src="/logo.webp"
             alt="School Bite Logo"
             className="w-16 h-16 rounded-2xl shadow-lg shadow-amber-500/25 object-contain mx-auto"
           />
@@ -310,7 +310,7 @@ function HomePageContent() {
                     onBlur={(e) => validateParentEmail(e.currentTarget)}
                     onInvalid={(e) => validateParentEmail(e.currentTarget)}
                     placeholder="Enter parent email address"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
                 </div>
               </div>
@@ -327,7 +327,7 @@ function HomePageContent() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
                   />
                 </div>
               </div>
@@ -380,7 +380,7 @@ function HomePageContent() {
                     value={registerName}
                     onChange={(e) => setRegisterName(e.target.value)}
                     placeholder="Enter your full name"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
                 </div>
               </div>
@@ -399,7 +399,7 @@ function HomePageContent() {
                     onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please enter a valid email address.')}
                     onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                     placeholder="Enter parent email address"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
                 </div>
               </div>
@@ -416,14 +416,14 @@ function HomePageContent() {
                     value={registerPhone}
                     onChange={(e) => setRegisterPhone(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all font-medium"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Create Password (min. 6 chars)
+                  Create Password (min. 8 chars)
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -433,7 +433,7 @@ function HomePageContent() {
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
                   />
                 </div>
               </div>
@@ -450,7 +450,7 @@ function HomePageContent() {
                     value={registerConfirmPassword}
                     onChange={(e) => setRegisterConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 transition-all"
                   />
                 </div>
               </div>

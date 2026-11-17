@@ -4,31 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && next build",
-    "postinstall": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
-    "db:seed-firestore": "npx tsx scripts/seed-firestore.ts",
-    "db:verify-firestore": "npx tsx scripts/verify-firebase.ts",
-    "db:import-sqlite": "npx tsx scripts/restore-to-postgres.ts",
+    "build": "next build",
+    "vercel-build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts"
   },
-  "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
-  },
   "dependencies": {
-    "@prisma/client": "^6.4.1",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
     "firebase-admin": "^14.5.0",
     "jose": "^6.2.12",
     "lucide-react": "^1.49.0",
     "next": "16.3.8",
-    "prisma": "^6.4.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

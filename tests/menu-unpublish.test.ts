@@ -6,7 +6,6 @@ import { jsonRequest, signedInAs, useFakeFirestore } from './helpers/session';
 import { setFirestoreForTesting } from '../lib/firebase-admin';
 import { createSessionToken } from '../lib/auth';
 import { POST as unpublish } from '../app/api/admin/menus/unpublish/route';
-import { POST as publish } from '../app/api/admin/menus/publish/route';
 import { PUT as updateMenu } from '../app/api/admin/menus/route';
 import { GET as parentMenu } from '../app/api/menu/route';
 import { POST as checkout } from '../app/api/parent/orders/route';
@@ -145,7 +144,7 @@ test('after the admin cancels the orders, unpublish works', async () => {
 
 test('Admin → Menu: saving with no dish and switching an entry off follow the same rule', async () => {
   order('ORD-1', [{ item: 'oit_1', studentId: 'stu_a' }]);
-  const save = await publish(jsonRequest('/api/admin/menus/publish', 'POST', { date: DATE, studentCategory: 'Primary', selectedMealIds: [] }, admin));
+  const save = await unpublish(jsonRequest('/api/admin/menus/unpublish', 'POST', { date: DATE, studentCategory: 'Primary' }, admin));
   assert.equal(save.status, 409);
   assert.match((await save.json()).error, /1 child has already ordered this/);
 
@@ -154,7 +153,7 @@ test('Admin → Menu: saving with no dish and switching an entry off follow the 
   assert.equal(fs.getDoc('menus', PRIMARY)?.isActive, true);
 
   // A category without orders can be unpublished from Admin → Menu.
-  const ok = await publish(jsonRequest('/api/admin/menus/publish', 'POST', { date: DATE, studentCategory: 'Secondary', selectedMealIds: [] }, admin));
+  const ok = await unpublish(jsonRequest('/api/admin/menus/unpublish', 'POST', { date: DATE, studentCategory: 'Secondary' }, admin));
   assert.equal(ok.status, 200);
   assert.equal(fs.getDoc('menus', SECONDARY)?.isActive, false);
   assert.equal(fs.getDoc('menus', PRIMARY)?.isActive, true);

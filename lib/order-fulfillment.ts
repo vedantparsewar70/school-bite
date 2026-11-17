@@ -2,8 +2,10 @@ import crypto from 'crypto';
 import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { db } from './firebase-admin';
 import { cleanDoc, generateId } from './firestore-db';
-import { collectMenuStockInTransaction } from './menu-stock';
-import { isDeadlinePassed } from './utils';
+import { collectMenuStockInTransaction, normalizeStudentCategory } from './menu-stock';
+import { cartConflict, paidLinesForChildren } from './child-orders';
+import { APP_TIMEZONE, getTodayString, isDeadlinePassed, isSundayDate } from './utils';
+import { effectiveMenuEntry, type MenuEntryLike } from './menu-entries';
 import {
   isAcceptableReason,
   PAYMENT_EXCEPTIONS,
@@ -315,8 +317,30 @@ export async function fulfillParentOrder(
     }
 
     const menuStock = await collectMenuStockInTransaction(transaction, firestore, stockLines(cartItems));
+    // One brunch per child per day and at most 3 of each extra, across all of the family's orders:
+    // re-checked here because two checkouts can be paid at the same moment (reads only).
+    const earlier = await paidLinesForChildren(
+      (t) => transaction.get(t),
+      firestore,
+      cartItems.map((it: any) => String(it.studentId || '')),
+      cartItems.map((it: any) => String(it.date || ''))
+    );
+    const conflict = cartConflict(cartItems as any[], earlier);
 
     // --- Writes ---
+    if (conflict) {
+      recordPaymentException(transaction, exceptionRef, pendingRef, {
+        orderId, orderType: 'PARENT', ownerId: pending.parentId, reason: 'ALREADY_ORDERED', detail: conflict.detail,
+        expectedAmount: pending.totalAmount, payment, cashfreeOrderId: pending.cashfreeOrderId, items: cartItems, now,
+      });
+      return {
+        success: false,
+        orderId,
+        reason: 'ALREADY_ORDERED',
+        message: 'Payment received, but this meal was already ordered for the child, so it will be refunded.',
+        exceptionRecorded: true,
+      };
+    }
     // The meal must still be servable when the payment completed: menu active, not a holiday,
     // and paid before that date's ordering deadline. Otherwise the payment becomes an exception
     // that an admin reviews (accept as an order, or refund); it is never refunded automatically.
@@ -412,6 +436,23 @@ export async function acceptPaymentException(
     };
     if (checkPaidAmount(payment, pending.totalAmount)) {
       throw new PaymentReviewError('The paid amount does not match the order total; refund it instead.');
+    }
+
+    // The meal must still be servable: never accept a payment for a day that has passed, a Sunday, or
+    // a holiday for that child's class (the money would be kept for a meal that cannot be handed over).
+    const today = getTodayString(APP_TIMEZONE);
+    const cart = (pending.cartItems || []) as Array<{ date?: string; studentCategory?: string | null }>;
+    for (const date of Array.from(new Set(cart.map((it) => String(it.date || ''))))) {
+      if (!date || date < today) throw new PaymentReviewError(`The meal date ${date || '(unknown)'} has passed; refund it instead.`);
+      if (isSundayDate(date)) throw new PaymentReviewError(`${date} is a Sunday (canteen closed); refund it instead.`);
+      const daySnap = await transaction.get(firestore.collection('menus').where('date', '==', date));
+      const entries = daySnap.docs.map((d) => ({ ...(d.data() as MenuEntryLike), id: d.id }));
+      for (const it of cart.filter((x) => x.date === date)) {
+        const cat = normalizeStudentCategory(it.studentCategory || null);
+        if (cat !== 'ALL' && effectiveMenuEntry(entries, date, cat)?.isHoliday) {
+          throw new PaymentReviewError(`${date} is a holiday for ${cat}; refund it instead.`);
+        }
+      }
     }
 
     const menuStock = await collectMenuStockInTransaction(transaction, firestore, stockLines(pending.cartItems || []));

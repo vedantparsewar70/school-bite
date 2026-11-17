@@ -13,9 +13,10 @@ import {
   splitSharedEntry,
   usesSharedEntry,
   type MenuEntry,
+  withLineClasses,
 } from './menu-orders';
 import { extrasOn, isExtraLine, paidExtrasRefusal, switchOffExtras } from './menu-extras';
-import { APP_TIMEZONE, getOffsetDateString, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import { APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
 
 /**
  * The Student Menu editor's day actions (holiday, undo holiday, portions) and its read model. Every
@@ -257,7 +258,8 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
   const paid = new Set(orderSnaps.filter((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED').map((o) => o.id));
   const meals = new Map(mealSnaps.filter((m) => m.exists).map((m) => [m.id, m.data() as any]));
   // Main-dish counts never include extras; extras are counted per extra entry.
-  const paidItems = items.filter((it) => paid.has(String(it.orderId)) && !isExtraLine(it));
+  // Older lines without a class count for their child's class only (as in Prepare and Serve).
+  const paidItems = await withLineClasses((t) => t.get(), firestore, items.filter((it) => paid.has(String(it.orderId)) && !isExtraLine(it)));
   const paidExtras = items.filter((it) => paid.has(String(it.orderId)) && isExtraLine(it));
 
   return dates.map((date) => {
@@ -272,12 +274,18 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
       const holiday = Boolean(live?.isHoliday);
       const shared = Boolean(live && normalizeStudentCategory(live.studentCategory) === 'ALL');
       const meal = onSale && live?.mealId ? meals.get(live.mealId) : null;
+      // Every live entry of this class counts (older duplicate entries too), as Prepare does.
+      const classEntries = rankMenuEntries(dayEntries, date, category);
+      const classEntryIds = new Map(classEntries.map((m) => [m.id, normalizeStudentCategory(m.studentCategory)]));
       const lines = live
-        ? paidItems.filter((it) =>
-            it.menuId
-              ? it.menuId === live.id && (!shared || normalizeStudentCategory(it.studentCategory) === category || normalizeStudentCategory(it.studentCategory) === 'ALL')
-              : it.mealId === live.mealId && [category, 'ALL'].includes(normalizeStudentCategory(it.studentCategory))
-          )
+        ? paidItems.filter((it) => {
+            const lineCat = normalizeStudentCategory(it.studentCategory);
+            if (it.menuId) {
+              if (!classEntryIds.has(it.menuId)) return false;
+              return classEntryIds.get(it.menuId) !== 'ALL' || lineCat === category || lineCat === 'ALL';
+            }
+            return it.mealId === live.mealId && (lineCat === category || lineCat === 'ALL');
+          })
         : [];
       const closed = orderingClosed(dayEntries, date, category, now);
       return {
@@ -341,4 +349,3 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
 }
 
 export const MENU_DAYS_DEFAULT = 14;
-export const firstMenuDay = () => getOffsetDateString(0, APP_TIMEZONE);

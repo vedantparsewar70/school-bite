@@ -219,7 +219,7 @@ function ServeContent() {
   return (
     <div className="max-w-2xl mx-auto pb-32">
       {/* Sticky header: title, counter, search, filters */}
-      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
+      <div className="sticky top-16 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl font-black text-slate-900">Serve</h1>
@@ -341,7 +341,7 @@ function ServeContent() {
               <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center">
                 <p className="text-lg font-black text-slate-900">{closedReason}</p>
               </div>
-            ) : visibleRows.length === 0 ? (
+            ) : loadError && rows.length === 0 ? null : visibleRows.length === 0 ? (
               <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">
                 {rows.length === 0
                   ? 'No paid orders for today.'
@@ -406,7 +406,7 @@ function ServeContent() {
               </ul>
             )}
           </>
-        ) : visibleTeachers.length === 0 ? (
+        ) : loadError && teachers.length === 0 ? null : visibleTeachers.length === 0 ? (
           <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">
             {teachers.length === 0 ? 'No teacher orders for today.' : 'No teacher matches.'}
           </div>

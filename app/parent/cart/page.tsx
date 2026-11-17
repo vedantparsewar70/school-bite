@@ -74,7 +74,8 @@ export default function CartPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [phoneRequired, setPhoneRequired] = useState(false);
 
-  // Live availability tracking: Map of `${mealId}__${date}` -> reason
+  // Live availability tracking, per cart line (cartItemId -> reason): two children can have the same
+  // dish on the same day, and only one of them may be unavailable.
   const [unavailableItemsMap, setUnavailableItemsMap] = useState<Record<string, string>>({});
   // Current prices from the server; checkout charges these, so the cart shows them too.
   const [serverPrices, setServerPrices] = useState<ServerPriceMap>({});
@@ -96,22 +97,25 @@ export default function CartPage() {
     }
 
     let isMounted = true;
+    const sentItems = cartItems;
     async function checkAvailability() {
       setIsValidatingAvailability(true);
       try {
         const res = await fetch('/api/parent/cart/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cartItems }),
+          body: JSON.stringify({ cartItems: sentItems }),
         });
 
         if (res.ok && isMounted) {
           const data = await res.json();
           const map: Record<string, string> = {};
           if (Array.isArray(data.items)) {
-            data.items.forEach((it: any) => {
-              if (!it.isAvailable) {
-                map[`${it.mealId}__${it.date}`] = it.reason || 'Not available for this date';
+            // The server answers line by line, in the order the cart was sent.
+            data.items.forEach((it: any, index: number) => {
+              const line = sentItems[index];
+              if (!it.isAvailable && line) {
+                map[line.cartItemId] = it.reason || 'Not available for this date';
               }
             });
           }
@@ -139,8 +143,7 @@ export default function CartPage() {
   const handleRemoveAllUnavailable = () => {
     let removedCount = 0;
     cartItems.forEach((item) => {
-      const key = `${item.mealId}__${item.date}`;
-      if (unavailableItemsMap[key]) {
+      if (unavailableItemsMap[item.cartItemId]) {
         removeFromCart(item.cartItemId);
         removedCount++;
       }
@@ -216,8 +219,10 @@ export default function CartPage() {
 
       let res = await submit(checkoutKeyFor(signature));
       let data = await res.json();
-      if (res.status === 409 && data.code === 'CHECKOUT_EXPIRED') {
-        // The previous payment window closed unpaid: start a new one.
+      if (res.status === 409 && (data.code === 'CHECKOUT_EXPIRED' || data.code === 'PAYMENT_EXCEPTION')) {
+        // The previous payment window closed unpaid, or that payment ended as an exception (refunded or
+        // under review): start a new checkout. It is checked again in full (stock, deadline, one brunch
+        // per child), so it can never charge twice for the same meal.
         res = await submit(checkoutKeyFor(signature, true));
         data = await res.json();
       }
@@ -227,11 +232,12 @@ export default function CartPage() {
         setErrorMessage(errorText);
         setPhoneRequired(data.code === 'PHONE_REQUIRED');
         if (data.unavailableItem) {
-          const key = `${data.unavailableItem.mealId}__${data.unavailableItem.date}`;
-          setUnavailableItemsMap((prev) => ({
-            ...prev,
-            [key]: data.unavailableItem.reason || 'Disabled by canteen staff',
-          }));
+          // Mark only that child's line (siblings may have the same dish that day).
+          const u = data.unavailableItem;
+          const hit = cartItems.find((c) => c.mealId === u.mealId && c.date === u.date && (!u.studentId || c.studentId === u.studentId));
+          if (hit) {
+            setUnavailableItemsMap((prev) => ({ ...prev, [hit.cartItemId]: u.reason || 'Disabled by canteen staff' }));
+          }
         }
         showToast(errorText, 'error');
         setProcessing(false);
@@ -395,8 +401,7 @@ export default function CartPage() {
                   {/* Items for this student & date */}
                   <div className="divide-y divide-slate-100">
                     {items.map((item) => {
-                      const itemKey = `${item.mealId}__${item.date}`;
-                      const itemUnavailableReason = unavailableItemsMap[itemKey];
+                      const itemUnavailableReason = unavailableItemsMap[item.cartItemId];
                       const isItemUnavailable = Boolean(itemUnavailableReason);
 
                       return (
@@ -532,7 +537,7 @@ export default function CartPage() {
                 placeholder="e.g. a note for the canteen"
                 rows={2}
                 disabled={processing}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none placeholder:text-slate-400"
+                className="w-full text-base sm:text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none placeholder:text-slate-400"
               />
             </div>
 

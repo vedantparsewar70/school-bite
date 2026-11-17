@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { effectiveEntries, hasOrdersMessage, paidChildrenFor, publishDish, withdrawDish } from '@/lib/menu-publish';
 import { normalizeStudentCategory } from '@/lib/menu-stock';
 import { STUDENT_CATEGORIES } from '@/lib/monthly-menu';

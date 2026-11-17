@@ -27,6 +27,7 @@ import { formatINR, formatDatePretty, formatDateTimePretty, getOrderStatusColor,
 import { formatServeTime } from '@/lib/service-dates';
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 /** The cancellation result in admin wording (the server's message is written for parents). */
 function adminCancelMessage(paymentStatus: string | undefined, refundAmount: number): string {
@@ -45,6 +46,7 @@ function AdminOrdersContent() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Filters
   // Today in India (IST), worked out on every render so it moves on after midnight.
@@ -93,6 +95,11 @@ function AdminOrdersContent() {
       if (search) params.append('search', search);
 
       const ordRes = await fetch(`/api/admin/orders?${params.toString()}`);
+      if (!ordRes.ok) {
+        setLoadError(loadFailedMessage('orders', ordRes.status));
+        return;
+      }
+      setLoadError('');
       if (ordRes.ok) {
         const data = await ordRes.json();
         // With a date selected, each order shows (and changes) that day's status only.
@@ -104,6 +111,7 @@ function AdminOrdersContent() {
         );
       }
     } catch (err) {
+      setLoadError(loadFailedMessage('orders'));
       console.error('Failed to fetch orders:', err);
       showToast('Could not load orders', 'error');
     } finally {
@@ -162,12 +170,17 @@ function AdminOrdersContent() {
   const canRetryRefund = (o: any) =>
     o.orderStatus === 'CANCELLED' && ['REFUND_PENDING', 'REFUND_FAILED'].includes(o.paymentStatus);
 
+  /** Every child in the order ("Riya, Aarav"), so the admin knows exactly whose meals are cancelled. */
+  const childNamesOf = (o: any) =>
+    Array.from(new Set((o.items || []).map((it: any) => it.studentName).filter(Boolean))).join(', ') || 'this student';
+
   const handleCancelOrder = async (o: any) => {
     const retry = o.orderStatus === 'CANCELLED';
     const days = o.isMultiDate ? ' This cancels every day in this order.' : '';
+    const children = childNamesOf(o);
     const question = retry
       ? `Retry the refund of ${formatINR(o.totalAmount)} for order ${o.id}? The same refund is reused, so the parent can never be refunded twice.`
-      : `Cancel order ${o.id} for ${o.items?.[0]?.studentName || 'this student'}?${days} The full ${formatINR(o.totalAmount)} will be refunded to the parent's original payment method through Cashfree. This cannot be undone.`;
+      : `Cancel order ${o.id} for ${children}?${days} The full ${formatINR(o.totalAmount)} will be refunded to the parent's original payment method through Cashfree. This cannot be undone.`;
     if (!window.confirm(question)) return;
     await handleUpdateStatus(o.id, 'CANCELLED');
   };
@@ -203,6 +216,16 @@ function AdminOrdersContent() {
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-500' : ''}`} />
           <span className="hidden sm:inline">Refresh</span>
         </button>
+      </div>
+
+      {/* Student / teacher orders */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-h-[44px] px-4 rounded-xl text-sm font-bold bg-slate-900 text-white inline-flex items-center" aria-current="page">
+          Student orders
+        </span>
+        <Link href="/admin/teacher-orders" className="min-h-[44px] px-4 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center">
+          Teacher orders
+        </Link>
       </div>
 
       {/* Quick Date Pills */}
@@ -262,7 +285,7 @@ function AdminOrdersContent() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Student name, roll no, order ID..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
               />
             </div>
           </div>
@@ -278,7 +301,7 @@ function AdminOrdersContent() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800"
               />
             </div>
           </div>
@@ -291,7 +314,7 @@ function AdminOrdersContent() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800"
             >
               <option value="">All Statuses</option>
               <option value="CONFIRMED">Confirmed</option>
@@ -329,6 +352,8 @@ function AdminOrdersContent() {
         <div className="min-h-[35vh] flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : loadError && orders.length === 0 ? (
+        <LoadError message={loadError} onRetry={() => fetchOrders()} />
       ) : orders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3 max-w-md mx-auto">
           <FileText className="w-12 h-12 text-slate-300 mx-auto" />

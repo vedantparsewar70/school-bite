@@ -16,6 +16,8 @@ function exceptionMessage(reason: string | undefined, refundState: string | null
       ? 'A meal in your order sold out before your payment completed, so no order was created.'
       : reason === 'PAID_AFTER_CUTOFF'
       ? 'Your payment was received after the ordering deadline, so the order was not confirmed automatically.'
+      : reason === 'ALREADY_ORDERED'
+      ? 'This meal was already ordered for your child in another order, so no second order was created.'
       : reason === 'SERVICE_UNAVAILABLE'
       ? 'Your payment was received, but the meal is no longer being served that day, so the order was not confirmed automatically.'
       : 'Your payment was received but the order could not be confirmed automatically.';

@@ -9,6 +9,7 @@ import {
   verifySessionToken,
 } from '@/lib/auth';
 import type { UserRole } from '@/types';
+import { secureCookie } from '@/lib/input-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
           name: TOKEN_COOKIE_NAME,
           value: fresh,
           httpOnly: true,
-          secure: proto === 'https',
+          secure: secureCookie(proto === 'https'),
           sameSite: 'lax',
           path: '/',
           maxAge: sessionMaxAgeSeconds('STAFF'),

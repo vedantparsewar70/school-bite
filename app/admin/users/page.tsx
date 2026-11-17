@@ -18,6 +18,7 @@ import {
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { formatINR } from '@/lib/utils';
+import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const ALLERGY_FILTERS = [
   'Milk',
@@ -36,6 +37,7 @@ export default function AdminUsersPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Filters
   const [search, setSearch] = useState('');
@@ -50,12 +52,17 @@ export default function AdminUsersPage() {
     async function loadData() {
       try {
         const res = await fetch('/api/admin/users');
+        if (!res.ok) {
+          setLoadError(loadFailedMessage('users', res.status));
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           setStudents(data.students || []);
           setParents(data.parents || []);
         }
       } catch (err) {
+        setLoadError(loadFailedMessage('users'));
         console.error('Failed to load users:', err);
       } finally {
         setLoading(false);
@@ -111,6 +118,14 @@ export default function AdminUsersPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && students.length === 0 && parents.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <LoadError message={loadError} onRetry={() => window.location.reload()} />
       </div>
     );
   }
@@ -220,7 +235,7 @@ export default function AdminUsersPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Student name, ID, parent..."
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -231,7 +246,7 @@ export default function AdminUsersPage() {
                 <select
                   value={allergyFilter}
                   onChange={(e: any) => setAllergyFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold text-base"
                 >
                   <option value="ALL">All Students ({students.length})</option>
                   <option value="HAS_ALLERGIES">Has Allergies ({allergyRecordedCount})</option>
@@ -245,7 +260,7 @@ export default function AdminUsersPage() {
                 <select
                   value={specificAllergy}
                   onChange={(e) => setSpecificAllergy(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-base"
                 >
                   <option value="">Any Allergen</option>
                   {ALLERGY_FILTERS.map((alg) => (
@@ -262,7 +277,7 @@ export default function AdminUsersPage() {
                 <select
                   value={gradeFilter}
                   onChange={(e) => setGradeFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-base"
                 >
                   <option value="">All Classes</option>
                   {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((g) => (

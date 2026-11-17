@@ -369,7 +369,7 @@ test('OK 4g: failed attempt then retry reuses the same Cashfree order; after exp
   assert.equal(createdOrders.length, 2);
 });
 
-test('BUG 4g: changing the cart after a failed/abandoned attempt opens a second Cashfree order while the first is still payable; paying both double-books the shared meal', async () => {
+test('FIXED 4g (C2): paying both of two open payments no longer double-books the child; the second is refunded automatically', async () => {
   at('2026-11-01T10:00');
   const first = await (await startCheckout('CHK-X1')).json();
   // Parent closes popup (a UPI collect request may still be pending on the phone), adds another day.
@@ -380,7 +380,10 @@ test('BUG 4g: changing the cart after a failed/abandoned attempt opens a second 
   await paymentWebhook(first.orderId);
   await paymentWebhook(second.orderId);
   const nov2Items = fs.list('orderItems').filter((i) => i.date === '2026-11-02' && i.studentId === 'stu_1');
-  assert.equal(nov2Items.length, 2, 'same child, same meal, same day booked and charged twice');
+  assert.equal(nov2Items.length, 1, 'one brunch for the child that day');
+  const ex = fs.getDoc('payment_exceptions', second.orderId)!;
+  assert.equal(ex.reason, 'ALREADY_ORDERED');
+  assert.equal(refundsCreated.filter((r) => r.orderId === second.orderId || String(r.refund_id || '').includes(second.orderId)).length, 1, 'the second payment is refunded automatically, once');
 });
 
 const teacherOrder = (headers: Record<string, string> = {}, items = [{ mealId: 'TM-001', quantity: 1 }], teacherPhone = '9876543210') =>

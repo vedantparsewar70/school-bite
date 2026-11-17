@@ -135,7 +135,7 @@ export default function StaffHistoryPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-32 print:pb-0 print:max-w-none">
-      <div className="print:hidden sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
+      <div className="print:hidden sticky top-16 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 px-4 pt-3 pb-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-black text-slate-900">History</h1>
@@ -218,7 +218,7 @@ export default function StaffHistoryPage() {
 
         {!loaded ? (
           <div className="h-32 rounded-2xl bg-white border border-slate-200 animate-pulse" aria-hidden />
-        ) : view === 'NOT_SERVED' ? (
+        ) : error && rows.length === 0 && teachers.length === 0 ? null : view === 'NOT_SERVED' ? (
           <NotServedList date={date} rows={rows} teachers={teachers} />
         ) : tab === 'STUDENTS' ? (
           served.length === 0 ? (

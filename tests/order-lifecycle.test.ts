@@ -35,9 +35,11 @@ const patch = (handler: (req: Request) => Promise<Response>, url: string, body: 
 
 test('a handed-over meal can be un-given by staff (on the day) but never cancelled and refunded by staff', async () => {
   seedOrder('ORD-1', {}, getTodayString());
-  assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, staff)).status, 200);
+  // Whole-order handover here is an admin action (staff serve per child on the Serve screen).
+  assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, staff)).status, 403);
+  assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, admin)).status, 200);
   assert.ok(fs.getDoc('orders', 'ORD-1')?.collectedAt);
-  assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, staff)).status, 409, 'no double handover');
+  assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'COLLECTED' }, admin)).status, 409, 'no double handover');
 
   assert.equal((await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'CONFIRMED' }, staff)).status, 200, 'undo allowed');
   const cancel = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-1', orderStatus: 'CANCELLED' }, staff);
@@ -59,11 +61,11 @@ test('only paid orders can be prepared or handed over', async () => {
   seedOrder('ORD-R', { paymentStatus: 'REFUNDED', orderStatus: 'CONFIRMED' });
   for (const id of ['ORD-P', 'ORD-R']) {
     for (const orderStatus of ['READY', 'COLLECTED']) {
-      const res = await patch(updateOrder, '/api/admin/orders', { orderId: id, orderStatus }, staff);
+      const res = await patch(updateOrder, '/api/admin/orders', { orderId: id, orderStatus }, admin);
       assert.equal(res.status, 400, `${id} -> ${orderStatus}`);
     }
   }
-  const missing = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-NOPE', orderStatus: 'READY' }, staff);
+  const missing = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-NOPE', orderStatus: 'READY' }, admin);
   assert.equal(missing.status, 404);
   assert.doesNotMatch(JSON.stringify(await missing.json()), /Error:|stack/);
 });
@@ -94,9 +96,11 @@ test('teacher orders: only GIVEN/undo, only when paid, never given twice', async
   fs.seed('teacher_orders', 'TCH-U', { id: 'TCH-U', paymentStatus: 'PENDING', orderStatus: 'CONFIRMED' });
   const url = '/api/staff/teacher-orders';
 
-  for (const orderStatus of ['CANCELLED', 'REFUNDED', 'anything', '']) {
+  for (const orderStatus of ['REFUNDED', 'anything', '']) {
     assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus }, staff)).status, 400, orderStatus);
   }
+  // Cancel + refund is an admin action (tests/fix-teacher-order-refund.test.ts).
+  assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus: 'CANCELLED' }, staff)).status, 403);
   assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-U', orderStatus: 'GIVEN' }, staff)).status, 400);
   assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus: 'GIVEN' }, staff)).status, 200);
   const givenAt = fs.getDoc('teacher_orders', 'TCH-1')?.collectedAt;

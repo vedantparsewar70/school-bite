@@ -24,7 +24,11 @@ export async function GET(req: Request) {
     let orders = snap.docs.map((d) => d.data());
 
     // Strictly filter for completed PAID orders only
-    orders = orders.filter((o: any) => o.paymentStatus === 'PAID');
+    // Admin → Teacher orders also lists cancelled/refunded ones (?withCancelled=1); everyone else sees paid only.
+    const withCancelled = user.role === 'ADMIN' && searchParams.get('withCancelled') === '1';
+    orders = orders.filter((o: any) =>
+      withCancelled ? ['PAID', 'REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED'].includes(o.paymentStatus) : o.paymentStatus === 'PAID'
+    );
 
     // Sort by latest created
     orders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -75,8 +79,28 @@ export async function PATCH(req: Request) {
     if (typeof orderId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(orderId)) {
       return NextResponse.json({ error: 'orderId is required' }, { status: 400 });
     }
-    // GIVEN = handed over; CONFIRMED = undo a mistaken handover. Nothing else is accepted here
-    // (cancellation and refunds are not done through this endpoint).
+    // CANCELLED: an administrator cancels the paid order and refunds it in full (same no-double-refund
+    // logic as parent orders). Staff cannot cancel or refund.
+    if (orderStatus === 'CANCELLED') {
+      if (user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Only an administrator can cancel and refund a teacher order.' }, { status: 403 });
+      }
+      const { cancelTeacherOrderWithRefund, OrderCancellationError } = await import('@/lib/order-cancellation');
+      try {
+        const result = await cancelTeacherOrderWithRefund({ orderId, cancelledBy: user.id });
+        try {
+          const { notifyTeacherOrdersUpdated } = await import('@/lib/sync-events');
+          await notifyTeacherOrdersUpdated();
+        } catch {
+          // non-blocking
+        }
+        return NextResponse.json({ success: true, ...result });
+      } catch (err) {
+        if (err instanceof OrderCancellationError) return NextResponse.json({ error: err.message }, { status: err.status });
+        throw err;
+      }
+    }
+    // GIVEN = handed over; CONFIRMED = undo a mistaken handover.
     if (orderStatus !== 'GIVEN' && orderStatus !== 'CONFIRMED') {
       return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
     }

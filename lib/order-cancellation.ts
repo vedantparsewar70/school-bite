@@ -8,7 +8,7 @@ import {
   isMockPaymentAllowed,
 } from './cashfree';
 import { collectMenuStockInTransaction } from './menu-stock';
-import { isPartlyServed, orderServiceDates, serviceStatesFor } from './service-dates';
+import { isPartlyServed, itemServedAt, orderServiceDates, serviceStatesFor } from './service-dates';
 
 export type RefundPaymentStatus = 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED';
 
@@ -212,7 +212,9 @@ export async function cancelOrderWithRefund(
       throw new OrderCancellationError('This meal was already handed over. Only an administrator can cancel and refund it.', 403);
     }
     // A full refund of a multi-date order would also refund the days already served.
-    const servedDates = dates.filter((d) => states[d].collectedAt);
+    // A day counts as handed over only while a child on it is still served (an undone tap leaves the
+    // old collectedAt behind, which must not block a refund).
+    const servedDates = dates.filter((d) => items.some((it: any) => it.date === d && itemServedAt(order, d, String(it.id))));
     if (servedDates.length > 0 && servedDates.length < dates.length) {
       throw new OrderCancellationError(
         `Part of this order was already handed over (${servedDates.join(', ')}). Cancelling it would refund those meals too, and partial refunds are not supported yet. Nothing was changed.`,
@@ -281,9 +283,10 @@ async function recordRefundOutcome(
   orderId: string,
   refundId: string,
   refund: { paymentStatus: RefundPaymentStatus; refundStatus: string; cfRefundId?: string | null; error?: string | null },
-  firestore: Firestore
+  firestore: Firestore,
+  collection: 'orders' | 'teacher_orders' = 'orders'
 ): Promise<string> {
-  const orderRef = firestore.collection('orders').doc(orderId);
+  const orderRef = firestore.collection(collection).doc(orderId);
   const now = new Date().toISOString();
 
   return firestore.runTransaction(async (transaction) => {
@@ -316,10 +319,75 @@ export async function applyRefundStatus(
   refund: CashfreeRefund,
   firestore: Firestore = db
 ): Promise<string> {
-  return recordRefundOutcome(
+  const outcome = { paymentStatus: paymentStatusForRefund(refund.status), refundStatus: refund.status, cfRefundId: refund.cfRefundId };
+  // The refund belongs to a parent order or a teacher order; each update only applies when that
+  // order is cancelled with this refund ID.
+  const forTeacher = await recordRefundOutcome(orderId, refund.refundId, outcome, firestore, 'teacher_orders');
+  const forParent = await recordRefundOutcome(orderId, refund.refundId, outcome, firestore, 'orders');
+  return forParent !== 'undefined' ? forParent : forTeacher;
+}
+
+/**
+ * Admin cancels a paid TEACHER order and refunds it in full, with the same no-double-refund logic as
+ * parent orders (one refund ID per order; the gateway is asked before any create; a repeat only
+ * retries a pending or failed refund). Not possible once the meal was handed over.
+ */
+export async function cancelTeacherOrderWithRefund(
+  options: { orderId: string; cancelledBy: string },
+  firestore: Firestore = db,
+  refunds: RefundClient = cashfreeRefunds
+): Promise<CancelOrderResult> {
+  const { orderId } = options;
+  const orderRef = firestore.collection('teacher_orders').doc(orderId);
+  const now = new Date().toISOString();
+
+  const phase = await firestore.runTransaction(async (transaction) => {
+    const snap = await transaction.get(orderRef);
+    if (!snap.exists) throw new OrderCancellationError('Teacher order not found', 404);
+    const order = snap.data() || {};
+    const refundAmount = Number(order.totalAmount || 0);
+    const refundId: string = order.refundId || refundIdForOrder(orderId);
+
+    if (order.orderStatus === 'CANCELLED') {
+      const retryRefund = order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REFUND_FAILED';
+      return { order, refundId, refundAmount, refundNeeded: retryRefund, alreadyCancelled: true, paymentStatus: String(order.paymentStatus) };
+    }
+    // Judged on the current status only (an undone handover may leave collectedAt behind).
+    if (order.orderStatus === 'GIVEN' || order.orderStatus === 'COLLECTED') {
+      throw new OrderCancellationError('This meal was already handed over to the teacher, so it cannot be cancelled and refunded.', 409);
+    }
+    if (order.paymentStatus !== 'PAID') {
+      throw new OrderCancellationError('Only paid teacher orders can be cancelled and refunded.', 409);
+    }
+    const refundNeeded = refundAmount > 0;
+    const paymentStatus = refundNeeded ? 'REFUND_PENDING' : String(order.paymentStatus);
+    transaction.update(orderRef, {
+      orderStatus: 'CANCELLED',
+      paymentStatus,
+      cancelledAt: now,
+      cancelledBy: options.cancelledBy,
+      updatedAt: now,
+      ...(refundNeeded ? { refundId, refundAmount, refundStatus: 'REQUESTED' } : {}),
+    });
+    return { order, refundId, refundAmount, refundNeeded, alreadyCancelled: false, paymentStatus };
+  });
+
+  if (!phase.refundNeeded) {
+    return {
+      orderId,
+      alreadyCancelled: phase.alreadyCancelled,
+      paymentStatus: phase.paymentStatus,
+      refundAmount: 0,
+      message: phase.alreadyCancelled ? 'Order is already cancelled.' : 'Order cancelled.',
+    };
+  }
+  const refund = await requestRefund(phase.order, orderId, phase.refundId, phase.refundAmount, refunds);
+  const finalStatus = await recordRefundOutcome(orderId, phase.refundId, refund, firestore, 'teacher_orders');
+  return {
     orderId,
-    refund.refundId,
-    { paymentStatus: paymentStatusForRefund(refund.status), refundStatus: refund.status, cfRefundId: refund.cfRefundId },
-    firestore
-  );
+    alreadyCancelled: phase.alreadyCancelled,
+    paymentStatus: finalStatus,
+    refundAmount: phase.refundAmount,
+    message: refundMessage(finalStatus, phase.refundAmount),
+  };
 }

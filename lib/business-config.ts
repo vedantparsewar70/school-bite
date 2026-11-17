@@ -19,9 +19,6 @@ export interface BusinessConfig {
   shortDescription: string;
   websiteUrl: string;
   supportEmail: string;
-  supportPhone: string;
-  supportPhoneRaw: string;
-  whatsAppSupport: string;
   supportAvailability: string;
   businessAddress: {
     line1: string;
@@ -64,9 +61,6 @@ export const BUSINESS_CONFIG: BusinessConfig = {
 
   // Customer support contact details matching Cashfree KYC
   supportEmail: 'gayatriparsewar@gmail.com',
-  supportPhone: '+91 99220 28988',
-  supportPhoneRaw: '9922028988',
-  whatsAppSupport: 'Available',
   supportAvailability: 'Monday to Sunday, 08:00 AM – 06:00 PM IST',
 
   // Public Operating Address: Operating location of S.B. Patil School & canteen
