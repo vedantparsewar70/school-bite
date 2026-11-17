@@ -25,6 +25,9 @@ import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { validateCartAvailability } from '@/lib/availability';
 import { MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
 
+/** An error whose message is written for the parent and safe to show. */
+class CheckoutError extends Error {}
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // Rush-hour headroom: several Firestore round-trips plus a Cashfree call per request.
@@ -583,7 +586,7 @@ export async function POST(req: Request) {
     const evaluatedCartItems = cartItemsWithCategory.map((item, index) => {
       const meal = mealsMap.get(item.mealId);
       if (!meal) {
-        throw new Error(`Meal not found: ${item.mealName || item.mealId}`);
+        throw new CheckoutError(`${item.mealName || 'A dish'} in your cart is no longer on the menu. Please remove it and try again.`);
       }
 
       const serverUnitPrice = Number(meal.price || 0);
@@ -842,8 +845,18 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Error placing order:', error);
-    const userMessage = error?.message || 'Failed to process order';
-    return NextResponse.json({ error: userMessage }, { status: 400 });
+    // Only messages written for parents are shown; anything else (database, gateway, bugs) gets a
+    // friendly generic message, and the details stay in the server log.
+    if (error instanceof CheckoutError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Your order could not be read. Please refresh the page and try again.' }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: 'We could not place your order just now. Please try again in a moment.' },
+      { status: 500 }
+    );
   } finally {
     if (gatewayLock) {
       await releaseParentGatewayLock(gatewayLock.parentId, gatewayLock.token);
