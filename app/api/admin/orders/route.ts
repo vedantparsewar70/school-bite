@@ -281,8 +281,20 @@ export async function PATCH(req: Request) {
       const dates = orderServiceDates(itemsSnap.docs.map((d) => d.data()));
       const serviceDate = resolveServiceDate(dates, date);
       // Staff may undo a handover only on the day itself; older corrections are for an administrator.
-      if (user.role === 'STAFF' && orderStatus === 'CONFIRMED' && serviceDate !== getTodayString() && serviceStatusFor(orderData, serviceDate) === 'COLLECTED') {
-        throw new ServiceDateError('Only today’s handovers can be undone. Ask an administrator.', 403);
+      if (user.role === 'STAFF') {
+        // Staff hand meals over per child on the Serve screen (never a whole order, never another day),
+        // and only change today's orders here.
+        if (orderStatus === 'COLLECTED') {
+          throw new ServiceDateError('Meals are handed over on the Serve screen, one child at a time.', 403);
+        }
+        if (serviceDate !== getTodayString()) {
+          throw new ServiceDateError(
+            orderStatus === 'CONFIRMED' && serviceStatusFor(orderData, serviceDate) === 'COLLECTED'
+              ? 'Only today’s handovers can be undone. Ask an administrator.'
+              : 'Only today’s orders can be changed. Ask an administrator.',
+            403
+          );
+        }
       }
       const update = applyServiceStatus(orderData, dates, serviceDate, orderStatus, user.id, new Date().toISOString());
 

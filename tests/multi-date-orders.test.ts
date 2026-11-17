@@ -43,7 +43,7 @@ afterEach(() => setFirestoreForTesting(null));
 
 const patch = (handler: (req: Request) => Promise<Response>, url: string, body: unknown, headers: Record<string, string>) =>
   handler(jsonRequest(url, 'PATCH', body, headers));
-const give = (date: string | undefined, who = staff) =>
+const give = (date: string | undefined, who = admin) =>
   patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-M', orderStatus: 'COLLECTED', date }, who);
 const staffView = async (date: string) =>
   (await (await listAdminOrders(jsonRequest(`/api/admin/orders?date=${date}`, 'GET', undefined, staff))).json()).orders;
@@ -183,7 +183,7 @@ test('orders saved before per-day tracking keep their meaning: a collected order
 test('single-date orders still work without naming the date, and the parent sees each day', async () => {
   fs.seed('orders', 'ORD-S', { id: 'ORD-S', parentId: 'par_usr_parent', totalAmount: 80, paymentStatus: 'PAID', orderStatus: 'CONFIRMED' });
   fs.seed('orderItems', 'oit_s', { id: 'oit_s', orderId: 'ORD-S', studentId: 'stu_1', mealId: 'meal_soya', date: MON, quantity: 1 });
-  const res = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-S', orderStatus: 'COLLECTED' }, staff);
+  const res = await patch(updateOrder, '/api/admin/orders', { orderId: 'ORD-S', orderStatus: 'COLLECTED' }, admin);
   assert.equal(res.status, 200);
   assert.equal(fs.getDoc('orders', 'ORD-S')?.orderStatus, 'COLLECTED');
 
