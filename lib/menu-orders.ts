@@ -4,6 +4,7 @@ import { STUDENT_CATEGORIES, type StudentCategory } from './monthly-menu';
 import { effectiveMenuEntry, rankMenuEntries, type MenuEntryLike } from './menu-entries';
 import { categoryMenuDocId, normalizeStudentCategory } from './menu-stock';
 import { APP_TIMEZONE, getTodayString, isDeadlinePassed } from './utils';
+import { getStudentCategory } from './october-2026-timetable';
 
 /**
  * Shared rules for changing a day's menu (Student Menu, Admin → Menu, older menu APIs):
@@ -25,6 +26,31 @@ type Reader = (target: any) => Promise<any>;
 
 export const DEFAULT_DEADLINE = '08:30';
 
+/**
+ * Order lines saved without a class (older orders) get their child's class, the same rule Prepare and
+ * Serve use, so they count for that class only and not for every class.
+ */
+export async function withLineClasses<T extends { studentCategory?: string | null; studentId?: string | null }>(
+  read: Reader,
+  firestore: Firestore,
+  lines: T[]
+): Promise<T[]> {
+  const missing = Array.from(
+    new Set(lines.filter((l) => normalizeStudentCategory(l.studentCategory) === 'ALL' && l.studentId).map((l) => String(l.studentId)))
+  );
+  const classes = new Map<string, string>();
+  for (const id of missing) {
+    const snap = await read(firestore.collection('students').doc(id));
+    const s = snap.exists ? snap.data() : null;
+    if (s) classes.set(id, normalizeStudentCategory(getStudentCategory(s.grade, s.studentCategory)));
+  }
+  return lines.map((l) =>
+    normalizeStudentCategory(l.studentCategory) === 'ALL' && l.studentId && classes.has(String(l.studentId))
+      ? { ...l, studentCategory: classes.get(String(l.studentId)) }
+      : l
+  );
+}
+
 export const hasOrdersMessage = (n: number) =>
   `${n} ${n === 1 ? 'child has' : 'children have'} already ordered this. Ask the admin to cancel and refund those orders first.`;
 
@@ -45,8 +71,8 @@ export async function paidOrdersFor(
   const mealIds = new Set(entries.map((m) => m.mealId).filter(Boolean) as string[]);
   const cats = new Set(categories.map((c) => normalizeStudentCategory(c)));
   const itemsSnap = await read(firestore.collection('orderItems').where('date', '==', date));
-  const lines = (itemsSnap.docs as Array<{ id: string; data: () => any }>)
-    .map((d) => ({ ...d.data(), id: d.id }))
+  const all = (itemsSnap.docs as Array<{ id: string; data: () => any }>).map((d) => ({ ...d.data(), id: d.id }));
+  const lines = (await withLineClasses(read, firestore, all))
     .filter((it: any) => {
       if (it.kind === 'EXTRA') return false; // extras have their own rules (lib/menu-extras.ts)
       if (it.menuId) return ids.has(String(it.menuId));

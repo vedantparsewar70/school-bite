@@ -358,7 +358,10 @@ export async function applyMonthlyMenu(
         orders.filter((o) => o.exists && o.data()?.paymentStatus === 'PAID' && o.data()?.orderStatus !== 'CANCELLED').map((o) => o.id)
       );
       // Extras are never part of the main brunch the import sets.
-      orderItemsByDate.set(date, lines.filter((it) => active.has(String(it.orderId || '')) && (it as { kind?: string }).kind !== 'EXTRA'));
+      // Older lines without a class count for their child's class only.
+      const counted = lines.filter((it) => active.has(String(it.orderId || '')) && (it as { kind?: string }).kind !== 'EXTRA');
+      const { withLineClasses } = await import('./menu-orders');
+      orderItemsByDate.set(date, await withLineClasses((t) => t.get(), firestore, counted as Array<StoredOrderItem & { studentId?: string }>));
     }
     return orderItemsByDate.get(date)!;
   };
