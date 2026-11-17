@@ -213,6 +213,16 @@ function AdminOrdersContent() {
         </button>
       </div>
 
+      {/* Student / teacher orders */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-h-[44px] px-4 rounded-xl text-sm font-bold bg-slate-900 text-white inline-flex items-center" aria-current="page">
+          Student orders
+        </span>
+        <Link href="/admin/teacher-orders" className="min-h-[44px] px-4 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center">
+          Teacher orders
+        </Link>
+      </div>
+
       {/* Quick Date Pills */}
       <div className="flex flex-wrap items-center gap-2">
         <button

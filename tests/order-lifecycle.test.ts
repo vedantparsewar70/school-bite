@@ -96,9 +96,11 @@ test('teacher orders: only GIVEN/undo, only when paid, never given twice', async
   fs.seed('teacher_orders', 'TCH-U', { id: 'TCH-U', paymentStatus: 'PENDING', orderStatus: 'CONFIRMED' });
   const url = '/api/staff/teacher-orders';
 
-  for (const orderStatus of ['CANCELLED', 'REFUNDED', 'anything', '']) {
+  for (const orderStatus of ['REFUNDED', 'anything', '']) {
     assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus }, staff)).status, 400, orderStatus);
   }
+  // Cancel + refund is an admin action (tests/fix-teacher-order-refund.test.ts).
+  assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus: 'CANCELLED' }, staff)).status, 403);
   assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-U', orderStatus: 'GIVEN' }, staff)).status, 400);
   assert.equal((await patch(teacherOrderUpdate, url, { orderId: 'TCH-1', orderStatus: 'GIVEN' }, staff)).status, 200);
   const givenAt = fs.getDoc('teacher_orders', 'TCH-1')?.collectedAt;
