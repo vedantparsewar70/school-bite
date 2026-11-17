@@ -30,7 +30,19 @@ import { formatDatePretty, formatINR, getTodayString } from '@/lib/utils';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import VegBadge from '@/components/VegBadge';
-import { DEFAULT_BRUNCH_PRICES, MAX_BRUNCH_PRICE, priceChanges, validateBrunchPrices, type BrunchPrices } from '@/lib/brunch-prices';
+import {
+  DEFAULT_BRUNCH_PRICES,
+  DEFAULT_PORTIONS,
+  MAX_BRUNCH_PRICE,
+  MAX_DEFAULT_PORTIONS,
+  portionChanges,
+  priceChanges,
+  validateBrunchPrices,
+  validateBulkPortions,
+  validateDefaultPortions,
+  type BrunchPrices,
+  type DefaultPortions,
+} from '@/lib/brunch-prices';
 
 /**
  * Student Menu editor (Staff → Student Menu and Admin → Menu). What each class can order on each
@@ -146,6 +158,8 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
   const [notice, setNotice] = useState<{ ok: boolean; text: string; retryOthers?: () => void } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState(false);
+  // Portions a new main dish starts with, per class (from the settings card; 500 until saved).
+  const [defaultPortions, setDefaultPortions] = useState<DefaultPortions>(DEFAULT_PORTIONS);
   const seq = useRef(0);
   const stripRef = useRef<HTMLDivElement>(null);
   // One save at a time: a second tap while a save is running does nothing.
@@ -281,11 +295,12 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
     const targets: ClassName[] = classes === 'ALL' ? CLASSES : classes;
     const r = await send('/api/admin/menus/assign', 'POST', { date, studentCategory: classes === 'ALL' ? 'ALL' : classes[0], mealId, replace: true });
     if (!r.ok) return { ok: false, data: r.data };
-    // Portions: set when chosen and different from what the class now has (a new dish starts at 50).
+    // Portions: set when chosen and different from what the class now has (a new dish starts at the
+    // class's default portions).
     if (portions !== null) {
       for (const cat of targets) {
         const before = cardsBefore.find((c) => c.category === cat);
-        const current = before?.mealId === mealId ? before.maxQuantity : 50;
+        const current = before?.mealId === mealId ? before.maxQuantity : defaultPortions[cat];
         if (current !== portions) {
           const p = await send('/api/admin/menus/portions', 'POST', { date, studentCategory: cat, portions });
           if (!p.ok) return { ok: false, data: { ...p.data, error: `${cat}: ${p.data.error || 'Portions not saved.'}` } };
@@ -477,7 +492,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
 
       {tab === 'MENU' ? (
         <>
-          <BrunchPricesCard />
+          <BrunchPricesCard onDefaults={setDefaultPortions} onApplied={() => refreshAfterChange()} />
 
           {/* Date strip: scrolls sideways on its own; the page never does. */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 sm:p-3 space-y-2" aria-label="Choose a day">
@@ -667,6 +682,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
           category={sheet.category}
           mode={sheet.mode}
           dishes={dishes}
+          defaultPortions={defaultPortions}
           busy={busy}
           onClose={() => setSheet(null)}
           onCreated={(d) => setDishes((prev) => [d, ...prev.filter((x) => x.id !== d.id)])}
@@ -794,23 +810,33 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
 // --- Pieces ----------------------------------------------------------------------------------
 
 /**
- * Brunch prices by class (staff and admin). The server validates and stores them
- * (/api/admin/menus/brunch-prices); before saving, the old → new price of each changed class is
- * shown for confirmation so a typo (₹90 → ₹900) is caught.
+ * Student Menu settings card (staff and admin): brunch prices by class, default portions per class
+ * for new main menu entries, and "Apply portions to upcoming days". The server validates and stores
+ * everything (/api/admin/menus/brunch-prices, /api/admin/menus/portions/bulk); each save first
+ * shows a confirmation (old → new), so a typo (₹90 → ₹900) is caught.
  */
-function BrunchPricesCard() {
-  const [saved, setSaved] = useState<BrunchPrices | null>(null);
-  const [form, setForm] = useState<Record<ClassName, string>>({ 'Pre-primary': '', Primary: '', Secondary: '' });
+function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPortions) => void; onApplied: () => void }) {
+  type Form = Record<ClassName, string>;
+  const toForm = (v: Record<ClassName, number>): Form => ({ 'Pre-primary': String(v['Pre-primary']), Primary: String(v.Primary), Secondary: String(v.Secondary) });
+  const [saved, setSaved] = useState<{ prices: BrunchPrices; defaultPortions: DefaultPortions } | null>(null);
+  const [priceForm, setPriceForm] = useState<Form>({ 'Pre-primary': '', Primary: '', Secondary: '' });
+  const [portionForm, setPortionForm] = useState<Form>({ 'Pre-primary': '', Primary: '', Secondary: '' });
   const [loadError, setLoadError] = useState('');
   const [problem, setProblem] = useState('');
   const [message, setMessage] = useState('');
-  const [confirm, setConfirm] = useState<{ prices: BrunchPrices; lines: string[] } | null>(null);
+  const [confirm, setConfirm] = useState<{ title: string; lines: string[]; note: string; body: Record<string, unknown> } | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const show = (p: BrunchPrices) => {
-    setSaved(p);
-    setForm({ 'Pre-primary': String(p['Pre-primary']), Primary: String(p.Primary), Secondary: String(p.Secondary) });
-  };
+  const show = useCallback(
+    (s: { prices: BrunchPrices; defaultPortions: DefaultPortions }) => {
+      setSaved(s);
+      setPriceForm(toForm(s.prices));
+      setPortionForm(toForm(s.defaultPortions));
+      onDefaults(s.defaultPortions);
+    },
+    [onDefaults]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -821,55 +847,84 @@ function BrunchPricesCard() {
         return;
       }
       setLoadError('');
-      show(body.prices as BrunchPrices);
+      show({ prices: body.prices as BrunchPrices, defaultPortions: (body.defaultPortions || DEFAULT_PORTIONS) as DefaultPortions });
     } catch {
       setLoadError('Could not load the brunch prices. Check the connection.');
     }
-  }, []);
+  }, [show]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const review = () => {
+  const reviewPrices = () => {
     setMessage('');
     if (!saved) return;
-    const v = validateBrunchPrices(form);
+    const v = validateBrunchPrices(priceForm);
     if (!v.ok) return setProblem(v.error);
     setProblem('');
-    const lines = priceChanges(saved, v.prices);
+    const lines = priceChanges(saved.prices, v.prices);
     if (lines.length === 0) return setMessage('No change: the prices are the same.');
-    setConfirm({ prices: v.prices, lines });
+    setConfirm({ title: 'Change brunch prices?', lines, note: 'Orders already paid keep the price they were bought at.', body: { prices: v.prices } });
+  };
+
+  const reviewPortions = () => {
+    setMessage('');
+    if (!saved) return;
+    const v = validateDefaultPortions(portionForm);
+    if (!v.ok) return setProblem(v.error);
+    setProblem('');
+    const lines = portionChanges(saved.defaultPortions, v.portions);
+    if (lines.length === 0) return setMessage('No change: the default portions are the same.');
+    setConfirm({ title: 'Change default portions?', lines, note: 'Used for new menu entries only. Days already on the menu keep their portions.', body: { defaultPortions: v.portions } });
   };
 
   const save = async () => {
     if (!confirm || busy) return;
     setBusy(true);
     try {
-      const r = await send('/api/admin/menus/brunch-prices', 'PUT', { prices: confirm.prices });
+      const r = await send('/api/admin/menus/brunch-prices', 'PUT', confirm.body);
       if (r.ok && r.data.prices) {
-        show(r.data.prices as BrunchPrices);
-        setMessage(r.data.message || 'Brunch prices saved. They apply to new orders only.');
-        setConfirm(null);
+        show({ prices: r.data.prices as BrunchPrices, defaultPortions: r.data.defaultPortions as DefaultPortions });
+        setMessage(r.data.message || 'Saved.');
         broadcastSyncEvent('MENU_UPDATED');
       } else {
-        setProblem(r.data.error || 'The prices could not be saved. Please try again.');
-        setConfirm(null);
+        setProblem(r.data.error || 'Not saved. Please try again.');
       }
     } catch {
       setProblem('Not saved: no connection. Please try again.');
-      setConfirm(null);
     } finally {
+      setConfirm(null);
       setBusy(false);
     }
   };
 
+  const numberFields = (form: Form, setForm: React.Dispatch<React.SetStateAction<Form>>, unit: string, max: number, placeholder: (c: ClassName) => string) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {CLASSES.map((c) => (
+        <label key={c} className="block">
+          <span className="text-sm font-bold text-slate-700">
+            {c} {unit}
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={max}
+            step={1}
+            disabled={!saved || busy}
+            value={form[c]}
+            placeholder={placeholder(c)}
+            onChange={(e) => setForm((f) => ({ ...f, [c]: e.target.value }))}
+            className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
+          />
+        </label>
+      ))}
+    </div>
+  );
+
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3" aria-labelledby="brunch-prices-title">
-      <div>
-        <h2 id="brunch-prices-title" className="text-lg font-black text-slate-900">Brunch prices by class</h2>
-        <p className="text-sm text-slate-600">Every main brunch costs the class price, whatever the dish. Changes apply to new orders only.</p>
-      </div>
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4" aria-labelledby="brunch-prices-title">
       {loadError ? (
         <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm font-semibold flex items-center justify-between gap-3">
           <span>{loadError}</span>
@@ -879,54 +934,182 @@ function BrunchPricesCard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {CLASSES.map((c) => (
-              <label key={c} className="block">
-                <span className="text-sm font-bold text-slate-700">{c} (₹)</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={MAX_BRUNCH_PRICE}
-                  step={1}
-                  disabled={!saved || busy}
-                  value={form[c]}
-                  placeholder={String(DEFAULT_BRUNCH_PRICES[c])}
-                  onChange={(e) => setForm((f) => ({ ...f, [c]: e.target.value }))}
-                  className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
-                />
-              </label>
-            ))}
+          <div className="space-y-3">
+            <div>
+              <h2 id="brunch-prices-title" className="text-lg font-black text-slate-900">Brunch prices by class</h2>
+              <p className="text-sm text-slate-600">Every main brunch costs the class price, whatever the dish. Changes apply to new orders only.</p>
+            </div>
+            {numberFields(priceForm, setPriceForm, '(₹)', MAX_BRUNCH_PRICE, (c) => String(DEFAULT_BRUNCH_PRICES[c]))}
+            <p className="text-xs text-slate-500">Whole rupees, ₹1 to ₹{MAX_BRUNCH_PRICE}. Extras and the teacher menu keep their own prices.</p>
+            <button type="button" disabled={!saved || busy} onClick={reviewPrices} className={`${PRIMARY_BTN} w-full sm:w-auto px-6`}>
+              Save prices
+            </button>
           </div>
-          <p className="text-xs text-slate-500">Whole rupees, ₹1 to ₹{MAX_BRUNCH_PRICE}. Extras and the teacher menu keep their own prices.</p>
+
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Default portions per class</h3>
+              <p className="text-sm text-slate-600">Portions a new main dish starts with (monthly import, Add dish, Change dish into an empty class). Extras keep their own portions.</p>
+            </div>
+            {numberFields(portionForm, setPortionForm, '(portions)', MAX_DEFAULT_PORTIONS, (c) => String(DEFAULT_PORTIONS[c]))}
+            <p className="text-xs text-slate-500">Whole numbers, 1 to {MAX_DEFAULT_PORTIONS}.</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button type="button" disabled={!saved || busy} onClick={reviewPortions} className={`${PRIMARY_BTN} px-6`}>
+                Save default portions
+              </button>
+              <button
+                type="button"
+                disabled={!saved || busy}
+                onClick={() => {
+                  setMessage('');
+                  setProblem('');
+                  setBulkOpen(true);
+                }}
+                className="min-h-[48px] px-5 rounded-xl border border-slate-300 bg-white text-base font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Apply portions to upcoming days
+              </button>
+            </div>
+          </div>
           {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
           {message && <p role="status" className="text-base font-semibold text-emerald-800">{message}</p>}
-          <button type="button" disabled={!saved || busy} onClick={review} className={`${PRIMARY_BTN} w-full sm:w-auto px-6`}>
-            Save prices
-          </button>
         </>
       )}
       {confirm && (
-        <BottomSheet title="Change brunch prices?" subtitle="Changes apply to new orders only." onClose={() => setConfirm(null)}>
-          <ul className="space-y-1.5" aria-label="Price changes">
+        <BottomSheet title={confirm.title} subtitle="Please check before saving." onClose={() => setConfirm(null)}>
+          <ul className="space-y-1.5" aria-label="Changes">
             {confirm.lines.map((line) => (
               <li key={line} className="text-lg font-bold text-slate-900">
                 {line}
               </li>
             ))}
           </ul>
-          <p className="text-sm text-slate-600">Orders already paid keep the price they were bought at.</p>
+          <p className="text-sm text-slate-600">{confirm.note}</p>
           <div className="grid grid-cols-2 gap-3">
             <button type="button" onClick={() => setConfirm(null)} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
               Go back
             </button>
             <button type="button" disabled={busy} onClick={save} className={`${PRIMARY_BTN} min-h-[48px]`}>
-              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save new prices
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save
             </button>
           </div>
         </BottomSheet>
       )}
+      {bulkOpen && saved && <BulkPortionsSheet defaults={saved.defaultPortions} onClose={() => setBulkOpen(false)} onApplied={onApplied} />}
     </section>
+  );
+}
+
+/**
+ * "Apply portions to upcoming days": choose classes and a number, confirm, and every upcoming main
+ * menu entry for those classes gets it (never below what is already ordered). Shows what was
+ * updated and lists what was skipped.
+ */
+function BulkPortionsSheet({ defaults, onClose, onApplied }: { defaults: DefaultPortions; onClose: () => void; onApplied: () => void }) {
+  const [classes, setClasses] = useState<ClassName[]>([...CLASSES]);
+  const [portions, setPortions] = useState(String(defaults.Primary));
+  const [step, setStep] = useState<'choose' | 'confirm' | 'done'>('choose');
+  const [problem, setProblem] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ message: string; skipped: Array<{ date: string; category: string; reason: string }> } | null>(null);
+
+  const review = () => {
+    const v = validateBulkPortions({ classes, portions });
+    if (!v.ok) return setProblem(v.error);
+    setProblem('');
+    setStep('confirm');
+  };
+
+  const apply = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await send('/api/admin/menus/portions/bulk', 'POST', { classes, portions: Number(portions) });
+      if (r.ok) {
+        setResult({ message: r.data.message || 'Done.', skipped: Array.isArray(r.data.skipped) ? r.data.skipped : [] });
+        setStep('done');
+        broadcastSyncEvent('MENU_UPDATED');
+        onApplied();
+      } else {
+        setProblem(r.data.error || 'Not applied. Please try again.');
+        setStep('choose');
+      }
+    } catch {
+      setProblem('Not applied: no connection. Please try again.');
+      setStep('choose');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <BottomSheet title="Apply portions to upcoming days" subtitle="Main dishes only. Extras keep their own portions." onClose={onClose}>
+      {step === 'choose' && (
+        <>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-bold text-slate-700 mb-1">Classes</legend>
+            {CLASSES.map((c) => (
+              <label key={c} className={`flex items-center gap-3 min-h-[48px] px-3 rounded-xl border cursor-pointer ${classes.includes(c) ? 'border-slate-900 bg-slate-50' : 'border-slate-200'}`}>
+                <input
+                  type="checkbox"
+                  checked={classes.includes(c)}
+                  onChange={(e) => setClasses((prev) => (e.target.checked ? CLASSES.filter((x) => x === c || prev.includes(x)) : prev.filter((x) => x !== c)))}
+                  className="w-5 h-5 accent-slate-900 text-base"
+                />
+                <span className="text-base font-semibold">{c}</span>
+              </label>
+            ))}
+          </fieldset>
+          <label className="block">
+            <span className="text-sm font-bold text-slate-700">Portions for each day</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_DEFAULT_PORTIONS}
+              value={portions}
+              onChange={(e) => setPortions(e.target.value)}
+              className="mt-1 w-full min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+          </label>
+          {problem && <p role="alert" className="text-base font-semibold text-rose-700">{problem}</p>}
+          <SheetActions busy={busy} onCancel={onClose} onSave={review} saveLabel="Next" />
+        </>
+      )}
+      {step === 'confirm' && (
+        <>
+          <p className="text-base text-slate-900">
+            Set portions to <span className="font-black">{Number(portions)}</span> for <span className="font-black">{classes.join(', ')}</span> on every upcoming day (today too, if ordering is still open)?
+          </p>
+          <p className="text-sm text-slate-600">Never below what is already ordered: those days are skipped and listed. Past and closed days are not changed.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setStep('choose')} disabled={busy} className="min-h-[48px] rounded-xl border border-slate-300 bg-white text-base font-bold hover:bg-slate-50">
+              Go back
+            </button>
+            <button type="button" disabled={busy} onClick={apply} className={`${PRIMARY_BTN} min-h-[48px]`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Apply
+            </button>
+          </div>
+        </>
+      )}
+      {step === 'done' && result && (
+        <>
+          <p role="status" className="text-lg font-black text-slate-900">{result.message}</p>
+          {result.skipped.length > 0 && (
+            <ul className="max-h-[34dvh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl" aria-label="Skipped">
+              {result.skipped.map((s) => (
+                <li key={`${s.date}-${s.category}`} className="px-3 py-2 text-sm text-slate-700">
+                  <span className="font-bold">{formatDatePretty(s.date)} · {s.category}</span>: {s.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={onClose} className={`${PRIMARY_BTN} w-full`}>
+            Done
+          </button>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -1311,6 +1494,7 @@ function DishSheet({
   category,
   mode,
   dishes,
+  defaultPortions,
   busy,
   onClose,
   onCreated,
@@ -1320,6 +1504,7 @@ function DishSheet({
   category: ClassName;
   mode: 'add' | 'change';
   dishes: Dish[];
+  defaultPortions: DefaultPortions;
   busy: boolean;
   onClose: () => void;
   onCreated: (d: Dish) => void;
@@ -1331,7 +1516,7 @@ function DishSheet({
   // Starts at the class's total, but never below what is already ordered (shown on screen; the
   // server still enforces it).
   const [portions, setPortions] = useState(() =>
-    String(Math.max(card.maxQuantity ?? 50, ...day.classes.filter((c) => c.editable && c.mealId && c.mealId === card.mealId).map((c) => c.ordered)))
+    String(Math.max(card.maxQuantity ?? defaultPortions[category], ...day.classes.filter((c) => c.editable && c.mealId && c.mealId === card.mealId).map((c) => c.ordered)))
   );
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState('');

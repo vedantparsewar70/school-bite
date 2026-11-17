@@ -70,3 +70,56 @@ export function mainOrExtraPrice(
 export function priceChanges(oldPrices: BrunchPrices, newPrices: BrunchPrices): string[] {
   return STUDENT_CATEGORIES.filter((c) => oldPrices[c] !== newPrices[c]).map((c) => `${c}: ₹${oldPrices[c]} → ₹${newPrices[c]}`);
 }
+
+// --- Default portions per class ------------------------------------------------------------------
+// Stored in the same settings document (field `defaultPortions`) and edited on the same card. Used
+// when a NEW main menu entry is created (monthly import, Add dish, Change dish into an empty class).
+// Extras keep their own portions; the teacher menu is unchanged.
+
+export type DefaultPortions = Record<StudentCategory, number>;
+
+export const DEFAULT_PORTIONS: DefaultPortions = { 'Pre-primary': 500, Primary: 500, Secondary: 500 };
+export const MAX_DEFAULT_PORTIONS = 2000;
+
+export const isValidPortionCount = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_DEFAULT_PORTIONS;
+
+/** Stored value -> usable defaults; each class falls back to 500 when missing or invalid. */
+export function normalizeDefaultPortions(stored: unknown): DefaultPortions {
+  const src = stored && typeof stored === 'object' ? (stored as Record<string, unknown>) : {};
+  const out = { ...DEFAULT_PORTIONS };
+  for (const c of STUDENT_CATEGORIES) if (isValidPortionCount(src[c])) out[c] = src[c] as number;
+  return out;
+}
+
+const asNumber = (raw: unknown) => (typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim()) : raw);
+
+/** Validates new default portions: all three classes, whole numbers 1 to 2000. */
+export function validateDefaultPortions(input: unknown): { ok: true; portions: DefaultPortions } | { ok: false; error: string } {
+  const src = input && typeof input === 'object' ? (input as Record<string, unknown>) : null;
+  if (!src) return { ok: false, error: 'Please enter default portions for each class.' };
+  const portions = {} as DefaultPortions;
+  for (const c of STUDENT_CATEGORIES) {
+    const n = asNumber(src[c]);
+    if (!isValidPortionCount(n)) return { ok: false, error: `${c}: enter a whole number of portions from 1 to ${MAX_DEFAULT_PORTIONS}.` };
+    portions[c] = n;
+  }
+  return { ok: true, portions };
+}
+
+/** "Primary: 500 → 300 portions" lines for the classes whose default changes. */
+export function portionChanges(oldValues: DefaultPortions, newValues: DefaultPortions): string[] {
+  return STUDENT_CATEGORIES.filter((c) => oldValues[c] !== newValues[c]).map((c) => `${c}: ${oldValues[c]} → ${newValues[c]} portions`);
+}
+
+/** Bulk "Apply portions to upcoming days": the classes and a whole number 1 to 2000. */
+export function validateBulkPortions(input: { classes?: unknown; portions?: unknown }):
+  | { ok: true; classes: StudentCategory[]; portions: number }
+  | { ok: false; error: string } {
+  const list = Array.isArray(input.classes) ? input.classes : [];
+  const classes = STUDENT_CATEGORIES.filter((c) => list.includes(c));
+  if (classes.length === 0 || classes.length !== new Set(list).size) return { ok: false, error: 'Please choose at least one class (Pre-primary, Primary, Secondary).' };
+  const n = asNumber(input.portions);
+  if (!isValidPortionCount(n)) return { ok: false, error: `Portions must be a whole number from 1 to ${MAX_DEFAULT_PORTIONS}.` };
+  return { ok: true, classes, portions: n };
+}

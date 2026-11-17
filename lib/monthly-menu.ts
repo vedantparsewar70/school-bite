@@ -8,6 +8,7 @@ type StoredMenu = MenuEntryLike & { id: string; holidayReason?: string | null };
 type StoredOrderItem = { menuId?: string; mealId?: string; studentCategory?: string | null };
 import { getTodayString, APP_TIMEZONE, isSundayDate } from './utils';
 import type { XlsxSheet } from './xlsx-reader';
+import { getDefaultPortions } from './brunch-prices-server';
 
 /**
  * Monthly student menu import: a spreadsheet with Day, Date, Pre-primary, Primary, Secondary
@@ -372,6 +373,8 @@ export async function applyMonthlyMenu(
   // Switched-off entries for the same dish, switched back on in place (ID, stock and orders kept).
   const reactivations = new Map<string, Record<string, unknown>>();
   const resultDays: ImportResult['days'] = [];
+  // A new main entry starts with the class's default portions (Student Menu card; 500 until saved).
+  const defaultPortions = await getDefaultPortions(firestore);
   const keptVia: Array<{ cat: StudentCategory; entryId: string; entry: { id: string; data: Record<string, unknown> } }> = [];
   const standardEntry = (date: string, cat: StudentCategory, desired: { mealId: string; isHoliday: boolean; holidayReason: string | null }) => {
     const id = categoryMenuDocId(date, cat);
@@ -382,8 +385,8 @@ export async function applyMonthlyMenu(
         date,
         studentCategory: cat,
         ...desired,
-        availableQuantity: desired.isHoliday ? 0 : 50,
-        maxQuantity: 50,
+        availableQuantity: desired.isHoliday ? 0 : defaultPortions[cat],
+        maxQuantity: defaultPortions[cat],
         orderingDeadline: '08:30',
         isActive: !desired.isHoliday,
         source: 'monthly-import',

@@ -15,6 +15,9 @@ Live site: https://school-bite.vercel.app (hosted on Vercel).
 - Brunch price is set by class (defaults: Pre-primary ₹60, Primary ₹75, Secondary ₹90); staff and
   admin change it on the Student Menu page ("Brunch prices by class"; new orders only). Extras and
   the teacher menu keep their own per-dish prices.
+- New main menu entries start with the class's default portions (500 each until changed on the same
+  card). "Apply portions to upcoming days" sets portions for chosen classes on every upcoming day
+  (never below what is already ordered; closed days are skipped and listed).
 - Order up to 08:30 IST on the meal day. No ordering on Sundays or on holidays set for the class.
 - Pay online through Cashfree (UPI, cards, net banking). See orders, payments and receipts.
 - Orders cannot be cancelled online; the canteen (admin) cancels and refunds in full.

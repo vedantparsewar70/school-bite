@@ -147,7 +147,8 @@ export async function undoHoliday(
  */
 export async function setPortions(
   input: { date: unknown; studentCategory: unknown; portions: unknown; actorId: string },
-  firestore: Firestore = db
+  firestore: Firestore = db,
+  options: { notify?: boolean } = {}
 ): Promise<Result> {
   const { date, studentCategory, portions, actorId } = input;
   if (!validDate(date)) return { status: 400, body: { error: 'Please choose a valid date.' } };
@@ -182,9 +183,62 @@ export async function setPortions(
     );
     return { status: 200, body: { success: true, maxQuantity: n, availableQuantity: n - ordered, ordered } };
   }).then(async (r) => {
-    if (r.status === 200) await notify();
+    if (r.status === 200 && options.notify !== false) await notify();
     return r;
   });
+}
+
+export interface BulkPortionsResult {
+  /** Dates where at least one chosen class was updated. */
+  updatedDays: string[];
+  /** Class entries updated (date + class). */
+  updated: Array<{ date: string; category: StudentCategory }>;
+  /** Entries that could not be changed, with the reason. */
+  skipped: Array<{ date: string; category: StudentCategory; reason: string }>;
+}
+
+/**
+ * "Apply portions to upcoming days": sets the portions of every upcoming MAIN menu entry (today if
+ * ordering is still open, and every later day) for the chosen classes. Each entry goes through
+ * setPortions (one transaction each; never below what is already ordered). Extras are untouched.
+ * Entries that cannot be changed are skipped and listed (closed, Sunday, or more already ordered).
+ */
+export async function bulkSetPortions(
+  input: { classes: StudentCategory[]; portions: number; actorId: string },
+  firestore: Firestore = db
+): Promise<BulkPortionsResult> {
+  const today = getTodayString(APP_TIMEZONE);
+  const snap = await firestore.collection('menus').where('date', '>=', today).get();
+  const dates = new Set<string>();
+  for (const d of snap.docs) {
+    const m = d.data() as MenuEntry;
+    if (!validDate(m.date) || m.isHoliday || m.isActive === false) continue;
+    const cat = normalizeStudentCategory(m.studentCategory);
+    if (cat === 'ALL' || input.classes.includes(cat as StudentCategory)) dates.add(m.date);
+  }
+  const result: BulkPortionsResult = { updatedDays: [], updated: [], skipped: [] };
+  for (const date of Array.from(dates).sort()) {
+    for (const category of input.classes) {
+      if (isSundayDate(date)) {
+        result.skipped.push({ date, category, reason: 'Sunday (closed)' });
+        continue;
+      }
+      const r = await setPortions({ date, studentCategory: category, portions: input.portions, actorId: input.actorId }, firestore, { notify: false });
+      if (r.status === 200) {
+        result.updated.push({ date, category });
+        if (!result.updatedDays.includes(date)) result.updatedDays.push(date);
+      } else if (r.body.code === 'ORDERING_CLOSED') {
+        result.skipped.push({ date, category, reason: 'ordering closed' });
+      } else if (r.body.code === 'BELOW_ORDERED') {
+        result.skipped.push({ date, category, reason: `${r.body.ordered} already ordered (more than ${input.portions})` });
+      } else if (r.status !== 404) {
+        // 404: nothing on sale for this class that day (not an entry to change).
+        result.skipped.push({ date, category, reason: String(r.body.error || 'not changed') });
+      }
+    }
+  }
+  if (result.updated.length) await notify();
+  return result;
 }
 
 // --- Read model for the editor ---------------------------------------------------------------
