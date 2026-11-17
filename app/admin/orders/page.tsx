@@ -170,12 +170,17 @@ function AdminOrdersContent() {
   const canRetryRefund = (o: any) =>
     o.orderStatus === 'CANCELLED' && ['REFUND_PENDING', 'REFUND_FAILED'].includes(o.paymentStatus);
 
+  /** Every child in the order ("Riya, Aarav"), so the admin knows exactly whose meals are cancelled. */
+  const childNamesOf = (o: any) =>
+    Array.from(new Set((o.items || []).map((it: any) => it.studentName).filter(Boolean))).join(', ') || 'this student';
+
   const handleCancelOrder = async (o: any) => {
     const retry = o.orderStatus === 'CANCELLED';
     const days = o.isMultiDate ? ' This cancels every day in this order.' : '';
+    const children = childNamesOf(o);
     const question = retry
       ? `Retry the refund of ${formatINR(o.totalAmount)} for order ${o.id}? The same refund is reused, so the parent can never be refunded twice.`
-      : `Cancel order ${o.id} for ${o.items?.[0]?.studentName || 'this student'}?${days} The full ${formatINR(o.totalAmount)} will be refunded to the parent's original payment method through Cashfree. This cannot be undone.`;
+      : `Cancel order ${o.id} for ${children}?${days} The full ${formatINR(o.totalAmount)} will be refunded to the parent's original payment method through Cashfree. This cannot be undone.`;
     if (!window.confirm(question)) return;
     await handleUpdateStatus(o.id, 'CANCELLED');
   };
