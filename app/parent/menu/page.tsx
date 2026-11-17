@@ -42,7 +42,7 @@ import {
   STUDENT_CATEGORIES,
   getStudentCategory,
   StudentCategory,
-} from '@/lib/october-2026-timetable';
+} from '@/lib/student-category';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
 
 const SCHEDULE_DAYS_AHEAD = 45;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { publishDish, withdrawDish } from '@/lib/menu-publish';
 
 export const dynamic = 'force-dynamic';

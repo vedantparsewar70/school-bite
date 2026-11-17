@@ -4,7 +4,7 @@ import { STUDENT_CATEGORIES, type StudentCategory } from './monthly-menu';
 import { effectiveMenuEntry, rankMenuEntries, type MenuEntryLike } from './menu-entries';
 import { categoryMenuDocId, normalizeStudentCategory } from './menu-stock';
 import { APP_TIMEZONE, getTodayString, isDeadlinePassed } from './utils';
-import { getStudentCategory } from './october-2026-timetable';
+import { getStudentCategory } from './student-category';
 
 /**
  * Shared rules for changing a day's menu (Student Menu, Admin → Menu, older menu APIs):

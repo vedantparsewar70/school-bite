@@ -6,7 +6,7 @@ import { FakeFirestore } from './helpers/fake-firestore';
 import { jsonRequest, signedInAs, useFakeFirestore } from './helpers/session';
 import { setFirestoreForTesting } from '../lib/firebase-admin';
 import { setSystemSetting } from '../lib/allergy';
-import { getStudentCategory } from '../lib/october-2026-timetable';
+import { getStudentCategory } from '../lib/student-category';
 import { TEACHER_ORDER_ACCESS, teacherGuestCookieName } from '../lib/teacher-orders';
 import * as parentOrders from '../app/api/parent/orders/route';
 import * as parentChildren from '../app/api/parent/children/route';

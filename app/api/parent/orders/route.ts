@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { CartItem, PaymentMethod } from '@/types';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { db } from '@/lib/firebase-admin';

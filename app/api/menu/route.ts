@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getTodayString, APP_TIMEZONE, isDeadlinePassed } from '@/lib/utils';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { getCurrentUser } from '@/lib/auth';
-import { getStudentCategory } from '@/lib/october-2026-timetable';
+import { getStudentCategory } from '@/lib/student-category';
 import { displayMenuEntry, type MenuEntryLike } from '@/lib/menu-entries';
 import { extrasOn, MAX_EXTRA_PER_CHILD } from '@/lib/menu-extras';
 import { deadlineFor, type MenuEntry } from '@/lib/menu-orders';

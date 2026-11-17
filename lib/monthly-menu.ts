@@ -23,8 +23,8 @@ import type { XlsxSheet } from './xlsx-reader';
  * - new dishes need a price and an explicit allergen decision from staff before publishing.
  */
 
-export const STUDENT_CATEGORIES = ['Pre-primary', 'Primary', 'Secondary'] as const;
-export type StudentCategory = (typeof STUDENT_CATEGORIES)[number];
+import { STUDENT_CATEGORIES, type StudentCategory } from './student-category';
+export { STUDENT_CATEGORIES, type StudentCategory };
 
 export type MenuCell =
   /** `mealId`: an exact catalogue dish (a day-only copy may share its original's name). Never set by the import. */
