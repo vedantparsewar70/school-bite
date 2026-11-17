@@ -215,7 +215,7 @@ function HomePageContent() {
         {/* Brand Icon */}
         <div className="inline-block">
           <img
-            src="/logo.png"
+            src="/logo.webp"
             alt="School Bite Logo"
             className="w-16 h-16 rounded-2xl shadow-lg shadow-amber-500/25 object-contain mx-auto"
           />

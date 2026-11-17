@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
       <img
-        src="/logo.png"
+        src="/logo.webp"
         alt="School Bite"
         className="w-16 h-16 rounded-2xl shadow-lg shadow-amber-500/25 object-contain mb-4"
       />

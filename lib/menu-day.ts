@@ -16,7 +16,7 @@ import {
   withLineClasses,
 } from './menu-orders';
 import { extrasOn, isExtraLine, paidExtrasRefusal, switchOffExtras } from './menu-extras';
-import { APP_TIMEZONE, getOffsetDateString, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import { APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
 
 /**
  * The Student Menu editor's day actions (holiday, undo holiday, portions) and its read model. Every
@@ -349,4 +349,3 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
 }
 
 export const MENU_DAYS_DEFAULT = 14;
-export const firstMenuDay = () => getOffsetDateString(0, APP_TIMEZONE);

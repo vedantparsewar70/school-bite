@@ -45,7 +45,7 @@ export default function Navbar() {
           {/* Brand Logo */}
           <Link href={isAdmin ? '/admin/dashboard' : isStaff ? '/staff/orders' : isParent ? '/parent/children' : '/'} className="flex items-center gap-2.5 group min-h-[44px]">
             <img
-              src="/logo.png"
+              src="/logo.webp"
               alt="School Bite"
               className="w-11 h-11 rounded-xl object-contain shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform"
             />

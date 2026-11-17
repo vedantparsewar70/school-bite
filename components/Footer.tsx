@@ -22,7 +22,7 @@ export default function Footer() {
           <div className="lg:col-span-5 space-y-4">
             <Link href="/" className="inline-flex items-center min-h-[44px] inline-flex items-center gap-2.5">
               <img
-                src="/logo.png"
+                src="/logo.webp"
                 alt="School Bite"
                 className="w-9 h-9 rounded-xl object-contain shadow-md shadow-amber-500/20"
               />

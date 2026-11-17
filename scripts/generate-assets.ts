@@ -74,13 +74,11 @@ async function main() {
   fs.writeFileSync(path.join(PUBLIC_DIR, 'icon-512.png'), logo512);
   console.log('✓ Created /public/icon.png and /public/icon-512.png');
 
-  // 4. /public/apple-icon.png (180x180)
+  // 4. Apple touch icon (180x180), written to /app below
   const apple180 = await sharp(SOURCE_IMAGE)
     .resize(180, 180)
     .png()
     .toBuffer();
-  fs.writeFileSync(path.join(PUBLIC_DIR, 'apple-icon.png'), apple180);
-  console.log('✓ Created /public/apple-icon.png (180x180)');
 
   // 5. Next.js App Router metadata icons in /app
   fs.writeFileSync(path.join(APP_DIR, 'icon.png'), icon192);
@@ -90,8 +88,7 @@ async function main() {
   // 6. ICO generation (replaces default Vercel favicon)
   const icoBuffer = await buildIco(SOURCE_IMAGE, [16, 32, 48]);
   fs.writeFileSync(path.join(APP_DIR, 'favicon.ico'), icoBuffer);
-  fs.writeFileSync(path.join(PUBLIC_DIR, 'favicon.ico'), icoBuffer);
-  console.log('✓ Created /app/favicon.ico and /public/favicon.ico (Replacing Vercel favicon)');
+  console.log('✓ Created /app/favicon.ico');
 
   // 7. /public/manifest.json (PWA & browser metadata)
   const manifest = {
