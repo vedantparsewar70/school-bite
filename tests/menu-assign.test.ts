@@ -48,7 +48,7 @@ test('a new catalog recipe is not on sale until staff publish it for a date; the
   const menu = fs.getDoc('menus', `menu_${DAY}_primary`)!;
   assert.equal(menu.mealId, mealId, 'the recipe keeps its own ID');
   assert.equal(menu.isActive, true);
-  assert.equal(menu.availableQuantity, 50);
+  assert.equal(menu.availableQuantity, 500, 'a new entry starts with the default portions');
   assert.equal(fs.list('meals').length, 2, 'no duplicate recipe created');
   assert.equal(fs.getDoc('meals', mealId)?.price, 85, 'catalog price untouched');
 
@@ -139,7 +139,7 @@ test('publishing for a chosen date affects only that date; it creates no order, 
   assert.equal(fs.list('orders').length, 1, 'no order is created (only the one that already existed)');
   assert.equal(fs.list('payments').length, 0);
   assert.equal(fs.list('orderItems').length, 1, 'only the order that already existed');
-  assert.equal(fs.getDoc('menus', `menu_${LATER}_primary`)?.availableQuantity, 50);
+  assert.equal(fs.getDoc('menus', `menu_${LATER}_primary`)?.availableQuantity, 500);
 
   const past = await publish({ date: '2020-03-02', studentCategory: 'Primary', mealId });
   assert.equal(past.status, 400);

@@ -107,9 +107,9 @@ test('the monthly import appears in the editor exactly as parents see it (dishes
 
   const monday = await day(MON);
   assert.deepEqual(monday.classes.map((c: any) => [c.mealName, c.price, c.ordered, c.maxQuantity, c.availableQuantity]), [
-    [SOYA, 60, 0, 50, 50],
-    [SOYA, 75, 0, 50, 50],
-    [SOYA, 90, 0, 50, 50],
+    [SOYA, 60, 0, 500, 500],
+    [SOYA, 75, 0, 500, 500],
+    [SOYA, 90, 0, 500, 500],
   ]);
   await sameForParents(MON);
   await sameForParents('2026-11-05');
@@ -159,16 +159,16 @@ test('portions never go below what is ordered, and a dish with paid orders canno
     id: 'oit_1', orderId: 'ORD-1', studentId: 'stu_1', studentCategory: 'Pre-primary', mealId: mealIdOf(SOYA),
     menuId: entryId(MON, 'Pre-primary'), date: MON, quantity: 3, unitPrice: 80, totalPrice: 240,
   });
-  fs.seed('menus', entryId(MON, 'Pre-primary'), { ...fs.getDoc('menus', entryId(MON, 'Pre-primary')), availableQuantity: 47 });
+  fs.seed('menus', entryId(MON, 'Pre-primary'), { ...fs.getDoc('menus', entryId(MON, 'Pre-primary')), availableQuantity: 497 });
 
   const c = await card(MON, 'Pre-primary');
-  assert.deepEqual([c.ordered, c.maxQuantity, c.availableQuantity], [3, 50, 47]);
+  assert.deepEqual([c.ordered, c.maxQuantity, c.availableQuantity], [3, 500, 497]);
   const low = await post(portions, '/api/admin/menus/portions', { date: MON, studentCategory: 'Pre-primary', portions: 2 });
   assert.equal(low.status, 409);
   assert.match((await low.json()).error, /3 portions are already ordered/);
   assert.equal((await post(portions, '/api/admin/menus/portions', { date: MON, studentCategory: 'Pre-primary', portions: 3 })).status, 200);
   assert.deepEqual([(await card(MON, 'Pre-primary')).maxQuantity, (await card(MON, 'Pre-primary')).availableQuantity], [3, 0]);
-  assert.equal((await card(MON, 'Primary')).maxQuantity, 50, 'other classes untouched');
+  assert.equal((await card(MON, 'Primary')).maxQuantity, 500, 'other classes untouched');
 
   const pulao = (await (await post(addMeal, '/api/admin/meals', { name: 'Veg Pulao + Raita', price: 75, category: 'LUNCH', isVegetarian: true })).json()).meal.id;
   const change = await post(assign, '/api/admin/menus/assign', { date: MON, studentCategory: 'ALL', mealId: pulao, replace: true });
