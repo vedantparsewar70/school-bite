@@ -20,7 +20,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           {/* Brand & Description (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
-            <Link href="/" className="inline-flex items-center gap-2.5">
+            <Link href="/" className="inline-flex items-center min-h-[44px] inline-flex items-center gap-2.5">
               <img
                 src="/logo.png"
                 alt="School Bite"
@@ -49,7 +49,7 @@ export default function Footer() {
               </p>
               <p className="text-[11px] text-slate-400 pl-5.5">
                 Official Website:{' '}
-                <a href={BUSINESS_CONFIG.websiteUrl} className="text-amber-400 hover:underline">
+                <a href={BUSINESS_CONFIG.websiteUrl} className="inline-flex items-center min-h-[44px] text-amber-400 hover:underline">
                   {BUSINESS_CONFIG.websiteUrl}
                 </a>
               </p>
@@ -66,39 +66,39 @@ export default function Footer() {
           {/* Quick Links (3 cols) */}
           <div className="lg:col-span-3 space-y-3">
             <p className="text-xs font-bold text-white uppercase tracking-wider">Quick Links</p>
-            <ul className="space-y-2.5 text-xs">
+            <ul className="space-y-0.5 text-xs">
               <li>
-                <Link href="/" className="hover:text-amber-400 transition-colors">
+                <Link href="/" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="hover:text-amber-400 transition-colors">
+                <Link href="/about" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-amber-400 transition-colors">
+                <Link href="/contact" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Contact Us
                 </Link>
               </li>
               <li>
-                <Link href="/privacy-policy" className="hover:text-amber-400 transition-colors">
+                <Link href="/privacy-policy" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms-and-conditions" className="hover:text-amber-400 transition-colors">
+                <Link href="/terms-and-conditions" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Terms & Conditions
                 </Link>
               </li>
               <li>
-                <Link href="/refund-policy" className="hover:text-amber-400 transition-colors">
+                <Link href="/refund-policy" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Refund & Cancellation Policy
                 </Link>
               </li>
               <li>
-                <Link href="/delivery-policy" className="hover:text-amber-400 transition-colors">
+                <Link href="/delivery-policy" className="inline-flex items-center min-h-[44px] hover:text-amber-400 transition-colors">
                   Shipping & Delivery Policy
                 </Link>
               </li>
@@ -113,7 +113,7 @@ export default function Footer() {
                 <Mail className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 block uppercase font-semibold">Email</span>
-                  <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="hover:text-amber-400 break-all text-slate-300 font-medium">
+                  <a href={`mailto:${BUSINESS_CONFIG.supportEmail}`} className="inline-flex items-center min-h-[44px] hover:text-amber-400 break-all text-slate-300 font-medium">
                     {BUSINESS_CONFIG.supportEmail}
                   </a>
                 </div>
@@ -123,7 +123,7 @@ export default function Footer() {
                 <Phone className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 block uppercase font-semibold">Canteen phone</span>
-                  <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="hover:text-amber-400 text-slate-300 font-medium">
+                  <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="inline-flex items-center min-h-[44px] hover:text-amber-400 text-slate-300 font-medium">
                     {BUSINESS_CONFIG.cancellationContactPhone}
                   </a>
                 </div>
@@ -149,27 +149,27 @@ export default function Footer() {
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/" className="hover:text-slate-400 transition-colors">
+            <Link href="/" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Home
             </Link>
             <span>•</span>
-            <Link href="/contact" className="hover:text-slate-400 transition-colors">
+            <Link href="/contact" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Contact Us
             </Link>
             <span>•</span>
-            <Link href="/privacy-policy" className="hover:text-slate-400 transition-colors">
+            <Link href="/privacy-policy" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Privacy Policy
             </Link>
             <span>•</span>
-            <Link href="/terms-and-conditions" className="hover:text-slate-400 transition-colors">
+            <Link href="/terms-and-conditions" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Terms & Conditions
             </Link>
             <span>•</span>
-            <Link href="/refund-policy" className="hover:text-slate-400 transition-colors">
+            <Link href="/refund-policy" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Refund Policy
             </Link>
             <span>•</span>
-            <Link href="/delivery-policy" className="hover:text-slate-400 transition-colors">
+            <Link href="/delivery-policy" className="inline-flex items-center min-h-[44px] hover:text-slate-400 transition-colors">
               Delivery Policy
             </Link>
           </div>
