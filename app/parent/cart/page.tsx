@@ -25,6 +25,7 @@ import { displayCartTotal, displayUnitPrice, serverPricesFrom, type ServerPriceM
 import VegBadge from '@/components/VegBadge';
 import MealIcon from '@/components/MealIcon';
 import { formatINR, formatDatePretty } from '@/lib/utils';
+import { classDivisionLabel } from '@/lib/division';
 
 const CHECKOUT_KEY_STORAGE = 'sb_checkout_key';
 
@@ -84,7 +85,8 @@ export default function CartPage() {
   // Group cart items by student and date for clear visual organization
   const groupedByChildAndDate: Record<string, typeof cartItems> = {};
   cartItems.forEach((item) => {
-    const key = `${item.studentName} (Class ${item.studentGrade}-${item.studentDivision})__${item.date}`;
+    const label = classDivisionLabel(item.studentCategory || item.studentGrade, item.studentDivision);
+    const key = `${item.studentName}${label ? ` (${label})` : ''}__${item.date}`;
     if (!groupedByChildAndDate[key]) groupedByChildAndDate[key] = [];
     groupedByChildAndDate[key].push(item);
   });

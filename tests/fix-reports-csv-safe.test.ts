@@ -23,7 +23,9 @@ test('the reports page builds every cell with csvCell and downloads a Blob (no e
   assert.match(exporter, /new Blob\(/);
   assert.ok(!exporter.includes('encodeURI'), 'no data: URL that a # would cut short');
   assert.ok(!/`"\$\{r\./.test(exporter), 'no hand-quoted cells');
-  for (const field of ['r.parentName', 'r.studentName', 'r.studentId', 'r.classDivision', 'r.rollNo']) {
+  for (const field of ['r.parentName', 'r.studentName', 'r.studentClass', 'r.division']) {
     assert.ok(exporter.includes(field), `${field} exported`);
   }
+  // The internal student ID and the roll number are never exported.
+  for (const field of ['r.studentId', 'r.rollNo', "'Student ID'", "'Roll No'"]) assert.ok(!exporter.includes(field), `${field} not exported`);
 });

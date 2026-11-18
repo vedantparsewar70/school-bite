@@ -325,7 +325,7 @@ test('Prepare lists extras separately; Serve shows them and one tick serves ever
   const rows = (await (await serveList(jsonRequest(`/api/staff/serve?date=${DAY}`, 'GET', undefined, staff))).json()).rows;
   const riya = rows.find((r: any) => r.studentName === 'Riya');
   assert.deepEqual(riya.meals.map((m: any) => [m.mealName, m.quantity, m.isExtra]), [['Dal Khichdi', 1, false], ['Banana', 2, true]]);
-  assert.match(notServedCsv(DAY, rows, []), /"Riya","3-A","7","Primary","Dal Khichdi; Banana x 2 \(extra\)"/);
+  assert.match(notServedCsv(DAY, rows, []), /"Riya","Primary","A","Dal Khichdi; Banana x 2 \(extra\)"/);
 
   const tick = await serve(jsonRequest('/api/staff/serve', 'POST', { date: DAY, orderItemIds: riya.meals.map((m: any) => m.orderItemId), action: 'serve' }, staff));
   assert.equal(tick.status, 200);

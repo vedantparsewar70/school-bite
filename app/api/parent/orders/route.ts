@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getStudentCategory } from '@/lib/student-category';
+import { divisionOf } from '@/lib/division';
 import { CartItem, PaymentMethod } from '@/types';
 import { evaluateAllergyConflict, getSystemSetting } from '@/lib/allergy';
 import { db } from '@/lib/firebase-admin';
@@ -289,8 +290,8 @@ export async function GET(req: Request) {
         studentId: item.studentId,
         studentName: item.student?.name || 'Student',
         studentGrade: item.student?.grade || '',
-        studentDivision: item.student?.division || '',
-        studentRollNo: item.student?.rollNo || '',
+        studentCategory: item.studentCategory || item.student?.studentCategory || '',
+        studentDivision: divisionOf(item.student?.division) || '',
         mealId: item.mealId,
         mealName: item.mealName || item.meal?.name || 'Meal',
         isExtra: item.kind === 'EXTRA',

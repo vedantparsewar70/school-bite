@@ -6,6 +6,9 @@ import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getTodayString } from '@/lib/utils';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { MAX_NAME_LENGTH, MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
+import { divisionOf, isDivision, withoutInternalId } from '@/lib/division';
+
+const DIVISION_REQUIRED = 'Please choose the division (A, B, C, D or E).';
 
 /** True when the child has a paid, not-cancelled meal today or later that has not been handed over. */
 async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
@@ -87,9 +90,8 @@ export async function GET(req: Request) {
         name: s.name,
         dob: s.dob,
         grade: s.grade,
-        division: s.division,
-        rollNo: s.rollNo,
-        studentId: s.studentId,
+        // Division A-E, or null for an older child who has none yet (asked to add it before ordering).
+        division: divisionOf(s.division),
         studentCategory: category,
         allergies: allergiesList.join(', ') || s.allergies || null,
         allergiesList,
@@ -166,6 +168,9 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    if (!isDivision(division)) {
+      return NextResponse.json({ error: DIVISION_REQUIRED }, { status: 400 });
+    }
 
     const generatedStudentId = studentId?.trim() || `STU-2026-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -182,7 +187,7 @@ export async function POST(req: Request) {
 
     const allergiesSummary = finalAllergies.join(', ');
     const resolvedGrade = studentCategory;
-    const resolvedDivision = division ? String(division).trim().toUpperCase() : '-';
+    const resolvedDivision = division;
     const resolvedRollNo = rollNo ? String(rollNo).trim() : '-';
 
     const newStudent = await prisma.student.create({
@@ -235,7 +240,8 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, student: newStudent }, { status: 201 });
+    // The internal student ID stays in the database; it is never sent to a screen.
+    return NextResponse.json({ success: true, student: withoutInternalId(newStudent) }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating child:', error);
     if (error.code === 'P2002') {
@@ -284,6 +290,9 @@ export async function PUT(req: Request) {
 
     if (name !== undefined && !String(name ?? '').trim()) {
       return NextResponse.json({ error: 'Student name cannot be empty' }, { status: 400 });
+    }
+    if (division !== undefined ? !isDivision(division) : !divisionOf(student.division)) {
+      return NextResponse.json({ error: DIVISION_REQUIRED, code: 'DIVISION_REQUIRED' }, { status: 400 });
     }
     if (tooLong(name, MAX_NAME_LENGTH) || tooLong(notes, MAX_NOTES_LENGTH)) {
       return NextResponse.json(
@@ -340,7 +349,7 @@ export async function PUT(req: Request) {
         name: name?.trim() ?? student.name,
         dob: dob !== undefined ? (dob ? String(dob).trim() : null) : student.dob,
         grade: nextGrade,
-        division: division ? String(division).trim().toUpperCase() : student.division,
+        division: division !== undefined ? division : student.division,
         rollNo: rollNo ? String(rollNo).trim() : student.rollNo,
         studentCategory: studentCategory || (student as any).studentCategory || 'Primary',
         allergies: allergiesProvided ? allergiesSummary || null : student.allergies,
@@ -376,7 +385,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, student: updated });
+    return NextResponse.json({ success: true, student: withoutInternalId(updated) });
   } catch (error) {
     console.error('Error updating child:', error);
     return NextResponse.json({ error: 'Failed to update student' }, { status: 500 });

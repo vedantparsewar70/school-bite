@@ -7,6 +7,7 @@ import { formatServeTime } from '@/lib/service-dates';
 import { DEFAULT_SERVE_FILTER, filterServeRows, serveCounter, type ServeFilter, type ServeStatusFilter } from '@/lib/serve-filter';
 import { useSyncWatcher, broadcastSyncEvent } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { classDivisionLabel, DIVISIONS } from '@/lib/division';
 
 /** One child on the Serve list (from GET /api/staff/serve). */
 type ServeRow = {
@@ -35,6 +36,7 @@ type TeacherOrder = {
 };
 
 const CATEGORIES = ['ALL', 'Pre-primary', 'Primary', 'Secondary'];
+const DIVISION_CHIPS = ['ALL', ...DIVISIONS];
 const STATUS_TABS: Array<{ id: ServeStatusFilter; label: string }> = [
   { id: 'NOT_SERVED', label: 'Not served' },
   { id: 'SERVED', label: 'Served' },
@@ -43,10 +45,8 @@ const STATUS_TABS: Array<{ id: ServeStatusFilter; label: string }> = [
 const UNDO_SECONDS = 6;
 
 const teacherGiven = (o: TeacherOrder) => o.orderStatus === 'GIVEN' || o.orderStatus === 'COLLECTED';
-const classLine = (r: ServeRow) =>
-  [r.grade && r.division ? `${r.grade}-${r.division}` : r.grade || '', r.rollNo ? `Roll ${r.rollNo}` : '', r.studentCategory]
-    .filter(Boolean)
-    .join(' · ');
+/** "Primary · B" (class and division; the roll number is not shown). */
+const classLine = (r: ServeRow) => classDivisionLabel(r.studentCategory, r.division);
 
 function ServeContent() {
   const today = getTodayString();
@@ -241,7 +241,7 @@ function ServeContent() {
             autoComplete="off"
             value={filter.search}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
-            placeholder={tab === 'STUDENTS' ? 'Child name or roll no.' : 'Teacher name or phone'}
+            placeholder={tab === 'STUDENTS' ? 'Child name' : 'Teacher name or phone'}
             className="w-full min-h-[48px] pl-10 pr-11 rounded-xl border border-slate-300 bg-white text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
           {filter.search && (
@@ -297,6 +297,23 @@ function ServeContent() {
               </button>
             ))}
         </div>
+        {tab === 'STUDENTS' && (
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-0.5" role="group" aria-label="Division">
+            {DIVISION_CHIPS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={(filter.division || 'ALL') === d}
+                onClick={() => setFilter((f) => ({ ...f, division: d }))}
+                className={`shrink-0 min-h-[44px] min-w-[44px] px-4 rounded-xl text-sm font-bold border ${
+                  (filter.division || 'ALL') === d ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-700 border-slate-300'
+                }`}
+              >
+                {d === 'ALL' ? 'All divisions' : `Div ${d}`}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="px-4 pt-3 space-y-3">
@@ -364,7 +381,7 @@ function ServeContent() {
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-lg font-black text-slate-900 leading-tight break-words">{r.studentName}</p>
-                        <p className="text-sm text-slate-600 mt-0.5">{classLine(r)}</p>
+                        <p className="text-base font-bold text-slate-700 mt-0.5">{classLine(r)}</p>
                         <p className="text-base font-semibold text-slate-800 mt-1 break-words">
                           {r.meals.map((m) => `${m.mealName}${m.quantity > 1 ? ` × ${m.quantity}` : ''}${(m as { isExtra?: boolean }).isExtra ? ' (extra)' : ''}`).join(', ')}
                         </p>

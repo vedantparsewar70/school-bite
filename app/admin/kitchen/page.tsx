@@ -24,6 +24,7 @@ import MealIcon from '@/components/MealIcon';
 import { formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/utils';
 import { useSyncWatcher } from '@/lib/client-sync';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
+import { classDivisionLabel } from '@/lib/division';
 
 function KitchenPageContent() {
   const searchParams = useSearchParams();
@@ -443,8 +444,7 @@ function KitchenPageContent() {
                   <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-bold text-[10px] tracking-wider">
                     <tr>
                       <th className="py-2.5 px-4">Student</th>
-                      <th className="py-2.5 px-4">Class</th>
-                      <th className="py-2.5 px-4">Roll No</th>
+                      <th className="py-2.5 px-4">Class · Division</th>
                       <th className="py-2.5 px-4">Meal Ordered</th>
                       <th className="py-2.5 px-4 text-center">Qty</th>
                       <th className="py-2.5 px-4 text-center">Status</th>
@@ -459,10 +459,7 @@ function KitchenPageContent() {
                             {s.studentName}
                           </td>
                           <td className="py-3 px-4 font-semibold text-slate-700">
-                            Class {s.grade}-{s.division}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-slate-600">
-                            {s.rollNo || '-'}
+                            {classDivisionLabel(s.studentCategory || s.grade, s.division)}
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-1.5 font-bold text-slate-800">

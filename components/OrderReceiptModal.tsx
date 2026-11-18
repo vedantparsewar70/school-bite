@@ -5,6 +5,7 @@ import { X, Printer, CheckCircle2, ShieldCheck, Utensils } from 'lucide-react';
 import { formatINR, formatDateTimePretty, formatDatePretty } from '@/lib/utils';
 import VegBadge from './VegBadge';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
+import { classDivisionLabel } from '@/lib/division';
 
 interface OrderReceiptModalProps {
   order: any;
@@ -101,7 +102,7 @@ export default function OrderReceiptModal({ order, onClose }: OrderReceiptModalP
                       <span className="text-slate-400">× {item.quantity}</span>
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      Student: <span className="font-semibold text-slate-700">{item.studentName}</span> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
+                      Student: <span className="font-semibold text-slate-700">{item.studentName}</span> ({classDivisionLabel(item.studentCategory || item.studentGrade, item.studentDivision)})
                     </div>
                     <div className="text-[11px] text-amber-700 font-medium">
                       Date of Meal: {formatDatePretty(item.date)}

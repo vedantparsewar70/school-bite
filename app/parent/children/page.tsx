@@ -18,6 +18,7 @@ import { useChildren } from '@/components/ChildrenContext';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { StudentData, StudentCategory } from '@/types';
+import { classDivisionLabel, divisionOf, DIVISIONS, isDivision, type Division } from '@/lib/division';
 
 export default function ChildrenPage() {
   const { user, refreshUser } = useAuth();
@@ -36,10 +37,11 @@ export default function ChildrenPage() {
   const [editingChild, setEditingChild] = useState<StudentData | null>(null);
   const [viewingChild, setViewingChild] = useState<StudentData | null>(null);
 
-  // Form states: exactly 3 fields (name, optional dob, category)
+  // Form states: name, optional dob, category and division (A-E)
   const [formName, setFormName] = useState('');
   const [formDob, setFormDob] = useState('');
   const [formCategory, setFormCategory] = useState<StudentCategory | ''>('');
+  const [formDivision, setFormDivision] = useState<Division | ''>('');
   const [submitting, setSubmitting] = useState(false);
 
   const openAddModal = () => {
@@ -47,6 +49,7 @@ export default function ChildrenPage() {
     setFormName('');
     setFormDob('');
     setFormCategory('');
+    setFormDivision('');
     setIsAddModalOpen(true);
   };
 
@@ -61,8 +64,29 @@ export default function ChildrenPage() {
         ? 'Primary'
         : 'Secondary');
     setFormCategory(cat as StudentCategory);
+    setFormDivision(divisionOf(child.division) || '');
     setIsAddModalOpen(true);
   };
+
+  // "/parent/children?edit=<id>" (from the menu, for a child with no division yet) opens the edit form.
+  const [editFromLink, setEditFromLink] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setEditFromLink(new URLSearchParams(window.location.search).get('edit'));
+    } catch {
+      // no query string
+    }
+  }, []);
+  useEffect(() => {
+    if (!editFromLink || loading) return;
+    const child = children.find((c) => c.id === editFromLink);
+    setEditFromLink(null);
+    if (child) {
+      openEditModal(child);
+      if (!divisionOf(child.division)) showToast(`Please add ${child.name}'s division to order meals.`, 'info');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editFromLink, loading, children]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +96,10 @@ export default function ChildrenPage() {
     }
     if (!formCategory) {
       showToast('Please select a Class / Category', 'error');
+      return;
+    }
+    if (!isDivision(formDivision)) {
+      showToast('Please select the Division (A, B, C, D or E)', 'error');
       return;
     }
     setSubmitting(true);
@@ -84,6 +112,7 @@ export default function ChildrenPage() {
         category: formCategory,
         studentCategory: formCategory,
         grade: formCategory,
+        division: formDivision,
       };
 
       const res = await fetch('/api/parent/children', {
@@ -100,9 +129,7 @@ export default function ChildrenPage() {
           name: formName.trim(),
           dob: formDob ? formDob.trim() : null,
           grade: formCategory,
-          division: data.student?.division || editingChild?.division || '-',
-          rollNo: data.student?.rollNo || editingChild?.rollNo || '-',
-          studentId: data.student?.studentId || editingChild?.studentId || '',
+          division: formDivision,
           studentCategory: formCategory,
           allergies: editingChild?.allergies || null,
           allergiesList: editingChild?.allergiesList || [],
@@ -229,7 +256,13 @@ export default function ChildrenPage() {
                       <ChildAvatar size="lg" />
                       <div>
                         <h3 className="font-extrabold text-slate-900 text-base">{child.name}</h3>
-                        <span className="text-[11px] font-mono text-slate-400 font-semibold">{child.studentId}</span>
+                        {divisionOf(child.division) ? (
+                          <span className="text-xs text-slate-600 font-bold">{classDivisionLabel(child.studentCategory || child.grade, child.division)}</span>
+                        ) : (
+                          <button type="button" onClick={() => openEditModal(child)} className="text-xs font-bold text-amber-700 underline underline-offset-2 cursor-pointer">
+                            Add division
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -247,11 +280,17 @@ export default function ChildrenPage() {
                   </div>
 
                   {/* Details Grid */}
-                  <div className="mt-4 grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+                  <div className="mt-4 grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
                     <div>
                       <p className="text-[10px] uppercase font-bold text-slate-400">Category</p>
                       <p className="text-sm font-extrabold text-slate-800">
                         {child.studentCategory || child.grade}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Division</p>
+                      <p className={`text-sm font-extrabold ${divisionOf(child.division) ? 'text-slate-800' : 'text-amber-700'}`}>
+                        {divisionOf(child.division) || 'Not set'}
                       </p>
                     </div>
                     <div>
@@ -303,7 +342,7 @@ export default function ChildrenPage() {
         </div>
       )}
 
-      {/* Simplified Register / Edit Child Modal: ONLY Name, optional DOB, and Category */}
+      {/* Register / Edit Child Modal: Name, optional DOB, Class / Category and Division */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
@@ -372,6 +411,24 @@ export default function ChildrenPage() {
                 </p>
               </div>
 
+              <div>
+                <label htmlFor="child-division" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Division *
+                </label>
+                <select
+                  id="child-division"
+                  required
+                  value={formDivision}
+                  onChange={(e) => setFormDivision(e.target.value as Division)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 cursor-pointer"
+                >
+                  <option value="" disabled>Select Division</option>
+                  {DIVISIONS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -418,7 +475,7 @@ export default function ChildrenPage() {
               <div className="flex items-center justify-center gap-1.5">
                 <h3 className="text-xl font-extrabold text-slate-900">{viewingChild.name}</h3>
               </div>
-              <p className="font-mono text-xs font-bold text-amber-700">{viewingChild.studentId}</p>
+              <p className="text-sm font-bold text-amber-700">{classDivisionLabel(viewingChild.studentCategory || viewingChild.grade, viewingChild.division) || 'Division not set'}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl text-xs">

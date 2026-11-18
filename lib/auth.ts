@@ -176,6 +176,7 @@ export function toSessionUser(user: any) {
     phone: user.phone,
     role: user.role as UserRole,
     parentId: user.parent?.id,
-    students: user.parent?.students ?? [],
+    // The internal student ID (e.g. "STU-2026-633") stays in the database; it is never displayed.
+    students: (user.parent?.students ?? []).map(({ studentId, ...s }: any) => (void studentId, s)),
   };
 }

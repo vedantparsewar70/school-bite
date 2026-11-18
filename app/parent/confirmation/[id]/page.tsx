@@ -19,6 +19,7 @@ import {
 import { formatINR, formatDateTimePretty, formatDatePretty } from '@/lib/utils';
 import VegBadge from '@/components/VegBadge';
 import { useCart } from '@/components/CartContext';
+import { classDivisionLabel } from '@/lib/division';
 
 const CLEARED_ORDERS_STORAGE = 'sb_cart_cleared_orders';
 
@@ -274,7 +275,7 @@ export default function OrderConfirmationPage() {
                     <span className="text-slate-400 font-semibold">× {item.quantity}</span>
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    For: <strong className="text-slate-700">{item.studentName}</strong> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
+                    For: <strong className="text-slate-700">{item.studentName}</strong> ({classDivisionLabel(item.studentCategory || item.studentGrade, item.studentDivision)})
                   </div>
                   <div className="text-[11px] font-semibold text-amber-700">
                     Meal Date: {formatDatePretty(item.date)}

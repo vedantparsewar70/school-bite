@@ -190,23 +190,22 @@ test('the admin whole-order "Collected" button still gives every child on that d
   assert.equal(order?.serviceDates?.[MON]?.status, 'COLLECTED', "Arjun's meal is now also marked given");
 });
 
-test('BUG: a child added by a parent shows as "Class Primary--, Roll #-" on the staff screen (no class/div/roll)', async () => {
-  // Exactly what app/parent/children/page.tsx sends: name, dob, category only.
-  const res = await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Aarav Shah', dob: null, category: 'Primary', studentCategory: 'Primary', grade: 'Primary' }, parent));
+test('FIXED: a child added by a parent has a division, so staff can tell two same-name children apart', async () => {
+  // Exactly what app/parent/children/page.tsx sends: name, dob, category and division.
+  const res = await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Aarav Shah', dob: null, category: 'Primary', studentCategory: 'Primary', grade: 'Primary', division: 'B' }, parent));
   assert.equal(res.status, 201);
   const { student } = await res.json();
   assert.equal(student.grade, 'Primary');
-  assert.equal(student.division, '-');
-  assert.equal(student.rollNo, '-');
-  // A second family's child with the same name in a different class looks identical.
-  const res2 = await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Aarav Shah', category: 'Primary', studentCategory: 'Primary', grade: 'Primary' }, other));
+  assert.equal(student.division, 'B');
+  assert.equal(student.studentId, undefined, 'the internal student ID is not sent');
+  // A second family's child with the same name, in division D.
+  const res2 = await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Aarav Shah', category: 'Primary', studentCategory: 'Primary', grade: 'Primary', division: 'D' }, other));
   const { student: twin } = await res2.json();
   seedPaidOrder('ORD-A1', 'par_usr_parent', [{ studentId: student.id, date: MON }]);
   seedPaidOrder('ORD-A2', 'par_usr_other', [{ studentId: twin.id, date: MON }]);
   const { orders } = await (await adminOrders.GET(jsonRequest(`/api/admin/orders?date=${MON}`, 'GET', undefined, staff))).json();
-  const shown = orders.map((o: any) => `${o.items[0].studentName}|${o.items[0].studentGrade}|${o.items[0].studentDivision}|${o.items[0].studentRollNo}`);
-  assert.equal(shown.length, 2);
-  assert.equal(shown[0], shown[1], 'staff can only tell them apart by the order id');
+  const shown = orders.map((o: any) => `${o.items[0].studentName}|${o.items[0].studentCategory}|${o.items[0].studentDivision}`).sort();
+  assert.deepEqual(shown, ['Aarav Shah|Primary|B', 'Aarav Shah|Primary|D']);
 });
 
 test("FIXED: a parent editing a child's name keeps the school class, division and roll number", async () => {
@@ -225,7 +224,7 @@ test("FIXED: a parent editing a child's name keeps the school class, division an
 });
 
 test('FIXED: a child the parent added (grade is just the category) still follows a category change', async () => {
-  const created = await (await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Kabir', category: 'Primary', studentCategory: 'Primary', grade: 'Primary' }, parent))).json();
+  const created = await (await parentChildren.POST(jsonRequest('/api/parent/children', 'POST', { name: 'Kabir', category: 'Primary', studentCategory: 'Primary', grade: 'Primary', division: 'C' }, parent))).json();
   const id = created.student?.id || created.id;
   await parentChildren.PUT(jsonRequest('/api/parent/children', 'PUT', { id, category: 'Secondary', studentCategory: 'Secondary', grade: 'Secondary' }, parent));
   assert.equal(fs.getDoc('students', id)?.grade, 'Secondary');

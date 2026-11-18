@@ -27,6 +27,7 @@ import MealIcon from '@/components/MealIcon';
 import MealCategoryBadge from '@/components/MealCategoryBadge';
 import { useSyncWatcher } from '@/lib/client-sync';
 import { MenuDayItem } from '@/types';
+import { classDivisionLabel } from '@/lib/division';
 
 export default function ParentDashboard() {
   const { user, isLoading } = useAuth();
@@ -270,7 +271,7 @@ export default function ParentDashboard() {
                       <VegBadge isVegetarian={child.isVegetarian} size="sm" />
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Class {child.grade}-{child.division} • Roll: {child.rollNo}
+                      {classDivisionLabel(child.studentCategory || child.grade, child.division) || 'Division not set'}
                     </p>
                   </div>
                 </div>

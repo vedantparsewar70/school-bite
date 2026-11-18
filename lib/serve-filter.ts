@@ -1,9 +1,11 @@
 /** Client-safe filtering for the staff Serve screen (one row per child). */
+import { divisionOf } from './division';
 
 export interface ServeRowLike {
   studentName: string;
   rollNo?: string | null;
   studentCategory?: string | null;
+  division?: string | null;
   served: boolean;
 }
 
@@ -13,11 +15,13 @@ export interface ServeFilter {
   status: ServeStatusFilter;
   /** 'ALL' or a category name: Pre-primary, Primary, Secondary. */
   category: string;
+  /** 'ALL' or a division A-E. */
+  division?: string;
   /** Matches the child's name (any part) or roll number. */
   search: string;
 }
 
-export const DEFAULT_SERVE_FILTER: ServeFilter = { status: 'NOT_SERVED', category: 'ALL', search: '' };
+export const DEFAULT_SERVE_FILTER: ServeFilter = { status: 'NOT_SERVED', category: 'ALL', division: 'ALL', search: '' };
 
 const norm = (v: unknown) => String(v ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -25,6 +29,7 @@ export function matchesServeFilter(row: ServeRowLike, filter: ServeFilter): bool
   if (filter.status === 'NOT_SERVED' && row.served) return false;
   if (filter.status === 'SERVED' && !row.served) return false;
   if (filter.category !== 'ALL' && norm(row.studentCategory) !== norm(filter.category)) return false;
+  if (filter.division && filter.division !== 'ALL' && divisionOf(row.division) !== filter.division) return false;
   const q = norm(filter.search);
   if (!q) return true;
   const roll = norm(row.rollNo);

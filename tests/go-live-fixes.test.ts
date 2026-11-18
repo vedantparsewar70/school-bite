@@ -23,13 +23,13 @@ beforeEach(async () => {
 afterEach(() => setFirestoreForTesting(null));
 
 test("editing a child's name keeps the allergies the school recorded", async () => {
-  fs.seed('students', 'stu_1', { id: 'stu_1', parentId: 'par_usr_parent', name: 'Riya', grade: 'Primary', studentCategory: 'Primary', allergies: 'Peanut', isActive: true });
+  fs.seed('students', 'stu_1', { id: 'stu_1', parentId: 'par_usr_parent', name: 'Riya', grade: 'Primary', division: 'A', studentCategory: 'Primary', allergies: 'Peanut', isActive: true });
   fs.seed('allergies', 'alg_peanut', { id: 'alg_peanut', name: 'Peanut' });
   fs.seed('studentAllergies', 'sa_1', { id: 'sa_1', studentId: 'stu_1', allergyId: 'alg_peanut' });
 
   // Exactly what the parent edit form sends: no allergy fields.
   const res = await editChild(jsonRequest('/api/parent/children', 'PUT', {
-    id: 'stu_1', name: 'Riya Sharma', dob: null, category: 'Primary', studentCategory: 'Primary', grade: 'Primary',
+    id: 'stu_1', name: 'Riya Sharma', dob: null, category: 'Primary', studentCategory: 'Primary', grade: 'Primary', division: 'A',
   }, parent));
   assert.equal(res.status, 200);
   assert.equal(fs.getDoc('students', 'stu_1')?.name, 'Riya Sharma');

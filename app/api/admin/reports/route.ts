@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { divisionOf } from '@/lib/division';
 
 export async function GET(req: Request) {
   try {
@@ -125,9 +126,8 @@ export async function GET(req: Request) {
       parentName: it.order.parent.user.name,
       parentPhone: it.order.parent.user.phone || '',
       studentName: it.student.name,
-      studentId: it.student.studentId,
-      classDivision: `${it.student.grade}-${it.student.division}`,
-      rollNo: it.student.rollNo,
+      studentClass: (it as any).studentCategory || (it.student as any).studentCategory || it.student.grade || '',
+      division: divisionOf(it.student.division) || '',
       mealName: it.mealName || it.meal?.name || 'Meal',
       itemType: (it as any).kind === 'EXTRA' ? 'Extra' : 'Brunch',
       quantity: it.quantity,
