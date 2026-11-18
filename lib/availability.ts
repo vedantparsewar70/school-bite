@@ -4,6 +4,8 @@ import { effectiveMenuEntry } from '@/lib/menu-entries';
 import { checkExtraLines, isExtraLine } from '@/lib/menu-extras';
 import { mainOrExtraPrice } from '@/lib/brunch-prices';
 import { getBrunchPrices } from '@/lib/brunch-prices-server';
+import { cutoffFor } from '@/lib/ordering-cutoff';
+import { loadOrderingCutoff } from '@/lib/ordering-cutoff-server';
 
 export interface MealItemAvailability {
   mealId: string;
@@ -74,6 +76,8 @@ export async function validateCartAvailability(
   });
   const mealsMap = new Map(meals.map((m: any) => [m.id, m]));
   const brunchPrices = await getBrunchPrices();
+  // One ordering cutoff for every class and day (the setting overrides each entry's stored time).
+  await loadOrderingCutoff();
 
   // 2. Fetch date-specific menu entries for all requested dates
   const dateMenuRecords = await prisma.menu.findMany({
@@ -305,7 +309,7 @@ export async function validateCartAvailability(
       continue;
     }
 
-    const deadline = menuRecord.orderingDeadline || '08:30';
+    const deadline = cutoffFor(menuRecord.orderingDeadline);
     const deadlinePassed = isDeadlinePassed(item.date, deadline);
 
     if (deadlinePassed) {

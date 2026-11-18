@@ -25,6 +25,7 @@ import { formatDatePretty, getTodayString, getOrderStatusColor } from '@/lib/uti
 import { useSyncWatcher } from '@/lib/client-sync';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
 import { classDivisionLabel } from '@/lib/division';
+import { DEFAULT_ORDERING_CUTOFF } from '@/lib/ordering-cutoff';
 
 function KitchenPageContent() {
   const searchParams = useSearchParams();
@@ -201,8 +202,8 @@ function KitchenPageContent() {
         </p>
         <p className="text-sm font-bold text-gray-700">
           {kitchenData?.cutoff === 'FINAL'
-            ? `Final (ordering closed at ${kitchenData?.deadline || '08:30'})`
-            : `Still open until ${kitchenData?.deadline || '08:30'}: numbers may still go up`}
+            ? `Final (ordering closed at ${kitchenData?.deadline || DEFAULT_ORDERING_CUTOFF})`
+            : `Still open until ${kitchenData?.deadline || DEFAULT_ORDERING_CUTOFF}: numbers may still go up`}
         </p>
       </div>
 
@@ -234,8 +235,8 @@ function KitchenPageContent() {
                 }`}
               >
                 {kitchenData?.cutoff === 'FINAL'
-                  ? `Final: ordering closed at ${kitchenData?.deadline || '08:30'}`
-                  : `Still open until ${kitchenData?.deadline || '08:30'}`}
+                  ? `Final: ordering closed at ${kitchenData?.deadline || DEFAULT_ORDERING_CUTOFF}`
+                  : `Still open until ${kitchenData?.deadline || DEFAULT_ORDERING_CUTOFF}`}
               </span>
             </div>
 

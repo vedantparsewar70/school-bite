@@ -71,12 +71,13 @@ export function getOffsetDateString(offsetDays: number, timeZone: string = APP_T
   return `${targetYear}-${targetMonth}-${targetDay}`;
 }
 
-export function isDeadlinePassed(dateStr: string, deadlineTime: string = '08:30', at: Date = new Date()): boolean {
+/** True from the deadline minute on (ordering "closes at 07:00": 06:59 is open, 07:00 is closed). */
+export function isDeadlinePassed(dateStr: string, deadlineTime: string = '07:00', at: Date = new Date()): boolean {
   try {
     const [hours, minutes] = deadlineTime.split(':').map(Number);
     // Explicitly parse in Asia/Kolkata timezone (+05:30)
     const deadline = new Date(`${dateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+05:30`);
-    return at.getTime() > deadline.getTime();
+    return at.getTime() >= deadline.getTime();
   } catch {
     return false;
   }

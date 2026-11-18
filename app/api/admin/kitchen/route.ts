@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase-admin';
 import { applyServiceStatus, itemServedAt, orderServiceDates, serviceStatusFor } from '@/lib/service-dates';
 import { cutoffState, dayPlan, menuEntriesOn, SERVING_CATEGORIES } from '@/lib/serving-day';
 import { normalizeStudentCategory } from '@/lib/menu-stock';
+import { loadOrderingCutoff } from '@/lib/ordering-cutoff-server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,9 +26,12 @@ export async function GET(req: Request) {
     const date = searchParams.get('date') || getTodayString();
     const bypassCache = searchParams.get('bypassCache') === 'true' || searchParams.get('refresh') === 'true';
 
+    // "Final / Still open until …" always uses the current "Ordering closes at" setting.
+    const settingCutoff = await loadOrderingCutoff();
     const cached = kitchenCache.get(date);
     if (!bypassCache && cached && Date.now() - cached.timestamp < KITCHEN_CACHE_TTL) {
-      return NextResponse.json({ ...cached.data, cutoff: cutoffState(date, cached.data.deadline) }, {
+      const deadline = settingCutoff || cached.data.deadline;
+      return NextResponse.json({ ...cached.data, deadline, cutoff: cutoffState(date, deadline) }, {
         headers: { 'X-Cache': 'HIT', 'Cache-Control': 'no-store, max-age=0' },
       });
     }

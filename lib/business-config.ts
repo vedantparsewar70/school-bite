@@ -74,7 +74,8 @@ export const BUSINESS_CONFIG: BusinessConfig = {
   },
 
   // Operational cutoff and policy parameters
-  cancellationCutoffTime: '08:30 AM on meal date',
+  // Fallback text only: pages show the "Ordering closes at" setting (lib/ordering-cutoff.ts).
+  cancellationCutoffTime: '07:00 AM on meal date',
   cancellationContactPhone: '9028977988',
   refundProcessingDays: '5 to 7 business days',
   paymentGatewayPartner: 'Cashfree Payments',

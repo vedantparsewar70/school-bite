@@ -122,7 +122,7 @@ test('staff add an extra for one class or all 3, beside the main dish; the main 
   assert.equal((await addBanana(10, 'ALL')).status, 200);
   for (const c of ['pre_primary', 'primary', 'secondary']) {
     const e = fs.getDoc('menuExtras', `extra_${DAY}_${c}_meal_banana`);
-    assert.deepEqual([e?.isActive, e?.maxQuantity, e?.availableQuantity, e?.orderingDeadline], [true, 10, 10, '08:30']);
+    assert.deepEqual([e?.isActive, e?.maxQuantity, e?.availableQuantity, e?.orderingDeadline], [true, 10, 10, '07:00']);
   }
   assert.equal(fs.getDoc('meals', 'meal_banana')?.isExtra, true, 'marked as an extra in the dish list');
   assert.equal(fs.getDoc('menus', MAIN)?.mealId, 'meal_dal');
@@ -137,7 +137,7 @@ test('staff add an extra for one class or all 3, beside the main dish; the main 
   assert.equal((await extrasPost({ action: 'add', date: DAY, studentCategory: 'Primary', mealId: 'meal_banana', portions: 5 }, parent)).status, 403);
 });
 
-test('extras follow the main-dish rules: Sunday, holiday, no main dish, closed after 08:30; portions never below ordered', async () => {
+test('extras follow the main-dish rules: Sunday, holiday, no main dish, closed from 07:00; portions never below ordered', async () => {
   assert.equal((await extrasPost({ action: 'add', date: '2026-11-22', studentCategory: 'Primary', mealId: 'meal_banana', portions: 5 })).status, 400);
   fs.seed('menus', MAIN, { ...fs.getDoc('menus', MAIN), isActive: false });
   const noMain = await addBanana();
@@ -157,7 +157,7 @@ test('extras follow the main-dish rules: Sunday, holiday, no main dish, closed a
   assert.equal(remove.status, 409);
   assert.equal((await remove.json()).error, '1 child has already ordered this. Ask the admin to cancel and refund those orders first.');
 
-  at(`${DAY}T08:31`);
+  at(`${DAY}T07:01`);
   assert.equal((await extrasPost({ action: 'portions', date: DAY, studentCategory: 'Primary', mealId: 'meal_banana', portions: 30 })).status, 400);
   assert.equal((await extrasPost({ action: 'add', date: DAY, studentCategory: 'Primary', mealId: 'meal_buttermilk', portions: 5 })).status, 400);
 });
@@ -288,10 +288,10 @@ test('sold-out, switched-off and late extras are refused before any payment', as
 test('an extra cannot be added after the main-dish deadline of the class, even with the brunch already paid', async () => {
   await addBanana(5);
   await payFor([line('meal_dal')]);
-  at(`${DAY}T08:31`);
+  at(`${DAY}T07:01`);
   const late = await startCheckout([line('meal_banana', 1, 'EXTRA')]);
   assert.equal(late.status, 400);
-  assert.match((await late.json()).error, /Ordering deadline \(08:30 AM\) has passed/);
+  assert.match((await late.json()).error, /Ordering deadline \(07:00 AM\) has passed/);
 });
 
 test('an extra switched off after payment started becomes a payment exception, as for the main dish', async () => {
@@ -309,7 +309,7 @@ test('an extra switched off after payment started becomes a payment exception, a
 // --- After payment ----------------------------------------------------------------------------
 
 test('Prepare lists extras separately; Serve shows them and one tick serves everything; Not served and Reports include them', async () => {
-  at(`${DAY}T07:00`);
+  at(`${DAY}T06:30`);
   await addBanana(10);
   at('2026-11-17T10:00');
   const orderId = await payFor([line('meal_dal'), line('meal_banana', 2, 'EXTRA')]);

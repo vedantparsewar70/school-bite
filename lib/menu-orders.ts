@@ -5,6 +5,8 @@ import { effectiveMenuEntry, rankMenuEntries, type MenuEntryLike } from './menu-
 import { categoryMenuDocId, normalizeStudentCategory } from './menu-stock';
 import { APP_TIMEZONE, getTodayString, isDeadlinePassed } from './utils';
 import { getStudentCategory } from './student-category';
+import { cutoffFor, DEFAULT_ORDERING_CUTOFF } from './ordering-cutoff';
+import { loadOrderingCutoff } from './ordering-cutoff-server';
 
 /**
  * Shared rules for changing a day's menu (Student Menu, Admin → Menu, older menu APIs):
@@ -24,7 +26,8 @@ export type MenuEntry = MenuEntryLike & {
 
 type Reader = (target: any) => Promise<any>;
 
-export const DEFAULT_DEADLINE = '08:30';
+/** Kept for older callers: the code default of the "Ordering closes at" setting. */
+export const DEFAULT_DEADLINE = DEFAULT_ORDERING_CUTOFF;
 
 /**
  * Order lines saved without a class (older orders) get their child's class, the same rule Prepare and
@@ -104,11 +107,13 @@ export async function paidChildrenFor(
   return (await paidOrdersFor(read, firestore, date, entries, categories)).children;
 }
 
-/** The ordering deadline that applies to a class on a date (its dish's, or 08:30). */
+/**
+ * The ordering deadline for a class on a date: the "Ordering closes at" setting (one time for every
+ * class and day). The entry's stored orderingDeadline is used only if the setting cannot be read.
+ */
 export function deadlineFor(entries: MenuEntry[], date: string, category: string): string {
   const e = effectiveMenuEntry(entries, date, category) as MenuEntry | null;
-  const t = e && !e.isHoliday && typeof e.orderingDeadline === 'string' && /^\d{1,2}:\d{2}$/.test(e.orderingDeadline) ? e.orderingDeadline : null;
-  return t ? t.padStart(5, '0') : DEFAULT_DEADLINE;
+  return cutoffFor(e && !e.isHoliday ? e.orderingDeadline : null);
 }
 
 /** Past dates, and today once its ordering deadline has passed, can no longer be changed. */
@@ -127,6 +132,7 @@ export function closedMessage(entries: MenuEntry[], date: string, category: stri
 }
 
 export async function menuEntriesFor(read: Reader, firestore: Firestore, date: string): Promise<MenuEntry[]> {
+  await loadOrderingCutoff(firestore);
   const snap = await read(firestore.collection('menus').where('date', '==', date));
   return (snap.docs as Array<{ id: string; data: () => any }>).map((d) => ({ ...(d.data() as MenuEntry), id: d.id }));
 }

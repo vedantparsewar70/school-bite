@@ -6,6 +6,7 @@ import { getStudentCategory } from '@/lib/student-category';
 import { effectiveEntries, hasOrdersMessage, paidChildrenFor, publishDish, withdrawDish } from '@/lib/menu-publish';
 import { normalizeStudentCategory } from '@/lib/menu-stock';
 import { STUDENT_CATEGORIES } from '@/lib/monthly-menu';
+import { cutoffFor } from '@/lib/ordering-cutoff';
 
 /**
  * Portion edits on an existing entry follow the Student Menu rules: not once ordering for the day
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { mealId, date, availableQuantity, maxQuantity, orderingDeadline = '08:30' } = body;
+    const { mealId, date, availableQuantity, maxQuantity, orderingDeadline = cutoffFor(null) } = body;
 
     if (!mealId || !date) {
       return NextResponse.json({ error: 'Meal ID and date are required' }, { status: 400 });
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
     const edits = {
       ...(availableQuantity !== undefined ? { availableQuantity: Number(availableQuantity) } : {}),
       ...(maxQuantity !== undefined ? { maxQuantity: Number(maxQuantity) } : {}),
-      ...(body.orderingDeadline !== undefined ? { orderingDeadline: orderingDeadline || '08:30' } : {}),
+      ...(body.orderingDeadline !== undefined ? { orderingDeadline: orderingDeadline || cutoffFor(null) } : {}),
     };
     let menu = null;
     if (availableQuantity !== undefined || maxQuantity !== undefined) {

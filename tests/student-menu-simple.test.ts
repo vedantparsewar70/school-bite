@@ -73,7 +73,7 @@ const post = (fn: (r: Request) => Promise<Response>, url: string, body: unknown,
 
 beforeEach(async () => {
   fs = useFakeFirestore();
-  at(`${TUE}T07:00`);
+  at(`${TUE}T06:30`);
   staff = await signedInAs(fs, 'STAFF');
   admin = await signedInAs(fs, 'ADMIN');
   parent = await signedInAs(fs, 'PARENT');
@@ -136,9 +136,9 @@ test('day status: all on sale / some / none / holiday / Sunday; past and closed 
   assert.equal(mon.isPast, true);
   assert.ok(mon.classes.every((c: any) => !c.editable && !c.removable), 'past days are view-only');
 
-  // Today: editable until 08:30, then view-only (Remove still offered while something is on sale).
+  // Today: editable until 07:00, then view-only (Remove still offered while something is on sale).
   assert.ok((await card(TUE, 'Primary')).editable);
-  at(`${TUE}T08:31`);
+  at(`${TUE}T07:01`);
   const closed = await card(TUE, 'Primary');
   assert.equal(closed.editable, false);
   assert.equal(closed.removable, true);
@@ -163,18 +163,18 @@ test('Monthly Menu import results appear in the editor straight away', async () 
 
 // --- Add / change / remove --------------------------------------------------------------------
 
-test('no publishing on Sundays, past days, or today after 08:30; Remove still works then when nobody ordered', async () => {
+test('no publishing on Sundays, past days, or today from 07:00; Remove still works then when nobody ordered', async () => {
   assert.equal((await post(assign, '/api/admin/menus/assign', { date: SUN, studentCategory: 'ALL', mealId: 'meal_dal' })).status, 400);
   assert.equal((await post(assign, '/api/admin/menus/assign', { date: '2026-11-16', studentCategory: 'Primary', mealId: 'meal_dal' })).status, 400);
 
   menu(TUE, 'Primary');
-  at(`${TUE}T08:31`);
+  at(`${TUE}T07:01`);
   for (const who of [staff, admin]) {
     const late = await post(assign, '/api/admin/menus/assign', { date: TUE, studentCategory: 'Secondary', mealId: 'meal_dal' }, who);
     assert.equal(late.status, 400);
     const body = await late.json();
     assert.equal(body.code, 'ORDERING_CLOSED');
-    assert.match(body.error, /closed at 08:30/);
+    assert.match(body.error, /closed at 07:00/);
   }
   assert.equal((await post(portions, '/api/admin/menus/portions', { date: TUE, studentCategory: 'Primary', portions: 80 })).status, 400);
   assert.equal((await post(holiday, '/api/admin/menus/holiday', { date: TUE, studentCategory: 'ALL', action: 'mark', reason: 'Rain' })).status, 400);

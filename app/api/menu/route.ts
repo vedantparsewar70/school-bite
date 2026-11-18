@@ -10,6 +10,8 @@ import { deadlineFor, type MenuEntry } from '@/lib/menu-orders';
 import { normalizeStudentCategory } from '@/lib/menu-stock';
 import { brunchPriceFor, dishPrice } from '@/lib/brunch-prices';
 import { getBrunchPrices } from '@/lib/brunch-prices-server';
+import { cutoffFor } from '@/lib/ordering-cutoff';
+import { loadOrderingCutoff } from '@/lib/ordering-cutoff-server';
 
 export function clearMenuCache() {
   // Authoritative database querying is always real-time
@@ -45,6 +47,8 @@ export async function GET(req: Request) {
 
     const allowAllergyOrdersSettingPromise = getSystemSetting('ALLOW_ALLERGY_ORDERS', 'true');
     const brunchPricesPromise = getBrunchPrices();
+    // One ordering cutoff for every class and day ("Ordering closes at"; overrides stored entry times).
+    await loadOrderingCutoff();
 
     // Optimize: Fetch child allergies and student category
     let studentAllergiesList: string[] = [];
@@ -128,12 +132,14 @@ export async function GET(req: Request) {
     const evaluatedMenus = menus.map((item) => {
       const isHoliday = Boolean((item as any).isHoliday);
       const isPastDate = item.date < todayStr;
-      const deadlinePassed = isPastDate || isDeadlinePassed(item.date, item.orderingDeadline || '08:30');
+      const deadline = cutoffFor(item.orderingDeadline);
+      const deadlinePassed = isPastDate || isDeadlinePassed(item.date, deadline);
       const isAvailable = Boolean(item.isActive) && !isHoliday && !isPastDate && (item.availableQuantity > 0) && !deadlinePassed;
 
       if (isHoliday) {
         return {
           ...item,
+          orderingDeadline: deadline,
           studentCategory: (item as any).studentCategory || 'ALL',
           isHoliday: true,
           holidayReason: (item as any).holidayReason || 'Holiday Today — No Brunch Scheduled',
@@ -181,6 +187,7 @@ export async function GET(req: Request) {
 
       return {
         ...item,
+        orderingDeadline: deadline,
         studentCategory: (item as any).studentCategory || 'ALL',
         isHoliday: false,
         holidayReason: null,
@@ -271,6 +278,8 @@ export async function GET(req: Request) {
       {
         menus: evaluatedMenus,
         extras,
+        // Shown on the parent menu: "Order before 07:00 AM on the meal day".
+        orderingCutoff: cutoffFor(null),
         policy: {
           allowAllergyOrders,
         },

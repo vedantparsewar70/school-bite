@@ -59,7 +59,7 @@ function order(id: string, date: string, lines: Array<{ item: string; studentId:
 
 beforeEach(async () => {
   fs = useFakeFirestore();
-  at(`${TUE}T07:00`);
+  at(`${TUE}T06:30`);
   staff = await signedInAs(fs, 'STAFF');
   await signedInAs(fs, 'ADMIN');
   parent = await signedInAs(fs, 'PARENT');
@@ -100,7 +100,7 @@ test('a switched-off (unpublished) dish does not make a serving day', async () =
   assert.equal(await nextServingDay(), THU);
 });
 
-test('dayPlan reports each category, the latest deadline, and cutoffState flips to FINAL at the deadline', () => {
+test('dayPlan reports each category; the one "Ordering closes at" setting overrides stored deadlines; cutoffState flips to FINAL at the deadline', () => {
   const entries = [
     { id: 'a', date: WED, studentCategory: 'Pre-primary', mealId: 'meal_dal', isActive: true, orderingDeadline: '08:00' },
     { id: 'b', date: WED, studentCategory: 'Primary', mealId: 'meal_dal', isActive: true, orderingDeadline: '09:15' },
@@ -109,8 +109,9 @@ test('dayPlan reports each category, the latest deadline, and cutoffState flips 
   const plan = dayPlan(entries, WED);
   assert.deepEqual(plan.categories.map((c) => c.state), ['OPEN', 'OPEN', 'HOLIDAY']);
   assert.equal(plan.categories[2].holidayReason, 'Exam');
-  assert.equal(plan.deadline, '09:15');
-  assert.equal(dayPlan([], WED).deadline, '08:30', 'fallback');
+  assert.equal(plan.deadline, '07:00', 'the setting (07:00 by default) overrides the stored 08:00 / 09:15');
+  assert.deepEqual(plan.categories.map((c) => c.deadline), ['07:00', '07:00', null]);
+  assert.equal(dayPlan([], WED).deadline, '07:00', 'fallback');
   assert.equal(dayPlan([{ id: 'x', date: SUN, studentCategory: 'Primary', mealId: 'meal_dal' }], SUN).isServingDay, false);
 
   assert.equal(cutoffState(WED, '09:15', new Date(`${WED}T09:14:00+05:30`)), 'OPEN');
@@ -139,7 +140,7 @@ test('Prepare counts: per-category dishes, teacher meals separate, Final/Open, a
   const open = await (await kitchen(jsonRequest(`/api/admin/kitchen?date=${TUE}&refresh=true`, 'GET', undefined, staff))).json();
   assert.equal(open.totalMeals, 4, 'students only');
   assert.equal(open.cutoff, 'OPEN');
-  assert.equal(open.deadline, '08:30');
+  assert.equal(open.deadline, '07:00');
   assert.deepEqual(open.byCategory, [
     { category: 'Pre-primary', total: 1, dishes: [{ mealName: 'Dal Khichdi', quantity: 1 }] },
     { category: 'Primary', total: 3, dishes: [{ mealName: 'Dal Khichdi', quantity: 2 }, { mealName: 'Poha', quantity: 1 }] },
@@ -152,8 +153,8 @@ test('Prepare counts: per-category dishes, teacher meals separate, Final/Open, a
   });
   assert.doesNotMatch(JSON.stringify(open), /unitPrice|totalPrice|totalAmount|"price"/, 'no money on the Prepare data');
 
-  // After 08:30 the same (cached) numbers are labelled Final.
-  at(`${TUE}T08:31`);
+  // From 07:00 the same (cached) numbers are labelled Final.
+  at(`${TUE}T07:01`);
   const final = await (await kitchen(jsonRequest(`/api/admin/kitchen?date=${TUE}`, 'GET', undefined, staff))).json();
   assert.equal(final.cutoff, 'FINAL');
 });

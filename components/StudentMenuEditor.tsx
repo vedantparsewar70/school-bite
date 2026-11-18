@@ -43,6 +43,7 @@ import {
   type BrunchPrices,
   type DefaultPortions,
 } from '@/lib/brunch-prices';
+import { DEFAULT_ORDERING_CUTOFF, validCutoff } from '@/lib/ordering-cutoff';
 
 /**
  * Student Menu editor (Staff → Student Menu and Admin → Menu). What each class can order on each
@@ -280,7 +281,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
       : d.isPast
         ? 'Past day: view only.'
         : d.classes.every((c) => !c.editable)
-          ? `Ordering closed at ${d.classes[0]?.deadline || '08:30'}: view only.`
+          ? `Ordering closed at ${d.classes[0]?.deadline || DEFAULT_ORDERING_CUTOFF}: view only.`
           : null;
 
   // --- Actions ---------------------------------------------------------------------------------
@@ -492,7 +493,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
 
       {tab === 'MENU' ? (
         <>
-          <BrunchPricesCard onDefaults={setDefaultPortions} onApplied={() => refreshAfterChange()} />
+          <BrunchPricesCard isAdmin={isAdmin} onDefaults={setDefaultPortions} onApplied={() => refreshAfterChange()} />
 
           {/* Date strip: scrolls sideways on its own; the page never does. */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 sm:p-3 space-y-2" aria-label="Choose a day">
@@ -571,7 +572,7 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-sm font-semibold">
-                      <Clock className="w-3.5 h-3.5" /> Parents can order until {day.classes[0]?.deadline || '08:30'}
+                      <Clock className="w-3.5 h-3.5" /> Parents can order until {day.classes[0]?.deadline || DEFAULT_ORDERING_CUTOFF}
                       {day.isToday ? ' today' : ' on the day'}
                     </span>
                   )}
@@ -815,10 +816,12 @@ export default function StudentMenuEditor({ isAdmin = false }: { isAdmin?: boole
  * everything (/api/admin/menus/brunch-prices, /api/admin/menus/portions/bulk); each save first
  * shows a confirmation (old → new), so a typo (₹90 → ₹900) is caught.
  */
-function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPortions) => void; onApplied: () => void }) {
+function BrunchPricesCard({ isAdmin = false, onDefaults, onApplied }: { isAdmin?: boolean; onDefaults: (d: DefaultPortions) => void; onApplied: () => void }) {
   type Form = Record<ClassName, string>;
   const toForm = (v: Record<ClassName, number>): Form => ({ 'Pre-primary': String(v['Pre-primary']), Primary: String(v.Primary), Secondary: String(v.Secondary) });
-  const [saved, setSaved] = useState<{ prices: BrunchPrices; defaultPortions: DefaultPortions } | null>(null);
+  type Saved = { prices: BrunchPrices; defaultPortions: DefaultPortions; orderingCutoff: string };
+  const [saved, setSaved] = useState<Saved | null>(null);
+  const [cutoffForm, setCutoffForm] = useState('');
   const [priceForm, setPriceForm] = useState<Form>({ 'Pre-primary': '', Primary: '', Secondary: '' });
   const [portionForm, setPortionForm] = useState<Form>({ 'Pre-primary': '', Primary: '', Secondary: '' });
   const [loadError, setLoadError] = useState('');
@@ -829,10 +832,11 @@ function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPo
   const [busy, setBusy] = useState(false);
 
   const show = useCallback(
-    (s: { prices: BrunchPrices; defaultPortions: DefaultPortions }) => {
+    (s: Saved) => {
       setSaved(s);
       setPriceForm(toForm(s.prices));
       setPortionForm(toForm(s.defaultPortions));
+      setCutoffForm(s.orderingCutoff);
       onDefaults(s.defaultPortions);
     },
     [onDefaults]
@@ -847,7 +851,11 @@ function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPo
         return;
       }
       setLoadError('');
-      show({ prices: body.prices as BrunchPrices, defaultPortions: (body.defaultPortions || DEFAULT_PORTIONS) as DefaultPortions });
+      show({
+        prices: body.prices as BrunchPrices,
+        defaultPortions: (body.defaultPortions || DEFAULT_PORTIONS) as DefaultPortions,
+        orderingCutoff: validCutoff(body.orderingCutoff) || DEFAULT_ORDERING_CUTOFF,
+      });
     } catch {
       setLoadError('Could not load the brunch prices. Check the connection.');
     }
@@ -879,13 +887,33 @@ function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPo
     setConfirm({ title: 'Change default portions?', lines, note: 'Used for new menu entries only. Days already on the menu keep their portions.', body: { defaultPortions: v.portions } });
   };
 
+  /** "Ordering closes at" (admin only): one cutoff for every class and day. */
+  const reviewCutoff = () => {
+    setMessage('');
+    if (!saved) return;
+    const t = validCutoff(cutoffForm);
+    if (!t) return setProblem('Please enter a real time (HH:MM).');
+    setProblem('');
+    if (t === saved.orderingCutoff) return setMessage('No change: ordering already closes at that time.');
+    setConfirm({
+      title: 'Change when ordering closes?',
+      lines: [`Ordering closes: ${saved.orderingCutoff} → ${t}`],
+      note: 'Applies to every class and every day, including menus already published. Teachers are not affected.',
+      body: { orderingCutoff: t },
+    });
+  };
+
   const save = async () => {
     if (!confirm || busy) return;
     setBusy(true);
     try {
       const r = await send('/api/admin/menus/brunch-prices', 'PUT', confirm.body);
       if (r.ok && r.data.prices) {
-        show({ prices: r.data.prices as BrunchPrices, defaultPortions: r.data.defaultPortions as DefaultPortions });
+        show({
+          prices: r.data.prices as BrunchPrices,
+          defaultPortions: r.data.defaultPortions as DefaultPortions,
+          orderingCutoff: validCutoff(r.data.orderingCutoff) || DEFAULT_ORDERING_CUTOFF,
+        });
         setMessage(r.data.message || 'Saved.');
         broadcastSyncEvent('MENU_UPDATED');
       } else {
@@ -944,6 +972,36 @@ function BrunchPricesCard({ onDefaults, onApplied }: { onDefaults: (d: DefaultPo
             <button type="button" disabled={!saved || busy} onClick={reviewPrices} className={`${PRIMARY_BTN} w-full sm:w-auto px-6`}>
               Save prices
             </button>
+          </div>
+
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Ordering closes at</h3>
+              <p className="text-sm text-slate-600">Parents can order (brunch and extras) until this time on the meal day, for every class. Teachers have no cutoff.</p>
+            </div>
+            {isAdmin ? (
+              <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                <label className="block">
+                  <span className="text-sm font-bold text-slate-700">Time (IST)</span>
+                  <input
+                    type="time"
+                    step={60}
+                    disabled={!saved || busy}
+                    value={cutoffForm}
+                    onChange={(e) => setCutoffForm(e.target.value)}
+                    className="mt-1 w-full sm:w-40 min-h-[48px] px-3 rounded-xl border border-slate-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
+                  />
+                </label>
+                <button type="button" disabled={!saved || busy} onClick={reviewCutoff} className={`${PRIMARY_BTN} px-6`}>
+                  Save time
+                </button>
+              </div>
+            ) : (
+              <p className="text-2xl font-black text-slate-900 tabular-nums" data-testid="ordering-cutoff">
+                {saved?.orderingCutoff || DEFAULT_ORDERING_CUTOFF}
+                <span className="block text-xs font-semibold text-slate-500">Only the admin can change this.</span>
+              </p>
+            )}
           </div>
 
           <div className="space-y-3 border-t border-slate-100 pt-4">

@@ -3,13 +3,20 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RotateCcw, CheckCircle2, XCircle, AlertTriangle, Clock, CreditCard, Mail } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress } from '@/lib/business-config';
+import { cutoffLabel } from '@/lib/ordering-cutoff';
+import { policyCutoffTime } from '@/lib/ordering-cutoff-server';
 
 export const metadata: Metadata = {
   title: 'Refund & Cancellation Policy',
   description: 'How to cancel a School-Bite order and how refunds work.',
 };
 
-export default function RefundPolicyPage() {
+
+// The ordering cutoff comes from the "Ordering closes at" setting (refreshed every 5 minutes).
+export const revalidate = 300;
+
+export default async function RefundPolicyPage() {
+  const cutoffText = `${cutoffLabel(await policyCutoffTime())} on meal date`;
   const formattedAddress = getFormattedAddress();
 
   return (
@@ -62,7 +69,7 @@ export default function RefundPolicyPage() {
                   <span>How to Cancel</span>
                 </div>
                 <p className="text-xs text-emerald-900 leading-relaxed">
-                  Orders cannot be cancelled online. To cancel an order, please contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a> before the daily cutoff deadline (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>). Approved refunds go back to your original payment method.
+                  Orders cannot be cancelled online. To cancel an order, please contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a> before the daily cutoff deadline (<strong>{cutoffText}</strong>). Approved refunds go back to your original payment method.
                 </p>
               </div>
 
@@ -72,7 +79,7 @@ export default function RefundPolicyPage() {
                   <span>After Daily Cutoff Time</span>
                 </div>
                 <p className="text-xs text-rose-900 leading-relaxed">
-                  After {BUSINESS_CONFIG.cancellationCutoffTime}, orders cannot be cancelled or refunded.
+                  After {cutoffText}, orders cannot be cancelled or refunded.
                 </p>
               </div>
             </div>
