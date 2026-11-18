@@ -5,6 +5,7 @@ import { Printer, RefreshCw } from 'lucide-react';
 import { formatDatePretty, getTodayString } from '@/lib/utils';
 import { useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { dishSplit, dishSplitLabel } from '@/lib/prepare-split';
 
 type CategoryDay = { category: string; state: 'OPEN' | 'HOLIDAY' | 'NONE'; holidayReason: string | null };
 
@@ -194,12 +195,19 @@ export default function StaffPreparePage() {
               <section className="rounded-2xl bg-white border border-slate-200">
                 <h2 className="px-4 pt-3 text-sm font-bold text-slate-500 uppercase tracking-wide">All dishes</h2>
                 <ul className="divide-y divide-slate-100">
-                  {dishes.map((m) => (
-                    <li key={m.mealId} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <span className="text-base font-bold text-slate-900 break-words min-w-0">{m.mealName}</span>
-                      <span className="text-2xl font-black text-slate-900 tabular-nums shrink-0">{m.quantityToPrepare}</span>
-                    </li>
-                  ))}
+                  {dishes.map((m) => {
+                    // Per-class split of this dish, from the same response (byCategory).
+                    const split = dishSplitLabel(dishSplit(m.mealName, data.byCategory));
+                    return (
+                      <li key={m.mealId} className="flex items-center justify-between gap-3 px-4 py-3 break-inside-avoid">
+                        <div className="min-w-0">
+                          <p className="text-base font-bold text-slate-900 break-words">{m.mealName}</p>
+                          {split && <p className="text-sm font-semibold text-slate-600 mt-0.5" data-testid="dish-split">{split}</p>}
+                        </div>
+                        <span className="text-2xl font-black text-slate-900 tabular-nums shrink-0">{m.quantityToPrepare}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
 
