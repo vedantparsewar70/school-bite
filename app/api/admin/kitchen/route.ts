@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { classDivisionLabel, divisionOf } from '@/lib/division';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString } from '@/lib/utils';
@@ -123,7 +124,8 @@ export async function GET(req: Request) {
     };
 
     for (const it of validItems) {
-      const key = `Class ${it.student.grade}-${it.student.division}`;
+      // "Primary · B" (class and division).
+      const key = classDivisionLabel((it.student as any).studentCategory || it.student.grade, it.student.division) || 'Class not set';
       classBreakdownMap.set(key, (classBreakdownMap.get(key) || 0) + it.quantity);
 
       const cat =
@@ -159,11 +161,9 @@ export async function GET(req: Request) {
         orderItemId: it.id,
         orderId: it.orderId,
         studentName: it.student.name,
-        studentId: it.student.studentId,
         studentCategory: studentCat,
         grade: it.student.grade,
-        division: it.student.division,
-        rollNo: it.student.rollNo,
+        division: divisionOf(it.student.division) || '',
         allergies: studentAllergies.join(', ') || it.student.allergies || null,
         hasAllergyAlert: it.hasAllergyAlert,
         conflictAllergens: it.conflictAllergens || it.student.allergies || null,
@@ -218,8 +218,7 @@ export async function GET(req: Request) {
         orderItemId: it.id,
         studentName: it.student?.name || 'Student',
         grade: it.student?.grade || '',
-        division: it.student?.division || '',
-        rollNo: it.student?.rollNo || '',
+        division: divisionOf(it.student?.division) || '',
         studentCategory: cat,
         mealName: name,
         quantity: it.quantity,

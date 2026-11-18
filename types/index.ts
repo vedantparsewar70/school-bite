@@ -23,7 +23,6 @@ export interface StudentData {
   grade: string;
   division?: string;
   rollNo?: string;
-  studentId: string;
   studentCategory?: StudentCategory;
   allergies?: string | null;
   allergiesList?: string[];

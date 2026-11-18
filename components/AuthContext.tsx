@@ -17,7 +17,6 @@ export interface AuthUser {
     grade: string;
     division: string;
     rollNo: string;
-    studentId: string;
     allergies?: string | null;
     isVegetarian: boolean;
     profilePhoto?: string | null;

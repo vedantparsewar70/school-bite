@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { divisionOf } from '@/lib/division';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/firebase-admin';
@@ -167,8 +168,8 @@ export async function GET(req: Request) {
           studentId: item.studentId,
           studentName: item.student?.name || 'Student',
           studentGrade: item.student?.grade || '',
-          studentDivision: item.student?.division || '',
-          studentRollNo: item.student?.rollNo || '',
+          studentCategory: item.studentCategory || item.student?.studentCategory || '',
+          studentDivision: divisionOf(item.student?.division) || '',
           allergies: item.student?.allergies || null,
           hasAllergyAlert: Boolean(item.hasAllergyAlert),
           conflictAllergens: item.conflictAllergens || item.student?.allergies || null,

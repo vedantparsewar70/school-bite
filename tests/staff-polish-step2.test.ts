@@ -188,14 +188,15 @@ test('Not served list: unserved children in class order, teachers in their own s
     { teacherName: 'Mr Iyer', teacherPhone: '9000000000', orderStatus: 'GIVEN', items: [{ mealName: 'Teacher Thali', quantity: 1 }] },
   ];
 
-  assert.deepEqual(notServedChildren(rows).map((r) => r.studentName), ['Chitra', 'Bilal', '=HYPERLINK("http://x")'], 'roll 2 before roll 11');
+  assert.deepEqual(notServedChildren(rows).map((r) => r.studentName), ['Bilal', 'Chitra', '=HYPERLINK("http://x")'], 'by class, then division, then name');
 
   const csv = notServedCsv(TUE, rows, teachers);
   const lines = csv.trimEnd().split('\r\n');
-  assert.equal(lines[1], '"Name","Class","Roll","Category","Dish"');
-  assert.equal(lines[2], '"Chitra","3-B","2","Primary","Poha"');
-  assert.equal(lines[3], '"Bilal","3-B","11","Primary","Dal Khichdi x 2"');
-  assert.equal(lines[4], `"'=HYPERLINK(""http://x"")","8-A","","Secondary","Dal ""special"""`, 'formula neutralised, quotes escaped');
+  assert.equal(lines[1], '"Name","Class","Division","Dish"');
+  assert.equal(lines[2], '"Bilal","Primary","B","Dal Khichdi x 2"');
+  assert.equal(lines[3], '"Chitra","Primary","B","Poha"');
+  assert.equal(lines[4], `"'=HYPERLINK(""http://x"")","Secondary","A","Dal ""special"""`, 'formula neutralised, quotes escaped');
+  assert.ok(!/Roll|"11"|"2"/.test(csv), 'no roll numbers');
   assert.ok(!csv.includes('Asha'), 'served children are not listed');
   assert.ok(lines.includes('"Teachers"'));
   assert.ok(csv.includes('"Ms Rao","9876543210","Teacher Thali"'));

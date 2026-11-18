@@ -1,4 +1,5 @@
 /** "Not served" list for a date: children (and, separately, teachers) with a paid meal not yet handed over. */
+import { classDivisionLabel, compareByClassDivisionName, divisionOf } from './division';
 
 export interface NotServedChild {
   studentName: string;
@@ -19,28 +20,16 @@ export interface NotServedTeacher {
 
 export const teacherServed = (t: { orderStatus: string }) => t.orderStatus === 'GIVEN' || t.orderStatus === 'COLLECTED';
 
-export const classLabel = (r: { grade?: string | null; division?: string | null }) =>
-  r.grade && r.division ? `${r.grade}-${r.division}` : r.grade || '';
+/** "Primary · B": the class (category) and division; roll numbers are not shown. */
+export const classLabel = (r: { studentCategory?: string | null; grade?: string | null; division?: string | null }) =>
+  classDivisionLabel(r.studentCategory || r.grade || '', r.division);
 
 export const dishLabel = (list: Array<{ mealName: string; quantity: number; isExtra?: boolean }>) =>
   list.map((m) => `${m.mealName}${m.quantity > 1 ? ` x ${m.quantity}` : ''}${m.isExtra ? ' (extra)' : ''}`).join('; ');
 
-const rollKey = (r: string | null | undefined) => {
-  const n = Number(r);
-  return Number.isFinite(n) && r !== '' && r != null ? n : Number.MAX_SAFE_INTEGER;
-};
-
-/** Children not served, in class order (category, class, roll number, name). */
+/** Children not served, by class (Pre-primary, Primary, Secondary), then division (A-E), then name. */
 export function notServedChildren<T extends NotServedChild>(rows: T[]): T[] {
-  return rows
-    .filter((r) => !r.served)
-    .sort(
-      (a, b) =>
-        String(a.studentCategory || '').localeCompare(String(b.studentCategory || '')) ||
-        classLabel(a).localeCompare(classLabel(b), undefined, { numeric: true }) ||
-        rollKey(a.rollNo) - rollKey(b.rollNo) ||
-        a.studentName.localeCompare(b.studentName)
-    );
+  return rows.filter((r) => !r.served).sort(compareByClassDivisionName);
 }
 
 export function notServedTeachers<T extends NotServedTeacher>(orders: T[]): T[] {
@@ -54,12 +43,12 @@ export function csvCell(value: unknown): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-/** CSV for the date: children first (Name, Class, Roll, Dish), then teachers in their own section. */
+/** CSV for the date: children first (Name, Class, Division, Dish), then teachers in their own section. */
 export function notServedCsv(date: string, children: NotServedChild[], teachers: NotServedTeacher[]): string {
   const line = (cells: unknown[]) => cells.map(csvCell).join(',');
-  const out = [line([`Not served on ${date}`]), line(['Name', 'Class', 'Roll', 'Category', 'Dish'])];
+  const out = [line([`Not served on ${date}`]), line(['Name', 'Class', 'Division', 'Dish'])];
   for (const r of notServedChildren(children)) {
-    out.push(line([r.studentName, classLabel(r), r.rollNo || '', r.studentCategory || '', dishLabel(r.meals)]));
+    out.push(line([r.studentName, r.studentCategory || r.grade || '', divisionOf(r.division) || '', dishLabel(r.meals)]));
   }
   const t = notServedTeachers(teachers);
   if (t.length) {

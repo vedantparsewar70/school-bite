@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { compareByClassDivisionName, divisionOf } from '@/lib/division';
 import { db } from '@/lib/firebase-admin';
 import { getCurrentUser } from '@/lib/auth';
 import { getTodayString, isSundayDate } from '@/lib/utils';
@@ -107,7 +108,7 @@ export async function GET(req: Request) {
           studentId: key,
           studentName: student.name || 'Student',
           grade: student.grade && student.grade !== '-' ? String(student.grade) : '',
-          division: student.division && student.division !== '-' ? String(student.division) : '',
+          division: divisionOf(student.division) || '',
           rollNo: student.rollNo && student.rollNo !== '-' ? String(student.rollNo) : '',
           studentCategory: categoryOf(it, student),
           meals: [],
@@ -157,7 +158,8 @@ export async function GET(req: Request) {
       r.meals.sort((a, b) => Number(a.isExtra) - Number(b.isExtra));
       return { ...r, served: allServed, servedAt: allServed ? r.servedAt : null, servedBy: allServed ? r.servedBy : null };
     });
-    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'en', { sensitivity: 'base' }));
+    // By class (Pre-primary, Primary, Secondary), then division (A-E), then name.
+    list.sort(compareByClassDivisionName);
 
     return NextResponse.json({
       date,

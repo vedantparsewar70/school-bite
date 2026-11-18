@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   CalendarDays,
@@ -44,6 +44,7 @@ import {
   StudentCategory,
 } from '@/lib/student-category';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
+import { classDivisionLabel, divisionOf } from '@/lib/division';
 
 const SCHEDULE_DAYS_AHEAD = 45;
 
@@ -86,6 +87,7 @@ function MenuPageContent() {
 
   const { addToCart, updateQuantity, cartItems, totalItems, subtotal } = useCart();
   const { showToast } = useToast();
+  const router = useRouter();
   const {
     children,
     isLoading: childrenLoading,
@@ -237,12 +239,25 @@ function MenuPageContent() {
     );
   };
 
+  /**
+   * An older child with no division (A-E) is asked to add it before ordering: the edit form opens.
+   * Returns true when ordering may go on.
+   */
+  const hasDivisionOrAsk = (): boolean => {
+    if (!selectedChild || divisionOf(selectedChild.division)) return true;
+    const first = selectedChild.name.split(' ')[0];
+    showToast(`Please add ${first}'s division (A to E) before ordering.`, 'info');
+    router.push(`/parent/children?edit=${encodeURIComponent(selectedChild.id)}`);
+    return false;
+  };
+
   /** Adds one of an extra (max 3 per child per day; the server also counts earlier orders). */
   const addExtra = (extra: any) => {
     if (!selectedChild) {
       showToast('Please select a child first', 'error');
       return;
     }
+    if (!hasDivisionOrAsk()) return;
     const inCartLine = cartItems.find(
       (c) => c.kind === 'EXTRA' && c.mealId === extra.meal.id && c.date === extra.date && c.studentId === selectedChild.id
     );
@@ -289,6 +304,7 @@ function MenuPageContent() {
       showToast('Please select a child first', 'error');
       return;
     }
+    if (!hasDivisionOrAsk()) return;
 
     if (isPastDate) {
       showToast('Ordering is closed for past dates', 'error');
@@ -436,7 +452,7 @@ function MenuPageContent() {
                           {cat}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-medium">Class {child.grade}-{child.division}</span>
+                      <span className="text-[10px] text-slate-500 font-medium">{divisionOf(child.division) ? classDivisionLabel(child.studentCategory || child.grade, child.division) : 'Division not set'}</span>
                     </div>
                   </button>
                 );

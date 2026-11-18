@@ -9,7 +9,7 @@ Live site: https://school-bite.vercel.app (hosted on Vercel).
 ## Who uses it
 
 **Parents** (`/parent/…`)
-- Register, add children with their class and allergies.
+- Register, add children with their class, division (A–E) and allergies.
 - See each child's class menu and order the day's brunch, plus optional extras (at most 3 of each
   extra per child per day, only with that day's brunch). One brunch per child per day.
 - Brunch price is set by class (defaults: Pre-primary ₹60, Primary ₹75, Secondary ₹90); staff and

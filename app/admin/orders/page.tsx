@@ -28,6 +28,7 @@ import { formatServeTime } from '@/lib/service-dates';
 import { useToast } from '@/components/ToastContext';
 import OrderReceiptModal from '@/components/OrderReceiptModal';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
+import { classDivisionLabel } from '@/lib/division';
 
 /** The cancellation result in admin wording (the server's message is written for parents). */
 function adminCancelMessage(paymentStatus: string | undefined, refundAmount: number): string {
@@ -377,9 +378,7 @@ function AdminOrdersContent() {
             const firstItem = o.items?.[0];
             // Every child in the order (each is handed over separately).
             const studentName = Array.from(new Set((o.items || []).map((it: any) => it.studentName))).join(', ') || 'Student';
-            const studentGrade = firstItem?.studentGrade || '-';
-            const studentDivision = firstItem?.studentDivision || '-';
-            const studentRollNo = firstItem?.studentRollNo || '-';
+            const classDivision = classDivisionLabel(firstItem?.studentCategory || firstItem?.studentGrade, firstItem?.studentDivision) || '-';
             const mealDate = firstItem?.date || dateFilter || todayDateStr;
 
             // Group items by meal for clean display
@@ -405,17 +404,12 @@ function AdminOrdersContent() {
                 key={o.id}
                 className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-400 hover:shadow-md transition-all overflow-hidden"
               >
-                {/* Clean Card Top Header: Class & Roll Number (Child name removed from top) */}
+                {/* Card header: Class · Division (child name below) */}
                 <div className="p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-black bg-purple-100 text-purple-800 border border-purple-200/80 tracking-wide">
-                      Class {studentGrade}-{studentDivision}
+                      {classDivision}
                     </span>
-                    {studentRollNo !== '-' && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-extrabold bg-slate-100 text-slate-700">
-                        Roll #{studentRollNo}
-                      </span>
-                    )}
                   </div>
 
                   <span className="text-xs font-mono font-semibold text-slate-400">
@@ -553,16 +547,9 @@ function AdminOrdersContent() {
               </div>
 
               <div className="flex justify-between py-1 border-b border-slate-200/60">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">Class:</span>
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Class · Division:</span>
                 <span className="font-bold text-slate-800">
-                  Class {detailOrder.items?.[0]?.studentGrade || '-'}-{detailOrder.items?.[0]?.studentDivision || '-'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1 border-b border-slate-200/60">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">Roll No:</span>
-                <span className="font-bold text-slate-800">
-                  {detailOrder.items?.[0]?.studentRollNo || '-'}
+                  {classDivisionLabel(detailOrder.items?.[0]?.studentCategory || detailOrder.items?.[0]?.studentGrade, detailOrder.items?.[0]?.studentDivision) || '-'}
                 </span>
               </div>
 

@@ -80,7 +80,7 @@ test('the Serve list has one row per child (siblings separate), only paid, activ
   assert.equal(status, 200);
   assert.equal(body.date, TODAY);
   assert.equal(body.closedReason, null);
-  assert.deepEqual(body.rows.map((r: any) => r.studentName), ['Arjun Sharma', 'Meera Joshi', 'Riya Sharma']);
+  assert.deepEqual(body.rows.map((r: any) => r.studentName), ['Meera Joshi', 'Riya Sharma', 'Arjun Sharma'], 'by class, then division, then name');
   const riya = body.rows.find((r: any) => r.studentId === 'stu_riya');
   assert.equal(riya.grade, '3');
   assert.equal(riya.division, 'A');
@@ -219,11 +219,11 @@ test('Serve filters: Not served by default, Served, All, category, and search by
   await tick(['oit_riya']);
   const { rows } = (await list()).body;
   const names = (f: Partial<typeof DEFAULT_SERVE_FILTER>) => filterServeRows(rows, { ...DEFAULT_SERVE_FILTER, ...f }).map((r: any) => r.studentName);
-  assert.deepEqual(names({}), ['Arjun Sharma', 'Meera Joshi']);
+  assert.deepEqual(names({}), ['Meera Joshi', 'Arjun Sharma']);
   assert.deepEqual(names({ status: 'SERVED' }), ['Riya Sharma']);
-  assert.deepEqual(names({ status: 'ALL' }), ['Arjun Sharma', 'Meera Joshi', 'Riya Sharma']);
+  assert.deepEqual(names({ status: 'ALL' }), ['Meera Joshi', 'Riya Sharma', 'Arjun Sharma']);
   assert.deepEqual(names({ status: 'ALL', category: 'Secondary' }), ['Arjun Sharma']);
-  assert.deepEqual(names({ status: 'ALL', search: 'sharma' }), ['Arjun Sharma', 'Riya Sharma']);
+  assert.deepEqual(names({ status: 'ALL', search: 'sharma' }), ['Riya Sharma', 'Arjun Sharma']);
   assert.deepEqual(names({ status: 'ALL', search: '12' }), ['Arjun Sharma'], 'roll number');
   assert.deepEqual(names({ status: 'ALL', search: '  meera ' }), ['Meera Joshi']);
   assert.deepEqual(serveCounter(rows), { served: 1, total: 3 });

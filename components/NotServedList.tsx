@@ -15,7 +15,7 @@ import {
 
 /**
  * "Not served" for a date, for staff (History) and admin: children first, teachers in their own
- * section, with Print and a CSV download (Name, Class, Roll, Dish).
+ * section, with Print and a CSV download (Name, Class, Division, Dish).
  */
 export default function NotServedList({
   date,
@@ -78,8 +78,7 @@ export default function NotServedList({
           <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wide">
             <tr>
               <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Class</th>
-              <th className="px-3 py-2">Roll</th>
+              <th className="px-3 py-2">Class · Division</th>
               <th className="px-3 py-2">Dish</th>
             </tr>
           </thead>
@@ -88,7 +87,6 @@ export default function NotServedList({
               <tr key={r.key || `${r.studentName}-${i}`} className="break-inside-avoid">
                 <td className="px-3 py-2 font-bold text-slate-900 break-words">{r.studentName}</td>
                 <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{classLabel(r)}</td>
-                <td className="px-3 py-2 text-slate-700 tabular-nums">{r.rollNo || ''}</td>
                 <td className="px-3 py-2 text-slate-800 break-words">{dishLabel(r.meals)}</td>
               </tr>
             ))}

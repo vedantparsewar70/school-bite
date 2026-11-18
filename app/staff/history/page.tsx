@@ -8,6 +8,7 @@ import { filterServeRows } from '@/lib/serve-filter';
 import { broadcastSyncEvent, useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import NotServedList from '@/components/NotServedList';
+import { classDivisionLabel } from '@/lib/division';
 
 type ServeRow = {
   key: string;
@@ -230,7 +231,7 @@ export default function StaffHistoryPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-lg font-black text-slate-900 leading-tight break-words">{r.studentName}</p>
                     <p className="text-sm text-slate-600">
-                      {[r.grade && r.division ? `${r.grade}-${r.division}` : r.grade, r.rollNo ? `Roll ${r.rollNo}` : '', r.studentCategory].filter(Boolean).join(' · ')}
+                      {classDivisionLabel(r.studentCategory || r.grade, r.division)}
                     </p>
                     <p className="text-base font-semibold text-slate-800 break-words">{meals(r.meals)}</p>
                     {r.servedAt && <p className="text-sm font-bold text-emerald-700">Served {formatServeTime(r.servedAt)}</p>}

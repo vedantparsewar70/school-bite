@@ -26,6 +26,7 @@ import {
 } from '@/lib/utils';
 import { BUSINESS_CONFIG } from '@/lib/business-config';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
+import { classDivisionLabel } from '@/lib/division';
 
 const PAYMENT_BADGE: Record<string, { label: string; tone: string }> = {
   PAID: { label: 'Paid', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -230,7 +231,7 @@ function OrdersPageContent() {
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 flex-wrap">
                             <ChildAvatar size="xs" />
                             <span className="break-words">
-                              For: <strong className="text-slate-700">{item.studentName}</strong> (Class {item.studentGrade}-{item.studentDivision}, Roll: {item.studentRollNo})
+                              For: <strong className="text-slate-700">{item.studentName}</strong> ({classDivisionLabel(item.studentCategory || item.studentGrade, item.studentDivision)})
                             </span>
                           </div>
                           <p className="text-[11px] font-semibold text-amber-700 flex flex-wrap items-center gap-1.5">

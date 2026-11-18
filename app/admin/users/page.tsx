@@ -19,6 +19,7 @@ import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { formatINR } from '@/lib/utils';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
+import { classDivisionLabel } from '@/lib/division';
 
 const ALLERGY_FILTERS = [
   'Milk',
@@ -77,7 +78,6 @@ export default function AdminUsersPage() {
     const q = search.toLowerCase();
     const matchSearch =
       s.name.toLowerCase().includes(q) ||
-      s.studentId.toLowerCase().includes(q) ||
       s.parentName.toLowerCase().includes(q);
 
     if (!matchSearch) return false;
@@ -308,7 +308,6 @@ export default function AdminUsersPage() {
                       <th className="py-3.5 px-4">Student Name</th>
                       <th className="py-3.5 px-3">Class</th>
                       <th className="py-3.5 px-3">Division</th>
-                      <th className="py-3.5 px-3">Roll No</th>
                       <th className="py-3.5 px-4">Dietary Type</th>
                       <th className="py-3.5 px-4">Allergies</th>
                       <th className="py-3.5 px-4">Allergy Alert</th>
@@ -334,19 +333,13 @@ export default function AdminUsersPage() {
                               <span>{st.name}</span>
                               <VegBadge isVegetarian={st.isVegetarian} size="sm" />
                             </div>
-                            <span className="text-[10px] font-mono font-medium text-slate-400 block">
-                              {st.studentId}
-                            </span>
                           </td>
 
                           {/* Class */}
-                          <td className="py-3.5 px-3 font-extrabold text-slate-800">{st.grade}</td>
+                          <td className="py-3.5 px-3 font-extrabold text-slate-800">{st.studentCategory || st.grade}</td>
 
                           {/* Division */}
-                          <td className="py-3.5 px-3 font-extrabold text-slate-800">{st.division}</td>
-
-                          {/* Roll Number */}
-                          <td className="py-3.5 px-3 font-mono text-slate-700 font-bold">{st.rollNo}</td>
+                          <td className="py-3.5 px-3 font-extrabold text-slate-800">{st.division || <span className="text-amber-700">Not set</span>}</td>
 
                           {/* Dietary Type */}
                           <td className="py-3.5 px-4">
@@ -462,7 +455,7 @@ export default function AdminUsersPage() {
                       >
                         <ChildAvatar size="xs" />
                         <span className="font-bold text-slate-800">{ch.name}</span>
-                        <span className="text-slate-400">({ch.grade}-{ch.division})</span>
+                        <span className="text-slate-400">({classDivisionLabel(ch.studentCategory || ch.grade, ch.division)})</span>
                       </div>
                     ))}
                   </div>
@@ -499,21 +492,16 @@ export default function AdminUsersPage() {
                 <h3 className="text-xl font-extrabold text-slate-900">{selectedStudent.name}</h3>
                 <VegBadge isVegetarian={selectedStudent.isVegetarian} size="md" />
               </div>
-              <p className="font-mono text-xs font-bold text-purple-700">{selectedStudent.studentId}</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl text-xs">
+            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl text-xs">
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase">Class</p>
-                <p className="font-extrabold text-slate-800">{selectedStudent.grade}</p>
+                <p className="font-extrabold text-slate-800">{selectedStudent.studentCategory || selectedStudent.grade}</p>
               </div>
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase">Division</p>
-                <p className="font-extrabold text-slate-800">{selectedStudent.division}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Roll No</p>
-                <p className="font-extrabold text-slate-800">{selectedStudent.rollNo}</p>
+                <p className="font-extrabold text-slate-800">{selectedStudent.division || 'Not set'}</p>
               </div>
             </div>
 

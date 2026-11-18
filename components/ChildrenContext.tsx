@@ -34,7 +34,6 @@ function mapAuthStudentToStudentData(s: any, parentId: string): StudentData {
     grade: s.grade,
     division: s.division,
     rollNo: s.rollNo,
-    studentId: s.studentId,
     allergies: s.allergies || null,
     allergiesList,
     dietaryRestrictions: s.dietaryRestrictions || null,

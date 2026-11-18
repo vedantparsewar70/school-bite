@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { divisionOf } from '@/lib/division';
 
 export async function GET(req: Request) {
   try {
@@ -78,9 +79,8 @@ export async function GET(req: Request) {
         id: s.id,
         name: s.name,
         grade: s.grade,
-        division: s.division,
-        rollNo: s.rollNo,
-        studentId: s.studentId,
+        studentCategory: (s as any).studentCategory || null,
+        division: divisionOf(s.division) || '',
         dietaryType: s.foodPreference || (s.isVegetarian ? 'Vegetarian' : 'Non-Vegetarian'),
         isVegetarian: s.isVegetarian,
         allergies: allergiesList.join(', ') || s.allergies || null,
@@ -110,9 +110,8 @@ export async function GET(req: Request) {
         id: s.id,
         name: s.name,
         grade: s.grade,
-        division: s.division,
-        rollNo: s.rollNo,
-        studentId: s.studentId,
+        studentCategory: (s as any).studentCategory || null,
+        division: divisionOf(s.division) || '',
         allergies: s.allergies,
         isVegetarian: s.isVegetarian,
         isActive: s.isActive,
