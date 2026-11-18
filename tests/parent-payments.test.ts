@@ -179,9 +179,9 @@ const resolve = async (orderId: string, action: 'accept' | 'refund') =>
 const parentIssues = async () =>
   (await (await listOrders(jsonRequest('/api/parent/orders', 'GET', undefined, parentAuth))).json()).paymentIssues;
 
-/** Checkout at 08:20; the UPI payment completes at 09:04, after the 08:30 cutoff. */
+/** Checkout at 06:50; the UPI payment completes at 09:04, after the 07:00 cutoff. */
 async function latePayment() {
-  at('2026-11-02T08:20');
+  at('2026-11-02T06:50');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:05');
   cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T09:04:00+05:30' };
@@ -297,20 +297,20 @@ test('accepting is refused for staff, and when the meal sold out meanwhile', asy
 });
 
 test('a payment made before the deadline is honoured even if confirmation arrives later', async () => {
-  at('2026-11-02T08:20');
+  at('2026-11-02T06:50');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T06:55:00+05:30' };
   const result = await verifyOrder(orderId);
   assert.equal(result.state, 'PAID');
   assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CONFIRMED');
 });
 
 test('if Cashfree payment details cannot be read, a payment made before the cutoff is never marked late', async () => {
-  at('2026-11-02T08:20');
+  at('2026-11-02T06:50');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T06:55:00+05:30' };
   paymentsDown = true;
 
   // Verify cannot tell when the parent paid: it asks them to refresh and records nothing.
@@ -324,7 +324,7 @@ test('if Cashfree payment details cannot be read, a payment made before the cuto
   // A signed webhook carrying the payment time is enough to confirm the order on time.
   const res = await deliverWebhook({
     type: 'PAYMENT_SUCCESS_WEBHOOK',
-    data: { order: { order_id: orderId }, payment: { payment_status: 'SUCCESS', payment_time: '2026-11-02T08:25:00+05:30' } },
+    data: { order: { order_id: orderId }, payment: { payment_status: 'SUCCESS', payment_time: '2026-11-02T06:55:00+05:30' } },
   });
   assert.equal(res.status, 200);
   assert.equal(fs.getDoc('orders', orderId)?.orderStatus, 'CONFIRMED');
@@ -332,10 +332,10 @@ test('if Cashfree payment details cannot be read, a payment made before the cuto
 });
 
 test('once Cashfree payment details are readable again, verification confirms the on-time payment', async () => {
-  at('2026-11-02T08:20');
+  at('2026-11-02T06:50');
   const { orderId } = await (await startCheckout()).json();
   at('2026-11-02T09:30');
-  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T08:25:00+05:30' };
+  cf = { status: 'PAID', amount: 75, paidAt: '2026-11-02T06:55:00+05:30' };
   paymentsDown = true;
   assert.equal((await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parentAuth))).status, 503);
 

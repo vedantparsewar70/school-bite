@@ -31,7 +31,7 @@ const at = (istLocal: string) => {
 
 beforeEach(async () => {
   fs = useFakeFirestore();
-  at('2026-11-17T10:00'); // Tuesday, after the 08:30 cutoff: today is closed.
+  at('2026-11-17T10:00'); // Tuesday, after the 07:00 cutoff: today is closed.
   staff = await signedInAs(fs, 'STAFF');
   admin = await signedInAs(fs, 'ADMIN');
   parent = { authorization: `Bearer ${await createSessionToken({ userId: 'usr_p1', email: 'p1@example.com', name: 'P', role: 'PARENT', parentId: 'par_1' })}` };
@@ -121,7 +121,7 @@ test('default portions: 500 / 500 / 500 until saved; whole numbers 1 to 2000; st
 function seedWeek() {
   for (const c of ['Pre-primary', 'Primary', 'Secondary']) {
     menu('2026-11-16', c); // yesterday (past)
-    menu('2026-11-17', c); // today, ordering closed (10:00 > 08:30)
+    menu('2026-11-17', c); // today, ordering closed (10:00 > 07:00)
     menu('2026-11-18', c);
     menu('2026-11-19', c);
   }
@@ -167,7 +167,7 @@ test('bulk apply updates only upcoming main entries of the chosen classes; skips
 });
 
 test('bulk apply above what is ordered sets the total and leaves the rest available; today counts while open', async () => {
-  at('2026-11-17T07:00'); // before the cutoff: today is open
+  at('2026-11-17T06:30'); // before the cutoff: today is open
   seedWeek();
   const body = await (await applyBulk({ classes: ['Primary'], portions: 40 })).json();
   assert.deepEqual(q('2026-11-18', 'Primary'), [40, 10], '40 total, 30 ordered, 10 left');

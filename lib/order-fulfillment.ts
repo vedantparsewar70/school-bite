@@ -13,6 +13,8 @@ import {
   recordPaymentException,
   type ExceptionReason,
 } from './payment-exceptions';
+import { cutoffFor } from './ordering-cutoff';
+import { loadOrderingCutoff } from './ordering-cutoff-server';
 
 export interface PendingParentOrder {
   id: string;
@@ -143,10 +145,11 @@ export function serviceProblem(
   if (!menu) return { reason: 'SERVICE_UNAVAILABLE', detail: 'menu not found' };
   if (menu.isHoliday) return { reason: 'SERVICE_UNAVAILABLE', detail: 'the date is a holiday' };
   if (menu.isActive === false) return { reason: 'SERVICE_UNAVAILABLE', detail: 'the menu was disabled by the canteen' };
-  if (menu.date && isDeadlinePassed(menu.date, menu.orderingDeadline || '08:30', paidAt)) {
+  const deadline = cutoffFor(menu.orderingDeadline);
+  if (menu.date && isDeadlinePassed(menu.date, deadline, paidAt)) {
     return {
       reason: 'PAID_AFTER_CUTOFF',
-      detail: `paid after the ${menu.orderingDeadline || '08:30'} ordering deadline for ${menu.date}`,
+      detail: `paid after the ${deadline} ordering deadline for ${menu.date}`,
     };
   }
   return null;
@@ -257,6 +260,7 @@ export async function fulfillParentOrder(
   payment: VerifiedPaymentDetails,
   firestore: Firestore = db
 ): Promise<FulfillmentResult> {
+  await loadOrderingCutoff(firestore); // the paid-after-cutoff check uses the current setting
   const now = new Date().toISOString();
   const orderRef = firestore.collection('orders').doc(orderId);
   const pendingRef = firestore.collection('pending_orders').doc(orderId);
@@ -405,6 +409,7 @@ export async function acceptPaymentException(
   actorId: string,
   firestore: Firestore = db
 ): Promise<{ orderId: string; alreadyAccepted: boolean }> {
+  await loadOrderingCutoff(firestore);
   const now = new Date().toISOString();
   const exceptionRef = firestore.collection(PAYMENT_EXCEPTIONS).doc(orderId);
   const orderRef = firestore.collection('orders').doc(orderId);
@@ -495,6 +500,7 @@ export async function fulfillTeacherOrder(
   payment: VerifiedPaymentDetails,
   firestore: Firestore = db
 ): Promise<FulfillmentResult> {
+  await loadOrderingCutoff(firestore); // the paid-after-cutoff check uses the current setting
   const now = new Date().toISOString();
   const orderRef = firestore.collection('teacher_orders').doc(orderId);
   const pendingRef = firestore.collection('pending_teacher_orders').doc(orderId);

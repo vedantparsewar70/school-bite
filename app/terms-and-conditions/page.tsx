@@ -3,13 +3,20 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileText, Mail } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress } from '@/lib/business-config';
+import { cutoffLabel } from '@/lib/ordering-cutoff';
+import { policyCutoffTime } from '@/lib/ordering-cutoff-server';
 
 export const metadata: Metadata = {
   title: 'Terms & Conditions',
   description: 'The terms for ordering S.B. Patil School canteen meals through School-Bite.',
 };
 
-export default function TermsAndConditionsPage() {
+
+// The ordering cutoff comes from the "Ordering closes at" setting (refreshed every 5 minutes).
+export const revalidate = 300;
+
+export default async function TermsAndConditionsPage() {
+  const cutoffText = `${cutoffLabel(await policyCutoffTime())} on meal date`;
   const formattedAddress = getFormattedAddress();
 
   return (
@@ -107,7 +114,7 @@ export default function TermsAndConditionsPage() {
               <span>5. Ordering and Cutoff</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-600">
-              Ordering for a meal day closes at <strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>.
+              Ordering for a meal day closes at <strong>{cutoffText}</strong>.
             </p>
           </section>
 
@@ -143,7 +150,7 @@ export default function TermsAndConditionsPage() {
               Cancellations and refunds follow our <Link href="/refund-policy" className="text-amber-600 font-bold hover:underline">Refund &amp; Cancellation Policy</Link>:
             </p>
             <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-slate-600">
-              <li>Orders cannot be cancelled online. Cancellations are only by contacting the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>, prior to the daily cutoff time (<strong>{BUSINESS_CONFIG.cancellationCutoffTime}</strong>) for that meal date. Approved refunds go back to the original payment method.</li>
+              <li>Orders cannot be cancelled online. Cancellations are only by contacting the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>, prior to the daily cutoff time (<strong>{cutoffText}</strong>) for that meal date. Approved refunds go back to the original payment method.</li>
               <li>Orders cannot be cancelled after the cutoff.</li>
             </ul>
           </section>

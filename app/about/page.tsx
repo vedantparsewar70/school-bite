@@ -8,6 +8,8 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { BUSINESS_CONFIG, getFormattedAddress } from '@/lib/business-config';
+import { cutoffLabel } from '@/lib/ordering-cutoff';
+import { policyCutoffTime } from '@/lib/ordering-cutoff-server';
 
 export const metadata: Metadata = {
   title: 'About Us',
@@ -15,7 +17,12 @@ export const metadata: Metadata = {
     'About School-Bite, meal pre-ordering for the S.B. Patil School canteen.',
 };
 
-export default function AboutPage() {
+
+// The ordering cutoff comes from the "Ordering closes at" setting (refreshed every 5 minutes).
+export const revalidate = 300;
+
+export default async function AboutPage() {
+  const cutoff = cutoffLabel(await policyCutoffTime());
   const formattedAddress = getFormattedAddress();
 
   return (
@@ -50,7 +57,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-base font-bold text-slate-900">Ordering Cutoff</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Order before 08:30 AM on the meal day. Orders can't be cancelled online; to cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>.
+              Order before {cutoff} on the meal day. Orders can't be cancelled online; to cancel, contact the canteen at <a href={`tel:${BUSINESS_CONFIG.cancellationContactPhone}`} className="font-bold hover:underline">{BUSINESS_CONFIG.cancellationContactPhone}</a>.
             </p>
           </div>
 
@@ -93,7 +100,7 @@ export default function AboutPage() {
               <span className="text-xs font-black text-amber-600 uppercase tracking-wider">Step 3</span>
               <h4 className="text-sm font-bold text-slate-900">Pay Online</h4>
               <p className="text-xs text-slate-500">
-                Pay online through {BUSINESS_CONFIG.paymentGatewayPartner} before 08:30 AM on the meal day.
+                Pay online through {BUSINESS_CONFIG.paymentGatewayPartner} before {cutoff} on the meal day.
               </p>
             </div>
 

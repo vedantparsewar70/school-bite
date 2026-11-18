@@ -45,6 +45,7 @@ import {
 } from '@/lib/student-category';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
 import { classDivisionLabel, divisionOf } from '@/lib/division';
+import { cutoffLabel, DEFAULT_ORDERING_CUTOFF, validCutoff } from '@/lib/ordering-cutoff';
 
 const SCHEDULE_DAYS_AHEAD = 45;
 
@@ -111,6 +112,8 @@ function MenuPageContent() {
   // Optional extras for the selected child and day (shown under the brunch).
   const [extras, setExtras] = useState<any[]>([]);
   const [allowAllergyOrders, setAllowAllergyOrders] = useState(true);
+  // "Ordering closes at" (one time for every day; from the menu API, 07:00 until it loads).
+  const [orderingCutoff, setOrderingCutoff] = useState(DEFAULT_ORDERING_CUTOFF);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +158,7 @@ function MenuPageContent() {
         setMenus(data.menus || []);
         setExtras(Array.isArray(data.extras) ? data.extras : []);
         setAllowAllergyOrders(data.policy?.allowAllergyOrders !== false);
+        if (validCutoff(data.orderingCutoff)) setOrderingCutoff(validCutoff(data.orderingCutoff)!);
       }
     } catch (err) {
       setLoadError(loadFailedMessage('the menu'));
@@ -379,7 +383,7 @@ function MenuPageContent() {
             Viewing menu for <strong className="text-slate-800 font-bold">{formatDatePretty(selectedDate)}</strong>
           </p>
           <p className="text-[11px] sm:text-xs font-semibold text-amber-700 mt-0.5">
-            Order before 08:30 AM on the meal day.
+            Order before {cutoffLabel(orderingCutoff)} on the meal day.
           </p>
         </div>
 

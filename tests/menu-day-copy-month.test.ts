@@ -81,7 +81,7 @@ test('a same-name copy (no price: set by class) is allowed, and the monthly impo
   assert.equal(result.dishes[0].mealId, 'meal_soya', 'the import uses the original, never the copy');
 });
 
-test('Edit for this day follows Change dish: refused with paid orders (no copy left behind), after 08:30, and for parents', async () => {
+test('Edit for this day follows Change dish: refused with paid orders (no copy left behind), from 07:00, and for parents', async () => {
   fs.seed('orders', 'ORD-1', { id: 'ORD-1', parentId: 'par_x', paymentStatus: 'PAID', orderStatus: 'CONFIRMED' });
   fs.seed('orderItems', 'oit_1', { id: 'oit_1', orderId: 'ORD-1', studentId: 'stu_1', mealId: 'meal_soya', menuId: id(WED, 'Primary'), date: WED, quantity: 1, studentCategory: 'Primary' });
   const one = await copy({ date: WED, studentCategory: 'Primary', mealId: 'meal_soya', name: 'Light Soya', price: 60, isVegetarian: true });
@@ -92,7 +92,7 @@ test('Edit for this day follows Change dish: refused with paid orders (no copy l
   assert.deepEqual((await all.json()).blockedCategories, ['Primary']);
   assert.equal(fs.list('meals').filter((m) => m.dayOnly).length, 0, 'no stray copy');
 
-  at(`${WED}T08:31`);
+  at(`${WED}T07:01`);
   assert.equal((await copy({ date: WED, studentCategory: 'Secondary', mealId: 'meal_soya', name: 'Light Soya', price: 60, isVegetarian: true })).status, 400);
   assert.equal((await copy({ date: THU, studentCategory: 'Secondary', mealId: 'meal_soya', name: 'Light Soya', price: 60, isVegetarian: true }, parent)).status, 403);
 });

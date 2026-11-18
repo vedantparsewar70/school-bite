@@ -24,7 +24,7 @@ import { buildXlsx } from './helpers/xlsx-builder';
 
 let fs: FakeFirestore;
 
-/** Freeze the clock at an IST wall-clock time, e.g. '2026-11-16T08:29'. */
+/** Freeze the clock at an IST wall-clock time, e.g. '2026-11-16T06:59'. */
 const atIST = (istLocal: string) => {
   mock.timers.reset();
   mock.timers.enable({ apis: ['Date'], now: new Date(`${istLocal}:00+05:30`) });
@@ -72,10 +72,10 @@ test('OK: getTodayString/getOffsetDateString use IST even when server is UTC (00
   assert.equal(getOffsetDateString(1), '2027-01-01');
 });
 
-test('OK: isDeadlinePassed cutoff is exactly 08:30 IST regardless of server TZ', () => {
-  atIST(`${MON}T08:29`);
+test('OK: isDeadlinePassed cutoff is exactly 07:00 IST regardless of server TZ', () => {
+  atIST(`${MON}T06:59`);
   assert.equal(isDeadlinePassed(MON), false);
-  atIST(`${MON}T08:31`);
+  atIST(`${MON}T07:01`);
   assert.equal(isDeadlinePassed(MON), true);
   // the night before (00:00-05:30 IST window) is still open
   atIST(`${MON}T01:00`);
@@ -83,11 +83,11 @@ test('OK: isDeadlinePassed cutoff is exactly 08:30 IST regardless of server TZ',
   assert.equal(isDeadlinePassed(SUN), true);
 });
 
-test('OK: checkout validation accepts Monday at 08:29 IST and rejects at 08:31 IST (server in UTC)', async () => {
+test('OK: checkout validation accepts Monday at 06:59 IST and rejects at 07:01 IST (server in UTC)', async () => {
   const cart = [{ mealId: 'meal_dal', date: MON, quantity: 1, studentCategory: 'Primary' } as any];
-  atIST(`${MON}T08:29`);
+  atIST(`${MON}T06:59`);
   assert.equal((await validateCartAvailability(cart)).valid, true);
-  atIST(`${MON}T08:31`);
+  atIST(`${MON}T07:01`);
   const late = await validateCartAvailability(cart);
   assert.equal(late.valid, false);
   assert.equal(late.items[0].isDeadlinePassed, true);
@@ -111,8 +111,8 @@ test('OK: /api/menu marks isPastDate/isDeadlinePassed by IST at 23:00 IST Sunday
 
 test('OK: serviceProblem accepts Cashfree payment_time with +05:30 offset just before cutoff', () => {
   const menu = { date: MON, isActive: true, isHoliday: false, orderingDeadline: '08:30' };
-  assert.equal(serviceProblem(menu, new Date(`${MON}T08:29:59+05:30`)), null);
-  assert.equal(serviceProblem(menu, new Date(`${MON}T08:30:30+05:30`))?.reason, 'PAID_AFTER_CUTOFF');
+  assert.equal(serviceProblem(menu, new Date(`${MON}T06:59:59+05:30`)), null);
+  assert.equal(serviceProblem(menu, new Date(`${MON}T07:00:30+05:30`))?.reason, 'PAID_AFTER_CUTOFF');
 });
 
 test('BUG (conditional, LOW): an offset-less paidAt string is read as UTC on Vercel, so 08:00 IST looks like 13:30 IST and is auto-refunded', () => {

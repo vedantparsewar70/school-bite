@@ -24,7 +24,7 @@ const at = (t: string) => {
 
 beforeEach(async () => {
   fs = useFakeFirestore();
-  at(`${TUE}T08:00`);
+  at(`${TUE}T06:30`);
   cf = installCashfreeStub();
   admin = await signedInAs(fs, 'ADMIN');
   fs.seed('users', 'usr_p1', { id: 'usr_p1', email: 'p1@example.com', name: 'Parent One', role: 'PARENT', phone: '9876543210' });
@@ -43,14 +43,14 @@ afterEach(() => {
   cf.restore();
 });
 
-/** Checkout before 08:30, payment completes at 08:40: a PAID_AFTER_CUTOFF exception for Tuesday. */
+/** Checkout before 07:00, payment completes at 07:10: a PAID_AFTER_CUTOFF exception for Tuesday. */
 async function latePayment(): Promise<string> {
   const res = await checkout(jsonRequest('/api/parent/orders', 'POST', {
     cartItems: [{ studentId: 'stu_1', studentName: 'Riya', mealId: 'meal_dal', date: TUE, quantity: 1, mealPrice: 80, studentCategory: 'Primary' }],
     paymentMethod: 'UPI', idempotencyKey: 'K1',
   }, parent));
   const { orderId } = await res.json();
-  at(`${TUE}T08:40`);
+  at(`${TUE}T07:10`);
   cf.paid[orderId] = 75;
   await verify(jsonRequest('/api/parent/orders/verify', 'POST', { orderId }, parent));
   assert.equal(fs.getDoc('payment_exceptions', orderId)?.reason, 'PAID_AFTER_CUTOFF');

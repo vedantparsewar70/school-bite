@@ -26,6 +26,7 @@ import { getDefaultPortions } from './brunch-prices-server';
  */
 
 import { STUDENT_CATEGORIES, type StudentCategory } from './student-category';
+import { cutoffFor } from './ordering-cutoff';
 export { STUDENT_CATEGORIES, type StudentCategory };
 
 export type MenuCell =
@@ -387,7 +388,7 @@ export async function applyMonthlyMenu(
         ...desired,
         availableQuantity: desired.isHoliday ? 0 : defaultPortions[cat],
         maxQuantity: defaultPortions[cat],
-        orderingDeadline: '08:30',
+        orderingDeadline: cutoffFor(null),
         isActive: !desired.isHoliday,
         source: 'monthly-import',
         createdAt: now,

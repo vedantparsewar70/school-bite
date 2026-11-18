@@ -2,6 +2,8 @@ import type { Firestore } from 'firebase-admin/firestore';
 import { db } from './firebase-admin';
 import { effectiveMenuEntry, type MenuEntryLike } from './menu-entries';
 import { APP_TIMEZONE, getOffsetDateString, getTodayString, isDeadlinePassed, isSundayDate, nextNonSundayDateString } from './utils';
+import { cutoffFor, DEFAULT_ORDERING_CUTOFF } from './ordering-cutoff';
+import { loadOrderingCutoff } from './ordering-cutoff-server';
 
 /**
  * Which categories have brunch on a date, and until when parents can still order. Used by the
@@ -9,7 +11,8 @@ import { APP_TIMEZONE, getOffsetDateString, getTodayString, isDeadlinePassed, is
  */
 
 export const SERVING_CATEGORIES = ['Pre-primary', 'Primary', 'Secondary'] as const;
-export const DEFAULT_ORDERING_DEADLINE = '08:30';
+/** Kept for older callers: the code default of the "Ordering closes at" setting. */
+export const DEFAULT_ORDERING_DEADLINE = DEFAULT_ORDERING_CUTOFF;
 
 export interface MenuDayEntry extends MenuEntryLike {
   holidayReason?: string | null;
@@ -30,7 +33,7 @@ export interface DayPlan {
   categories: CategoryDay[];
   /** True when at least one category has a dish on sale (and it is not a Sunday). */
   isServingDay: boolean;
-  /** Orders close at the latest category deadline of the day (08:30 when nothing says otherwise). */
+  /** Orders close at the "Ordering closes at" setting (07:00 unless the admin changed it). */
   deadline: string;
 }
 
@@ -44,7 +47,7 @@ export function dayPlan(entries: MenuDayEntry[], date: string): DayPlan {
       return { category, state: 'HOLIDAY', holidayReason: entry.holidayReason ? String(entry.holidayReason) : null, deadline: null };
     }
     if (entry && entry.mealId && !isSunday) {
-      return { category, state: 'OPEN', holidayReason: null, deadline: validTime(entry.orderingDeadline) || DEFAULT_ORDERING_DEADLINE };
+      return { category, state: 'OPEN', holidayReason: null, deadline: cutoffFor(validTime(entry.orderingDeadline)) };
     }
     return { category, state: 'NONE', holidayReason: null, deadline: null };
   });
@@ -54,7 +57,7 @@ export function dayPlan(entries: MenuDayEntry[], date: string): DayPlan {
     isSunday,
     categories,
     isServingDay: !isSunday && categories.some((c) => c.state === 'OPEN'),
-    deadline: deadlines.sort().pop() || DEFAULT_ORDERING_DEADLINE,
+    deadline: deadlines.sort().pop() || cutoffFor(null),
   };
 }
 
@@ -68,6 +71,7 @@ export function cutoffState(date: string, deadline: string, now: Date = new Date
 }
 
 export async function menuEntriesOn(date: string, firestore: Firestore = db): Promise<MenuDayEntry[]> {
+  await loadOrderingCutoff(firestore);
   const snap = await firestore.collection('menus').where('date', '==', date).get();
   return snap.docs.map((d) => ({ ...(d.data() as MenuDayEntry), id: d.id }));
 }

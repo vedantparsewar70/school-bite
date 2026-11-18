@@ -19,6 +19,7 @@ import { extrasOn, isExtraLine, paidExtrasRefusal, switchOffExtras } from './men
 import { brunchPriceFor, dishPrice } from './brunch-prices';
 import { getBrunchPrices } from './brunch-prices-server';
 import { APP_TIMEZONE, getTodayString, isSundayDate, SUNDAY_CLOSED_MESSAGE } from './utils';
+import { loadOrderingCutoff } from './ordering-cutoff-server';
 
 /**
  * The Student Menu editor's day actions (holiday, undo holiday, portions) and its read model. Every
@@ -299,6 +300,7 @@ export async function menuDays(from: string, days: number, firestore: Firestore 
   const dates = Array.from({ length: days }, (_, i) => new Date(start + i * 86400000).toISOString().slice(0, 10));
 
   const brunchPrices = await getBrunchPrices(firestore);
+  await loadOrderingCutoff(firestore);
   const [menuSnap, itemSnap, extras] = await Promise.all([
     firestore.collection('menus').where('date', 'in', dates).get(),
     firestore.collection('orderItems').where('date', 'in', dates).get(),

@@ -18,7 +18,9 @@ Live site: https://school-bite.vercel.app (hosted on Vercel).
 - New main menu entries start with the class's default portions (500 each until changed on the same
   card). "Apply portions to upcoming days" sets portions for chosen classes on every upcoming day
   (never below what is already ordered; closed days are skipped and listed).
-- Order up to 08:30 IST on the meal day. No ordering on Sundays or on holidays set for the class.
+- Order up to 07:00 IST on the meal day ("Ordering closes at" on the Student Menu settings card;
+  one time for every class, brunch and extras; the admin changes it). No ordering on Sundays or on
+  holidays set for the class. Teachers have no cutoff.
 - Pay online through Cashfree (UPI, cards, net banking). See orders, payments and receipts.
 - Orders cannot be cancelled online; the canteen (admin) cancels and refunds in full.
 

@@ -6,6 +6,7 @@ import { formatDatePretty, getTodayString } from '@/lib/utils';
 import { useSyncWatcher } from '@/lib/client-sync';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { dishSplit, dishSplitLabel } from '@/lib/prepare-split';
+import { DEFAULT_ORDERING_CUTOFF } from '@/lib/ordering-cutoff';
 
 type CategoryDay = { category: string; state: 'OPEN' | 'HOLIDAY' | 'NONE'; holidayReason: string | null };
 
@@ -96,7 +97,7 @@ export default function StaffPreparePage() {
   const byCategory = new Map((data?.byCategory || []).map((c) => [c.category, c]));
   const holidays = (data?.plan?.categories || []).filter((c) => c.state === 'HOLIDAY');
   const allClosed = Boolean(data?.plan && (data.plan.isSunday || holidays.length === CATEGORIES.length));
-  const deadline = data?.deadline || '08:30';
+  const deadline = data?.deadline || DEFAULT_ORDERING_CUTOFF;
   const loadedForDate = data?.date === date;
 
   return (

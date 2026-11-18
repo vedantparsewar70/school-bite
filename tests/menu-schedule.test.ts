@@ -73,15 +73,15 @@ test('public, staff and dashboard reads never deactivate menus', async () => {
 });
 
 test('service-date rules: deadline, past dates, holidays and month/year ends', async () => {
-  at('2026-11-02T07:00');
-  assert.equal(await bookable('2026-11-02'), true, 'before the 08:30 deadline');
+  at('2026-11-02T06:30');
+  assert.equal(await bookable('2026-11-02'), true, 'before the 07:00 cutoff');
   mock.timers.reset();
 
-  at('2026-11-02T08:31');
+  at('2026-11-02T07:01');
   assert.equal(await bookable('2026-11-02'), false, 'after the deadline');
   mock.timers.reset();
 
-  at('2026-11-03T07:00');
+  at('2026-11-03T06:30');
   assert.equal(await bookable('2026-11-02'), false, 'past date');
   mock.timers.reset();
 
