@@ -18,7 +18,7 @@ import { useChildren } from '@/components/ChildrenContext';
 import VegBadge from '@/components/VegBadge';
 import ChildAvatar from '@/components/ChildAvatar';
 import { StudentData, StudentCategory } from '@/types';
-import { classDivisionLabel, divisionOf, DIVISIONS, isDivision, type Division } from '@/lib/division';
+import { classDivisionLabel, divisionOf, DIVISION_LIST_TEXT, DIVISIONS, isDivision, type Division } from '@/lib/division';
 
 export default function ChildrenPage() {
   const { user, refreshUser } = useAuth();
@@ -37,7 +37,7 @@ export default function ChildrenPage() {
   const [editingChild, setEditingChild] = useState<StudentData | null>(null);
   const [viewingChild, setViewingChild] = useState<StudentData | null>(null);
 
-  // Form states: name, optional dob, category and division (A-E)
+  // Form states: name, optional dob, category and division (A to H)
   const [formName, setFormName] = useState('');
   const [formDob, setFormDob] = useState('');
   const [formCategory, setFormCategory] = useState<StudentCategory | ''>('');
@@ -99,7 +99,7 @@ export default function ChildrenPage() {
       return;
     }
     if (!isDivision(formDivision)) {
-      showToast('Please select the Division (A, B, C, D or E)', 'error');
+      showToast(`Please select the Division (${DIVISION_LIST_TEXT})`, 'error');
       return;
     }
     setSubmitting(true);

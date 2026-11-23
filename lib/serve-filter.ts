@@ -15,7 +15,7 @@ export interface ServeFilter {
   status: ServeStatusFilter;
   /** 'ALL' or a category name: Pre-primary, Primary, Secondary. */
   category: string;
-  /** 'ALL' or a division A-E. */
+  /** 'ALL' or a division (A to H). */
   division?: string;
   /** Matches the child's name (any part) or roll number. */
   search: string;

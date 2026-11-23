@@ -158,7 +158,7 @@ export async function GET(req: Request) {
       r.meals.sort((a, b) => Number(a.isExtra) - Number(b.isExtra));
       return { ...r, served: allServed, servedAt: allServed ? r.servedAt : null, servedBy: allServed ? r.servedBy : null };
     });
-    // By class (Pre-primary, Primary, Secondary), then division (A-E), then name.
+    // By class (Pre-primary, Primary, Secondary), then division (A to H), then name.
     list.sort(compareByClassDivisionName);
 
     return NextResponse.json({

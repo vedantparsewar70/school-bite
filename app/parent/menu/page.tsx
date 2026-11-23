@@ -44,7 +44,7 @@ import {
   StudentCategory,
 } from '@/lib/student-category';
 import LoadError, { loadFailedMessage } from '@/components/LoadError';
-import { classDivisionLabel, divisionOf } from '@/lib/division';
+import { classDivisionLabel, DIVISION_RANGE_TEXT, divisionOf } from '@/lib/division';
 import { cutoffLabel, DEFAULT_ORDERING_CUTOFF, validCutoff } from '@/lib/ordering-cutoff';
 
 const SCHEDULE_DAYS_AHEAD = 45;
@@ -244,13 +244,13 @@ function MenuPageContent() {
   };
 
   /**
-   * An older child with no division (A-E) is asked to add it before ordering: the edit form opens.
+   * An older child with no division (A to H) is asked to add it before ordering: the edit form opens.
    * Returns true when ordering may go on.
    */
   const hasDivisionOrAsk = (): boolean => {
     if (!selectedChild || divisionOf(selectedChild.division)) return true;
     const first = selectedChild.name.split(' ')[0];
-    showToast(`Please add ${first}'s division (A to E) before ordering.`, 'info');
+    showToast(`Please add ${first}'s division (${DIVISION_RANGE_TEXT}) before ordering.`, 'info');
     router.push(`/parent/children?edit=${encodeURIComponent(selectedChild.id)}`);
     return false;
   };

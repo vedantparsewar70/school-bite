@@ -18,7 +18,7 @@ import { GET as kitchen } from '../app/api/admin/kitchen/route';
 import { GET as reports } from '../app/api/admin/reports/route';
 import { GET as serveList } from '../app/api/staff/serve/route';
 
-/** Division (A-E) on children, shown wherever a child is identified; the internal student ID is never shown. */
+/** Division (A to H) on children, shown wherever a child is identified; the internal student ID is never shown. */
 
 const DAY = '2026-11-18';
 let fs: FakeFirestore;
@@ -49,11 +49,11 @@ const form = { name: 'Aarav Shah', dob: null, category: 'Primary', studentCatego
 
 // --- 1. Division on the child form (server) ------------------------------------------------------
 
-test('division is required on create and must be exactly A, B, C, D or E', async () => {
-  for (const division of [undefined, '', 'a', 'F', 'AB', ' A', 'Z', 1, null]) {
+test('division is required on create and must be exactly A, B, C, D, E, F, G or H', async () => {
+  for (const division of [undefined, '', 'a', 'I', 'AB', ' A', 'Z', 1, null]) {
     const res = await post({ ...form, division });
     assert.equal(res.status, 400, JSON.stringify(division));
-    assert.match((await res.json()).error, /division \(A, B, C, D or E\)/);
+    assert.match((await res.json()).error, /division \(A, B, C, D, E, F, G or H\)/);
   }
   assert.equal(fs.list('students').length, 0, 'nothing saved');
   for (const division of DIVISIONS) {
@@ -66,11 +66,11 @@ test('division is required on create and must be exactly A, B, C, D or E', async
   }
 });
 
-test('on edit a division must be A-E; an older child without one must add it; a child with one keeps it', async () => {
+test('on edit a division must be A to H; an older child without one must add it; a child with one keeps it', async () => {
   child('stu_old', 'Old Child', 'Primary', '-');
   child('stu_ok', 'Has Division', 'Secondary', 'C');
 
-  for (const division of ['', 'F', 'b']) assert.equal((await put({ id: 'stu_ok', name: 'Has Division', division })).status, 400, division);
+  for (const division of ['', 'I', 'b']) assert.equal((await put({ id: 'stu_ok', name: 'Has Division', division })).status, 400, division);
   const missing = await put({ id: 'stu_old', name: 'Old Child Renamed', category: 'Primary', studentCategory: 'Primary', grade: 'Primary' });
   assert.equal(missing.status, 400);
   assert.equal((await missing.json()).code, 'DIVISION_REQUIRED');
