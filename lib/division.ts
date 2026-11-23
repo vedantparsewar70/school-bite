@@ -1,5 +1,6 @@
 /**
- * A child's division (section) within their class: exactly A, B, C, D or E.
+ * A child's division (section) within their class: exactly one of DIVISIONS (A to H).
+ * This is the only place the allowed divisions are listed; every check, dropdown, filter and message uses it.
  * Older children may have none ("-" or empty); they are asked to add it before ordering.
  *
  * The internal student ID (e.g. "STU-2026-633", field `studentId` on a student document) is kept in
@@ -8,13 +9,18 @@
  * Safe for client components: no server imports.
  */
 
-export const DIVISIONS = ['A', 'B', 'C', 'D', 'E'] as const;
+export const DIVISIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
 export type Division = (typeof DIVISIONS)[number];
 
-/** True only for exactly "A".."E" (as sent by the form; no trimming or case folding). */
+/** "A, B, C, D, E, F, G or H" (for messages). */
+export const DIVISION_LIST_TEXT = `${DIVISIONS.slice(0, -1).join(', ')} or ${DIVISIONS[DIVISIONS.length - 1]}`;
+/** "A to H" (for short messages). */
+export const DIVISION_RANGE_TEXT = `${DIVISIONS[0]} to ${DIVISIONS[DIVISIONS.length - 1]}`;
+
+/** True only for exactly one of DIVISIONS (as sent by the form; no trimming or case folding). */
 export const isDivision = (v: unknown): v is Division => typeof v === 'string' && (DIVISIONS as readonly string[]).includes(v);
 
-/** A stored division for display/sorting: "A".."E" (case and spaces forgiven), else null. */
+/** A stored division for display/sorting: one of DIVISIONS (case and spaces forgiven), else null. */
 export function divisionOf(v: unknown): Division | null {
   const s = typeof v === 'string' ? v.trim().toUpperCase() : '';
   return isDivision(s) ? s : null;
@@ -35,7 +41,7 @@ export function realRollNo(v: unknown): string {
 
 const CLASS_ORDER: Record<string, number> = { 'pre-primary': 0, primary: 1, secondary: 2 };
 
-/** Sort children by class (Pre-primary, Primary, Secondary), then division (A..E, none last), then name. */
+/** Sort children by class (Pre-primary, Primary, Secondary), then division (in DIVISIONS order, none last), then name. */
 export function compareByClassDivisionName(
   a: { studentCategory?: string | null; division?: string | null; studentName?: string | null },
   b: { studentCategory?: string | null; division?: string | null; studentName?: string | null }

@@ -27,7 +27,7 @@ export const classLabel = (r: { studentCategory?: string | null; grade?: string 
 export const dishLabel = (list: Array<{ mealName: string; quantity: number; isExtra?: boolean }>) =>
   list.map((m) => `${m.mealName}${m.quantity > 1 ? ` x ${m.quantity}` : ''}${m.isExtra ? ' (extra)' : ''}`).join('; ');
 
-/** Children not served, by class (Pre-primary, Primary, Secondary), then division (A-E), then name. */
+/** Children not served, by class (Pre-primary, Primary, Secondary), then division (A to H), then name. */
 export function notServedChildren<T extends NotServedChild>(rows: T[]): T[] {
   return rows.filter((r) => !r.served).sort(compareByClassDivisionName);
 }

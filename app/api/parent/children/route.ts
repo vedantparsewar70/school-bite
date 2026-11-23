@@ -6,9 +6,9 @@ import { BUSINESS_CONFIG } from '@/lib/business-config';
 import { getTodayString } from '@/lib/utils';
 import { itemServedAt, serviceStatusFor } from '@/lib/service-dates';
 import { MAX_NAME_LENGTH, MAX_NOTES_LENGTH, tooLong } from '@/lib/input-limits';
-import { divisionOf, isDivision, withoutInternalId } from '@/lib/division';
+import { DIVISION_LIST_TEXT, divisionOf, isDivision, withoutInternalId } from '@/lib/division';
 
-const DIVISION_REQUIRED = 'Please choose the division (A, B, C, D or E).';
+const DIVISION_REQUIRED = `Please choose the division (${DIVISION_LIST_TEXT}).`;
 
 /** True when the child has a paid, not-cancelled meal today or later that has not been handed over. */
 async function hasUpcomingPaidMeals(studentId: string): Promise<boolean> {
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
         name: s.name,
         dob: s.dob,
         grade: s.grade,
-        // Division A-E, or null for an older child who has none yet (asked to add it before ordering).
+        // Division (A to H), or null for an older child who has none yet (asked to add it before ordering).
         division: divisionOf(s.division),
         studentCategory: category,
         allergies: allergiesList.join(', ') || s.allergies || null,
